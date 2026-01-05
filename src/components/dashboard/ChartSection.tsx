@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recharts';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ChannelWithMetrics } from '@/hooks/use-budget-calculator';
+import { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
 import { CATEGORY_INFO, formatCurrency, formatPercentage } from '@/lib/mediaplan-data';
 
 interface ChartSectionProps {
