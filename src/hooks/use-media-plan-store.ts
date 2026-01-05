@@ -1,399 +1,569 @@
-import { useState, useCallback, useMemo } from 'react';
-import { Channel, ChannelCategory, calculateChannelMetrics, calculateBlendedMetrics, CalculatedMetrics } from '@/lib/mediaplan-data';
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
 
-// Default channels from the original data
-const DEFAULT_CHANNELS: Channel[] = [
-  // SEO & Content
-  { id: 'seo-tech', name: 'SEO - Tech Audit & On-Page', category: 'seo', baseSpend: 500, basePercentage: 0, cpm: 2.5, ctr: 0.8, estimatedRoas: 3.2 },
-  { id: 'seo-content', name: 'SEO - Content Production', category: 'seo', baseSpend: 1500, basePercentage: 0, cpm: 1.8, ctr: 1.2, estimatedRoas: 4.5 },
-  { id: 'seo-backlinks', name: 'SEO - Backlinks / Guest Posts', category: 'seo', baseSpend: 1000, basePercentage: 0, cpm: 3.5, ctr: 0.5, estimatedRoas: 2.8 },
-  // Paid Media
-  { id: 'paid-native', name: 'Paid - Native Ads (Adult/Crypto)', category: 'paid', baseSpend: 2500, basePercentage: 0, cpm: 4.2, ctr: 0.35, estimatedRoas: 1.8 },
-  { id: 'paid-push', name: 'Paid - Push Notifications', category: 'paid', baseSpend: 1500, basePercentage: 0, cpm: 1.2, ctr: 2.5, estimatedRoas: 2.2 },
-  { id: 'paid-programmatic', name: 'Paid - Programmatic / Display', category: 'paid', baseSpend: 1000, basePercentage: 0, cpm: 5.5, ctr: 0.15, estimatedRoas: 1.5 },
-  { id: 'paid-retargeting', name: 'Paid - Retargeting (Pixel)', category: 'paid', baseSpend: 500, basePercentage: 0, cpm: 8.0, ctr: 1.8, estimatedRoas: 4.2 },
-  // Affiliates
-  { id: 'affiliate-listing', name: 'Affiliate - Listing Fees (Fixed)', category: 'affiliate', baseSpend: 1000, basePercentage: 0, cpm: 15.0, ctr: 3.5, estimatedRoas: 2.0 },
-  { id: 'affiliate-cpa', name: 'Affiliate - CPA Commissions', category: 'affiliate', baseSpend: 8500, basePercentage: 0, cpm: 25.0, ctr: 4.2, estimatedRoas: 3.5 },
-  // Influencers
-  { id: 'influencer-retainers', name: 'Influencer - Monthly Retainers', category: 'influencer', baseSpend: 2000, basePercentage: 0, cpm: 12.0, ctr: 1.5, estimatedRoas: 2.5 },
-  { id: 'influencer-funds', name: 'Influencer - Play Funds (Bal)', category: 'influencer', baseSpend: 1500, basePercentage: 0, cpm: 10.0, ctr: 2.0, estimatedRoas: 3.0 },
-];
+// ========== DATA MODEL ==========
 
-// Calculate base percentages
-function initializeChannels(channels: Channel[]): Channel[] {
-  const totalBaseSpend = channels.reduce((sum, ch) => sum + ch.baseSpend, 0);
-  return channels.map((ch) => ({
-    ...ch,
-    basePercentage: (ch.baseSpend / totalBaseSpend) * 100,
-  }));
+export type ImpressionMode = 'CPM' | 'FIXED';
+
+export interface ChannelData {
+  id: string;
+  name: string;
+  category: ChannelCategory;
+  allocationPct: number;
+  
+  // Base KPI inputs (from CSV/defaults)
+  baseCpm: number;
+  baseCtr: number;
+  baseCr: number; // Conversion rate (%)
+  baseCpa: number | null;
+  baseRoas: number;
+  
+  // Editable overrides (null = use base)
+  overrideCpm: number | null;
+  overrideCtr: number | null;
+  overrideCr: number | null;
+  overrideCpa: number | null;
+  overrideRoas: number | null;
+  
+  // Impression mode
+  impressionMode: ImpressionMode;
+  fixedImpressions: number;
+  
+  // Locked allocation (for normalization)
+  locked: boolean;
 }
 
 export interface GlobalMultipliers {
-  spendMultiplier: number; // 0.8 - 2.0
-  cpmOverride: number | null; // null means use individual CPMs
-  ctrBump: number; // -2 to +2 (added to each channel's CTR)
-  cpaTarget: number | null; // null means no target
-  roasTarget: number | null; // null means no target
+  spendMultiplier: number;
+  defaultCpmOverride: number | null;
+  ctrBump: number;
+  cpaTarget: number | null;
+  roasTarget: number | null;
 }
 
-export interface ChannelWithMetrics extends Channel {
+export interface CalculatedChannelMetrics {
+  spend: number;
+  effectiveCpm: number;
+  effectiveCtr: number;
+  effectiveCr: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  cpa: number | null;
+  revenue: number;
+  roas: number;
+}
+
+export interface ChannelWithMetrics extends ChannelData {
+  metrics: CalculatedChannelMetrics;
+  aboveCpaTarget: boolean;
+  belowRoasTarget: boolean;
+  // Legacy compat
   currentPercentage: number;
   effectiveCpm: number;
   effectiveCtr: number;
-  metrics: CalculatedMetrics;
   warnings: string[];
 }
 
-export interface UseMediaPlanStoreReturn {
-  // Budget
-  totalBudget: number;
-  setTotalBudget: (value: number) => void;
-  
-  // Channels
-  channels: Channel[];
-  addChannel: (channel: Omit<Channel, 'id' | 'basePercentage'>) => void;
-  updateChannel: (id: string, updates: Partial<Omit<Channel, 'id'>>) => void;
-  deleteChannel: (id: string) => void;
-  
-  // Allocations
-  channelAllocations: Record<string, number>;
-  setChannelAllocation: (channelId: string, percentage: number) => void;
-  normalizeAllocations: () => void;
-  
-  // Global Multipliers
-  globalMultipliers: GlobalMultipliers;
-  setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
-  resetGlobalMultipliers: () => void;
-  
-  // Computed
-  channelsWithMetrics: ChannelWithMetrics[];
-  blendedMetrics: ReturnType<typeof calculateBlendedMetrics>;
-  categoryTotals: Record<string, { spend: number; percentage: number }>;
-  
-  // Reset
-  resetAll: () => void;
-  
-  // Presets
-  savePreset: (name: string) => void;
-  loadPreset: (name: string) => void;
-  deletePreset: (name: string) => void;
-  presets: string[];
+export interface BlendedMetrics {
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  totalConversions: number;
+  blendedCpa: number | null;
+  projectedRevenue: number;
+  blendedRoas: number;
 }
+
+export interface Preset {
+  name: string;
+  totalBudget: number;
+  channels: ChannelData[];
+  globalMultipliers: GlobalMultipliers;
+}
+
+// ========== DEFAULT DATA ==========
+
+const BASE_CHANNELS_DATA = [
+  // SEO & Content
+  { id: 'seo-tech', name: 'SEO - Tech Audit & On-Page', category: 'seo' as ChannelCategory, baseSpend: 500, cpm: 2.5, ctr: 0.8, roas: 3.2 },
+  { id: 'seo-content', name: 'SEO - Content Production', category: 'seo' as ChannelCategory, baseSpend: 1500, cpm: 1.8, ctr: 1.2, roas: 4.5 },
+  { id: 'seo-backlinks', name: 'SEO - Backlinks / Guest Posts', category: 'seo' as ChannelCategory, baseSpend: 1000, cpm: 3.5, ctr: 0.5, roas: 2.8 },
+  // Paid Media
+  { id: 'paid-native', name: 'Paid - Native Ads (Adult/Crypto)', category: 'paid' as ChannelCategory, baseSpend: 2500, cpm: 4.2, ctr: 0.35, roas: 1.8 },
+  { id: 'paid-push', name: 'Paid - Push Notifications', category: 'paid' as ChannelCategory, baseSpend: 1500, cpm: 1.2, ctr: 2.5, roas: 2.2 },
+  { id: 'paid-programmatic', name: 'Paid - Programmatic / Display', category: 'paid' as ChannelCategory, baseSpend: 1000, cpm: 5.5, ctr: 0.15, roas: 1.5 },
+  { id: 'paid-retargeting', name: 'Paid - Retargeting (Pixel)', category: 'paid' as ChannelCategory, baseSpend: 500, cpm: 8.0, ctr: 1.8, roas: 4.2 },
+  // Affiliates
+  { id: 'affiliate-listing', name: 'Affiliate - Listing Fees (Fixed)', category: 'affiliate' as ChannelCategory, baseSpend: 1000, cpm: 15.0, ctr: 3.5, roas: 2.0 },
+  { id: 'affiliate-cpa', name: 'Affiliate - CPA Commissions', category: 'affiliate' as ChannelCategory, baseSpend: 8500, cpm: 25.0, ctr: 4.2, roas: 3.5 },
+  // Influencers
+  { id: 'influencer-retainers', name: 'Influencer - Monthly Retainers', category: 'influencer' as ChannelCategory, baseSpend: 2000, cpm: 12.0, ctr: 1.5, roas: 2.5 },
+  { id: 'influencer-funds', name: 'Influencer - Play Funds (Bal)', category: 'influencer' as ChannelCategory, baseSpend: 1500, cpm: 10.0, ctr: 2.0, roas: 3.0 },
+];
 
 const DEFAULT_MULTIPLIERS: GlobalMultipliers = {
   spendMultiplier: 1.0,
-  cpmOverride: null,
+  defaultCpmOverride: null,
   ctrBump: 0,
   cpaTarget: null,
   roasTarget: null,
 };
 
-const DEFAULT_BUDGET = 50000;
-const MIN_BUDGET = 10000;
-const MAX_BUDGET = 1000000;
-
-const PRESETS_KEY = 'mediaplan-presets';
-
-interface SavedPreset {
-  name: string;
-  totalBudget: number;
-  channels: Channel[];
-  channelAllocations: Record<string, number>;
-  globalMultipliers: GlobalMultipliers;
+function createInitialChannels(): ChannelData[] {
+  const totalBaseSpend = BASE_CHANNELS_DATA.reduce((sum, ch) => sum + ch.baseSpend, 0);
+  
+  return BASE_CHANNELS_DATA.map((ch) => ({
+    id: ch.id,
+    name: ch.name,
+    category: ch.category,
+    allocationPct: (ch.baseSpend / totalBaseSpend) * 100,
+    
+    baseCpm: ch.cpm,
+    baseCtr: ch.ctr,
+    baseCr: 2.5, // Default conversion rate
+    baseCpa: null,
+    baseRoas: ch.roas,
+    
+    overrideCpm: null,
+    overrideCtr: null,
+    overrideCr: null,
+    overrideCpa: null,
+    overrideRoas: null,
+    
+    impressionMode: (ch.category === 'influencer' || ch.id === 'affiliate-listing') ? 'FIXED' : 'CPM',
+    fixedImpressions: ch.category === 'influencer' ? 200000 : 100000,
+    
+    locked: false,
+  }));
 }
 
-function loadPresets(): SavedPreset[] {
-  try {
-    const data = localStorage.getItem(PRESETS_KEY);
-    return data ? JSON.parse(data) : [];
-  } catch {
-    return [];
+// ========== CALCULATION FUNCTIONS ==========
+
+function calculateChannelMetrics(
+  channel: ChannelData,
+  totalBudget: number,
+  multipliers: GlobalMultipliers
+): CalculatedChannelMetrics {
+  // Spend = allocation × budget × spend multiplier
+  const spend = (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
+  
+  // Effective values with overrides
+  let effectiveCpm = channel.overrideCpm 
+    ?? (multipliers.defaultCpmOverride && channel.overrideCpm === null ? multipliers.defaultCpmOverride : null)
+    ?? channel.baseCpm;
+  
+  // CTR with bump, clamped to minimum 0.01%
+  const effectiveCtr = Math.max(
+    0.01,
+    (channel.overrideCtr ?? channel.baseCtr) + multipliers.ctrBump
+  );
+  
+  const effectiveCr = channel.overrideCr ?? channel.baseCr;
+  
+  // Impressions based on mode
+  let impressions: number;
+  if (channel.impressionMode === 'FIXED') {
+    impressions = channel.fixedImpressions;
+    // Derive CPM from fixed impressions
+    effectiveCpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
+  } else {
+    impressions = effectiveCpm > 0 ? (spend / effectiveCpm) * 1000 : 0;
   }
-}
-
-function savePresets(presets: SavedPreset[]): void {
-  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
-}
-
-export function useMediaPlanStore(): UseMediaPlanStoreReturn {
-  const [totalBudget, setTotalBudgetState] = useState(DEFAULT_BUDGET);
-  const [channels, setChannels] = useState<Channel[]>(() => initializeChannels([...DEFAULT_CHANNELS]));
-  const [channelAllocations, setChannelAllocations] = useState<Record<string, number>>(() => {
-    const allocations: Record<string, number> = {};
-    const initialized = initializeChannels([...DEFAULT_CHANNELS]);
-    initialized.forEach((ch) => {
-      allocations[ch.id] = ch.basePercentage;
-    });
-    return allocations;
-  });
-  const [globalMultipliers, setGlobalMultipliersState] = useState<GlobalMultipliers>(DEFAULT_MULTIPLIERS);
-  const [presetsState, setPresetsState] = useState<string[]>(() => loadPresets().map(p => p.name));
-
-  // Set budget with validation
-  const setTotalBudget = useCallback((value: number) => {
-    setTotalBudgetState(Math.max(MIN_BUDGET, Math.min(MAX_BUDGET, value)));
-  }, []);
-
-  // Add channel
-  const addChannel = useCallback((channel: Omit<Channel, 'id' | 'basePercentage'>) => {
-    const id = `channel-${Date.now()}`;
-    const newChannel: Channel = {
-      ...channel,
-      id,
-      basePercentage: 0,
-    };
-    
-    setChannels((prev) => {
-      const updated = [...prev, newChannel];
-      // Recalculate base percentages
-      const total = updated.reduce((sum, ch) => sum + ch.baseSpend, 0);
-      return updated.map((ch) => ({
-        ...ch,
-        basePercentage: (ch.baseSpend / total) * 100,
-      }));
-    });
-    
-    // Add allocation for new channel (default to 5%)
-    setChannelAllocations((prev) => {
-      const currentTotal = Object.values(prev).reduce((sum, v) => sum + v, 0);
-      const newAllocation = 5;
-      const scaleFactor = (currentTotal - newAllocation) / currentTotal;
-      
-      const normalized: Record<string, number> = {};
-      Object.entries(prev).forEach(([key, value]) => {
-        normalized[key] = value * scaleFactor;
-      });
-      normalized[id] = newAllocation;
-      
-      return normalized;
-    });
-  }, []);
-
-  // Update channel
-  const updateChannel = useCallback((id: string, updates: Partial<Omit<Channel, 'id'>>) => {
-    setChannels((prev) => 
-      prev.map((ch) => (ch.id === id ? { ...ch, ...updates } : ch))
-    );
-  }, []);
-
-  // Delete channel
-  const deleteChannel = useCallback((id: string) => {
-    setChannels((prev) => {
-      const filtered = prev.filter((ch) => ch.id !== id);
-      // Recalculate base percentages
-      const total = filtered.reduce((sum, ch) => sum + ch.baseSpend, 0);
-      return filtered.map((ch) => ({
-        ...ch,
-        basePercentage: total > 0 ? (ch.baseSpend / total) * 100 : 0,
-      }));
-    });
-    
-    // Remove allocation and normalize
-    setChannelAllocations((prev) => {
-      const { [id]: removed, ...rest } = prev;
-      const total = Object.values(rest).reduce((sum, v) => sum + v, 0);
-      if (total === 0) return rest;
-      
-      const normalized: Record<string, number> = {};
-      Object.entries(rest).forEach(([key, value]) => {
-        normalized[key] = (value / total) * 100;
-      });
-      return normalized;
-    });
-  }, []);
-
-  // Set channel allocation
-  const setChannelAllocation = useCallback((channelId: string, percentage: number) => {
-    setChannelAllocations((prev) => ({
-      ...prev,
-      [channelId]: Math.max(0, Math.min(100, percentage)),
-    }));
-  }, []);
-
-  // Normalize allocations to 100%
-  const normalizeAllocations = useCallback(() => {
-    const total = Object.values(channelAllocations).reduce((sum, v) => sum + v, 0);
-    if (total === 0) return;
-    
-    const normalized: Record<string, number> = {};
-    Object.entries(channelAllocations).forEach(([key, value]) => {
-      normalized[key] = (value / total) * 100;
-    });
-    setChannelAllocations(normalized);
-  }, [channelAllocations]);
-
-  // Set global multipliers
-  const setGlobalMultipliers = useCallback((updates: Partial<GlobalMultipliers>) => {
-    setGlobalMultipliersState((prev) => ({ ...prev, ...updates }));
-  }, []);
-
-  // Reset global multipliers
-  const resetGlobalMultipliers = useCallback(() => {
-    setGlobalMultipliersState(DEFAULT_MULTIPLIERS);
-  }, []);
-
-  // Calculate metrics for each channel with multipliers applied
-  const channelsWithMetrics = useMemo((): ChannelWithMetrics[] => {
-    return channels.map((channel) => {
-      const currentPercentage = channelAllocations[channel.id] ?? channel.basePercentage;
-      const baseSpend = (currentPercentage / 100) * totalBudget;
-      const spend = baseSpend * globalMultipliers.spendMultiplier;
-      
-      const effectiveCpm = globalMultipliers.cpmOverride ?? channel.cpm ?? 5;
-      const effectiveCtr = Math.max(0, (channel.ctr ?? 1) + globalMultipliers.ctrBump);
-      
-      // Calculate metrics with effective values
-      const impressions = (spend / effectiveCpm) * 1000;
-      const clicks = impressions * (effectiveCtr / 100);
-      const conversionRate = 0.025;
-      const conversions = clicks * conversionRate;
-      const cpa = conversions > 0 ? spend / conversions : null;
-      const revenue = spend * (channel.estimatedRoas ?? 2);
-      const roas = channel.estimatedRoas ?? 2;
-
-      // Warnings
-      const warnings: string[] = [];
-      if (globalMultipliers.cpaTarget && cpa && cpa > globalMultipliers.cpaTarget) {
-        warnings.push(`CPA €${cpa.toFixed(0)} exceeds target €${globalMultipliers.cpaTarget}`);
-      }
-      if (globalMultipliers.roasTarget && roas < globalMultipliers.roasTarget) {
-        warnings.push(`ROAS ${roas.toFixed(1)}x below target ${globalMultipliers.roasTarget}x`);
-      }
-
-      return {
-        ...channel,
-        currentPercentage,
-        effectiveCpm,
-        effectiveCtr,
-        metrics: {
-          spend,
-          impressions,
-          clicks,
-          conversions,
-          cpa,
-          revenue,
-          roas,
-        },
-        warnings,
-      };
-    });
-  }, [channels, channelAllocations, totalBudget, globalMultipliers]);
-
-  // Calculate blended metrics
-  const blendedMetrics = useMemo(() => {
-    let totalSpend = 0;
-    let totalImpressions = 0;
-    let totalClicks = 0;
-    let totalConversions = 0;
-    let totalRevenue = 0;
-
-    channelsWithMetrics.forEach((ch) => {
-      totalSpend += ch.metrics.spend;
-      totalImpressions += ch.metrics.impressions;
-      totalClicks += ch.metrics.clicks;
-      totalConversions += ch.metrics.conversions;
-      totalRevenue += ch.metrics.revenue;
-    });
-
-    const blendedCpa = totalConversions > 0 ? totalSpend / totalConversions : null;
-    const blendedRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
-
-    return {
-      totalSpend,
-      totalImpressions,
-      totalClicks,
-      totalConversions,
-      blendedCpa,
-      projectedRevenue: totalRevenue,
-      blendedRoas,
-    };
-  }, [channelsWithMetrics]);
-
-  // Calculate category totals
-  const categoryTotals = useMemo(() => {
-    const totals: Record<string, { spend: number; percentage: number }> = {};
-    
-    channelsWithMetrics.forEach((ch) => {
-      if (!totals[ch.category]) {
-        totals[ch.category] = { spend: 0, percentage: 0 };
-      }
-      totals[ch.category].spend += ch.metrics.spend;
-      totals[ch.category].percentage += ch.currentPercentage;
-    });
-
-    return totals;
-  }, [channelsWithMetrics]);
-
-  // Reset all
-  const resetAll = useCallback(() => {
-    const initialized = initializeChannels([...DEFAULT_CHANNELS]);
-    setChannels(initialized);
-    setTotalBudgetState(DEFAULT_BUDGET);
-    setGlobalMultipliersState(DEFAULT_MULTIPLIERS);
-    
-    const allocations: Record<string, number> = {};
-    initialized.forEach((ch) => {
-      allocations[ch.id] = ch.basePercentage;
-    });
-    setChannelAllocations(allocations);
-  }, []);
-
-  // Save preset
-  const savePreset = useCallback((name: string) => {
-    const presets = loadPresets();
-    const newPreset: SavedPreset = {
-      name,
-      totalBudget,
-      channels: [...channels],
-      channelAllocations: { ...channelAllocations },
-      globalMultipliers: { ...globalMultipliers },
-    };
-    
-    const filtered = presets.filter(p => p.name !== name);
-    savePresets([...filtered, newPreset]);
-    setPresetsState(loadPresets().map(p => p.name));
-  }, [totalBudget, channels, channelAllocations, globalMultipliers]);
-
-  // Load preset
-  const loadPreset = useCallback((name: string) => {
-    const presets = loadPresets();
-    const preset = presets.find(p => p.name === name);
-    if (!preset) return;
-    
-    setTotalBudgetState(preset.totalBudget);
-    setChannels(preset.channels);
-    setChannelAllocations(preset.channelAllocations);
-    setGlobalMultipliersState(preset.globalMultipliers);
-  }, []);
-
-  // Delete preset
-  const deletePreset = useCallback((name: string) => {
-    const presets = loadPresets();
-    savePresets(presets.filter(p => p.name !== name));
-    setPresetsState(loadPresets().map(p => p.name));
-  }, []);
-
+  
+  // Clicks and conversions
+  const clicks = impressions * (effectiveCtr / 100);
+  const conversions = clicks * (effectiveCr / 100);
+  
+  // CPA (override or calculated)
+  const cpa = channel.overrideCpa 
+    ?? (conversions > 0 ? spend / conversions : null);
+  
+  // ROAS and Revenue
+  const effectiveRoas = channel.overrideRoas ?? channel.baseRoas;
+  const revenue = spend * effectiveRoas;
+  
   return {
-    totalBudget,
-    setTotalBudget,
-    channels,
-    addChannel,
-    updateChannel,
-    deleteChannel,
-    channelAllocations,
-    setChannelAllocation,
-    normalizeAllocations,
-    globalMultipliers,
-    setGlobalMultipliers,
-    resetGlobalMultipliers,
-    channelsWithMetrics,
-    blendedMetrics,
-    categoryTotals,
-    resetAll,
-    savePreset,
-    loadPreset,
-    deletePreset,
-    presets: presetsState,
+    spend,
+    effectiveCpm,
+    effectiveCtr,
+    effectiveCr,
+    impressions,
+    clicks,
+    conversions,
+    cpa,
+    revenue,
+    roas: effectiveRoas,
   };
 }
+
+// ========== STORE DEFINITION ==========
+
+interface MediaPlanState {
+  // Core data
+  totalBudget: number;
+  channels: ChannelData[];
+  globalMultipliers: GlobalMultipliers;
+  presets: Preset[];
+  
+  // Actions - Budget
+  setTotalBudget: (value: number) => void;
+  
+  // Actions - Channels
+  setChannelAllocation: (channelId: string, percentage: number) => void;
+  normalizeAllocations: () => void;
+  toggleChannelLock: (channelId: string) => void;
+  updateChannelOverride: (channelId: string, updates: Partial<ChannelData>) => void;
+  setImpressionMode: (channelId: string, mode: ImpressionMode) => void;
+  setFixedImpressions: (channelId: string, impressions: number) => void;
+  addChannel: (channel: Partial<ChannelData> & { name: string; category: ChannelCategory }) => void;
+  deleteChannel: (id: string) => void;
+  
+  // Actions - Multipliers
+  setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
+  resetGlobalMultipliers: () => void;
+  
+  // Actions - Rebalance
+  rebalanceToTargets: () => void;
+  
+  // Actions - Presets
+  savePreset: (name: string) => void;
+  loadPreset: (name: string) => void;
+  deletePreset: (name: string) => void;
+  
+  // Actions - Reset
+  resetAll: () => void;
+}
+
+export const useMediaPlanStore = create<MediaPlanState>()(
+  persist(
+    (set, get) => ({
+      // Initial state
+      totalBudget: 50000,
+      channels: createInitialChannels(),
+      globalMultipliers: { ...DEFAULT_MULTIPLIERS },
+      presets: [],
+      
+      // Budget
+      setTotalBudget: (value) => set({ totalBudget: Math.max(10000, Math.min(1000000, value)) }),
+      
+      // Channel allocation
+      setChannelAllocation: (channelId, percentage) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, allocationPct: Math.max(0, Math.min(100, percentage)) } : ch
+          ),
+        }));
+      },
+      
+      normalizeAllocations: () => {
+        set((state) => {
+          const locked = state.channels.filter((ch) => ch.locked);
+          const unlocked = state.channels.filter((ch) => !ch.locked);
+          
+          const lockedTotal = locked.reduce((sum, ch) => sum + ch.allocationPct, 0);
+          const unlockedTotal = unlocked.reduce((sum, ch) => sum + ch.allocationPct, 0);
+          
+          const targetUnlocked = Math.max(0, 100 - lockedTotal);
+          const factor = unlockedTotal > 0 ? targetUnlocked / unlockedTotal : 0;
+          
+          return {
+            channels: state.channels.map((ch) => {
+              if (ch.locked) return ch;
+              return {
+                ...ch,
+                allocationPct: Math.max(0, ch.allocationPct * factor),
+              };
+            }),
+          };
+        });
+      },
+      
+      toggleChannelLock: (channelId) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, locked: !ch.locked } : ch
+          ),
+        }));
+      },
+      
+      updateChannelOverride: (channelId, updates) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, ...updates } : ch
+          ),
+        }));
+      },
+      
+      setImpressionMode: (channelId, mode) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, impressionMode: mode } : ch
+          ),
+        }));
+      },
+      
+      setFixedImpressions: (channelId, impressions) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, fixedImpressions: Math.max(0, impressions) } : ch
+          ),
+        }));
+      },
+      
+      addChannel: (channelData) => {
+        set((state) => {
+          const id = `channel-${Date.now()}`;
+          const newChannel: ChannelData = {
+            id,
+            name: channelData.name,
+            category: channelData.category,
+            allocationPct: 5,
+            baseCpm: channelData.baseCpm ?? 5,
+            baseCtr: channelData.baseCtr ?? 1,
+            baseCr: channelData.baseCr ?? 2.5,
+            baseCpa: channelData.baseCpa ?? null,
+            baseRoas: channelData.baseRoas ?? 2,
+            overrideCpm: channelData.overrideCpm ?? null,
+            overrideCtr: channelData.overrideCtr ?? null,
+            overrideCr: channelData.overrideCr ?? null,
+            overrideCpa: channelData.overrideCpa ?? null,
+            overrideRoas: channelData.overrideRoas ?? null,
+            impressionMode: channelData.impressionMode ?? 'CPM',
+            fixedImpressions: channelData.fixedImpressions ?? 100000,
+            locked: false,
+          };
+          
+          // Normalize to include new channel
+          const allChannels = [...state.channels, newChannel];
+          const total = allChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);
+          const factor = 100 / total;
+          
+          return {
+            channels: allChannels.map((ch) => ({
+              ...ch,
+              allocationPct: ch.allocationPct * factor,
+            })),
+          };
+        });
+      },
+      
+      deleteChannel: (id) => {
+        set((state) => {
+          const remaining = state.channels.filter((ch) => ch.id !== id);
+          if (remaining.length === 0) return state;
+          
+          // Re-normalize
+          const total = remaining.reduce((sum, ch) => sum + ch.allocationPct, 0);
+          const factor = total > 0 ? 100 / total : 1;
+          
+          return {
+            channels: remaining.map((ch) => ({
+              ...ch,
+              allocationPct: ch.allocationPct * factor,
+            })),
+          };
+        });
+      },
+      
+      // Multipliers
+      setGlobalMultipliers: (updates) => {
+        set((state) => ({
+          globalMultipliers: { ...state.globalMultipliers, ...updates },
+        }));
+      },
+      
+      resetGlobalMultipliers: () => {
+        set({ globalMultipliers: { ...DEFAULT_MULTIPLIERS } });
+      },
+      
+      // Rebalance towards targets
+      rebalanceToTargets: () => {
+        const state = get();
+        const { cpaTarget, roasTarget } = state.globalMultipliers;
+        if (!cpaTarget && !roasTarget) return;
+        
+        // Calculate metrics for each channel
+        const channelsWithMetrics = state.channels.map((ch) => ({
+          ...ch,
+          metrics: calculateChannelMetrics(ch, state.totalBudget, state.globalMultipliers),
+        }));
+        
+        // Find good and bad performers
+        const poor: string[] = [];
+        const good: string[] = [];
+        
+        channelsWithMetrics.forEach((ch) => {
+          const aboveCpa = cpaTarget && ch.metrics.cpa && ch.metrics.cpa > cpaTarget;
+          const belowRoas = roasTarget && ch.metrics.roas < roasTarget;
+          
+          if (aboveCpa || belowRoas) {
+            poor.push(ch.id);
+          } else {
+            good.push(ch.id);
+          }
+        });
+        
+        if (poor.length === 0 || good.length === 0) return;
+        
+        // Shift 10% from poor to good channels
+        const shiftAmount = 10 / poor.length;
+        const addAmount = (shiftAmount * poor.length) / good.length;
+        
+        set({
+          channels: state.channels.map((ch) => {
+            if (poor.includes(ch.id)) {
+              return {
+                ...ch,
+                allocationPct: Math.max(0.5, ch.allocationPct - shiftAmount),
+              };
+            }
+            if (good.includes(ch.id)) {
+              return {
+                ...ch,
+                allocationPct: Math.min(100, ch.allocationPct + addAmount),
+              };
+            }
+            return ch;
+          }),
+        });
+      },
+      
+      // Presets
+      savePreset: (name) => {
+        set((state) => {
+          const preset: Preset = {
+            name,
+            totalBudget: state.totalBudget,
+            channels: JSON.parse(JSON.stringify(state.channels)),
+            globalMultipliers: { ...state.globalMultipliers },
+          };
+          
+          const existing = state.presets.filter((p) => p.name !== name);
+          return { presets: [...existing, preset] };
+        });
+      },
+      
+      loadPreset: (name) => {
+        set((state) => {
+          const preset = state.presets.find((p) => p.name === name);
+          if (!preset) return state;
+          
+          return {
+            totalBudget: preset.totalBudget,
+            channels: JSON.parse(JSON.stringify(preset.channels)),
+            globalMultipliers: { ...preset.globalMultipliers },
+          };
+        });
+      },
+      
+      deletePreset: (name) => {
+        set((state) => ({
+          presets: state.presets.filter((p) => p.name !== name),
+        }));
+      },
+      
+      // Reset
+      resetAll: () => {
+        set({
+          totalBudget: 50000,
+          channels: createInitialChannels(),
+          globalMultipliers: { ...DEFAULT_MULTIPLIERS },
+        });
+      },
+    }),
+    {
+      name: 'mediaplan-store-v2',
+      partialize: (state) => ({
+        totalBudget: state.totalBudget,
+        channels: state.channels,
+        globalMultipliers: state.globalMultipliers,
+        presets: state.presets,
+      }),
+    }
+  )
+);
+
+// ========== SELECTOR HOOKS ==========
+
+export function useChannelsWithMetrics(): ChannelWithMetrics[] {
+  const { totalBudget, channels, globalMultipliers } = useMediaPlanStore();
+  const { cpaTarget, roasTarget } = globalMultipliers;
+  
+  return channels.map((channel) => {
+    const metrics = calculateChannelMetrics(channel, totalBudget, globalMultipliers);
+    
+    const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
+    const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);
+    
+    // Warnings for legacy compat
+    const warnings: string[] = [];
+    if (aboveCpaTarget) {
+      warnings.push(`CPA €${metrics.cpa?.toFixed(0)} exceeds target €${cpaTarget}`);
+    }
+    if (belowRoasTarget) {
+      warnings.push(`ROAS ${metrics.roas.toFixed(1)}x below target ${roasTarget}x`);
+    }
+    
+    return {
+      ...channel,
+      metrics,
+      aboveCpaTarget,
+      belowRoasTarget,
+      // Legacy compat
+      currentPercentage: channel.allocationPct,
+      effectiveCpm: metrics.effectiveCpm,
+      effectiveCtr: metrics.effectiveCtr,
+      warnings,
+    };
+  });
+}
+
+export function useBlendedMetrics(): BlendedMetrics {
+  const { totalBudget, channels, globalMultipliers } = useMediaPlanStore();
+  
+  let totalSpend = 0;
+  let totalImpressions = 0;
+  let totalClicks = 0;
+  let totalConversions = 0;
+  let totalRevenue = 0;
+  
+  channels.forEach((channel) => {
+    const metrics = calculateChannelMetrics(channel, totalBudget, globalMultipliers);
+    totalSpend += metrics.spend;
+    totalImpressions += metrics.impressions;
+    totalClicks += metrics.clicks;
+    totalConversions += metrics.conversions;
+    totalRevenue += metrics.revenue;
+  });
+  
+  return {
+    totalSpend,
+    totalImpressions,
+    totalClicks,
+    totalConversions,
+    blendedCpa: totalConversions > 0 ? totalSpend / totalConversions : null,
+    projectedRevenue: totalRevenue,
+    blendedRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
+  };
+}
+
+export function useCategoryTotals(): Record<string, { spend: number; percentage: number }> {
+  const channelsWithMetrics = useChannelsWithMetrics();
+  const totals: Record<string, { spend: number; percentage: number }> = {};
+  
+  Object.keys(CATEGORY_INFO).forEach((cat) => {
+    totals[cat] = { spend: 0, percentage: 0 };
+  });
+  
+  channelsWithMetrics.forEach((ch) => {
+    totals[ch.category].spend += ch.metrics.spend;
+    totals[ch.category].percentage += ch.allocationPct;
+  });
+  
+  return totals;
+}
+
+// Legacy Channel type export for compatibility
+export type Channel = ChannelData;

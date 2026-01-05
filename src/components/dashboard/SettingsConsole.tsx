@@ -11,7 +11,10 @@ import {
   Save,
   RotateCcw,
   AlertTriangle,
-  X,
+  Lock,
+  Unlock,
+  Target,
+  TrendingUp,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +23,7 @@ import { Slider } from '@/components/ui/slider';
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
 import {
   Accordion,
   AccordionContent,
@@ -44,65 +48,59 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatCurrency, ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
-import { GlobalMultipliers, ChannelWithMetrics } from '@/hooks/use-media-plan-store';
-import { Channel } from '@/lib/mediaplan-data';
+import { 
+  useMediaPlanStore, 
+  useChannelsWithMetrics,
+  ChannelWithMetrics,
+  ImpressionMode,
+} from '@/hooks/use-media-plan-store';
 import { useToast } from '@/hooks/use-toast';
 
-interface SettingsConsoleProps {
-  totalBudget: number;
-  setTotalBudget: (value: number) => void;
-  channels: Channel[];
-  channelAllocations: Record<string, number>;
-  setChannelAllocation: (channelId: string, percentage: number) => void;
-  normalizeAllocations: () => void;
-  globalMultipliers: GlobalMultipliers;
-  setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
-  resetGlobalMultipliers: () => void;
-  channelsWithMetrics: ChannelWithMetrics[];
-  addChannel: (channel: Omit<Channel, 'id' | 'basePercentage'>) => void;
-  updateChannel: (id: string, updates: Partial<Omit<Channel, 'id'>>) => void;
-  deleteChannel: (id: string) => void;
-  resetAll: () => void;
-  savePreset: (name: string) => void;
-  presets: string[];
-  loadPreset: (name: string) => void;
-  deletePreset: (name: string) => void;
-}
-
-export function SettingsConsole({
-  totalBudget,
-  setTotalBudget,
-  channels,
-  channelAllocations,
-  setChannelAllocation,
-  normalizeAllocations,
-  globalMultipliers,
-  setGlobalMultipliers,
-  resetGlobalMultipliers,
-  channelsWithMetrics,
-  addChannel,
-  updateChannel,
-  deleteChannel,
-  resetAll,
-  savePreset,
-  presets,
-  loadPreset,
-  deletePreset,
-}: SettingsConsoleProps) {
+export function SettingsConsole() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [isAddChannelOpen, setIsAddChannelOpen] = useState(false);
   const [newChannel, setNewChannel] = useState({
     name: '',
     category: 'paid' as ChannelCategory,
-    baseSpend: 1000,
-    cpm: 5,
-    ctr: 1,
-    estimatedRoas: 2,
+    baseCpm: 5,
+    baseCtr: 1,
+    baseCr: 2.5,
+    baseRoas: 2,
+    impressionMode: 'CPM' as ImpressionMode,
+    fixedImpressions: 100000,
   });
+  
   const { toast } = useToast();
-
-  const allocationTotal = Object.values(channelAllocations).reduce((sum, v) => sum + v, 0);
+  
+  const {
+    totalBudget,
+    setTotalBudget,
+    channels,
+    globalMultipliers,
+    setGlobalMultipliers,
+    resetGlobalMultipliers,
+    setChannelAllocation,
+    normalizeAllocations,
+    toggleChannelLock,
+    updateChannelOverride,
+    setImpressionMode,
+    setFixedImpressions,
+    addChannel,
+    deleteChannel,
+    rebalanceToTargets,
+    resetAll,
+    savePreset,
+    loadPreset,
+    deletePreset,
+    presets,
+  } = useMediaPlanStore();
+  
+  const channelsWithMetrics = useChannelsWithMetrics();
+  
+  const allocationTotal = channels.reduce((sum, ch) => sum + ch.allocationPct, 0);
+  const hasTargets = globalMultipliers.cpaTarget !== null || globalMultipliers.roasTarget !== null;
+  const hasPoorPerformers = channelsWithMetrics.some((ch) => ch.aboveCpaTarget || ch.belowRoasTarget);
 
   const handleAddChannel = useCallback(() => {
     if (!newChannel.name.trim()) {
@@ -111,7 +109,16 @@ export function SettingsConsole({
     }
     
     addChannel(newChannel);
-    setNewChannel({ name: '', category: 'paid', baseSpend: 1000, cpm: 5, ctr: 1, estimatedRoas: 2 });
+    setNewChannel({ 
+      name: '', 
+      category: 'paid', 
+      baseCpm: 5, 
+      baseCtr: 1, 
+      baseCr: 2.5,
+      baseRoas: 2,
+      impressionMode: 'CPM',
+      fixedImpressions: 100000,
+    });
     setIsAddChannelOpen(false);
     toast({ title: 'Channel Added', description: `${newChannel.name} has been added.` });
   }, [addChannel, newChannel, toast]);
@@ -126,6 +133,11 @@ export function SettingsConsole({
     toast({ title: 'Preset Saved', description: `"${newPresetName}" has been saved.` });
   }, [newPresetName, savePreset, toast]);
 
+  const handleRebalance = useCallback(() => {
+    rebalanceToTargets();
+    toast({ title: 'Rebalanced', description: 'Budget shifted from poor to good performers.' });
+  }, [rebalanceToTargets, toast]);
+
   if (isCollapsed) {
     return (
       <div className="w-14 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-4 shrink-0">
@@ -138,36 +150,16 @@ export function SettingsConsole({
           <ChevronRight className="h-4 w-4" />
         </Button>
         <Separator className="bg-sidebar-border w-8" />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-sidebar-foreground hover:bg-sidebar-accent"
-          title="Settings Console"
-        >
+        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Settings Console">
           <Settings className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-sidebar-foreground hover:bg-sidebar-accent"
-          title="Budget"
-        >
+        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Budget">
           <DollarSign className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-sidebar-foreground hover:bg-sidebar-accent"
-          title="Multipliers"
-        >
+        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Multipliers">
           <Sliders className="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="text-sidebar-foreground hover:bg-sidebar-accent"
-          title="Channels"
-        >
+        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Channels">
           <Layers className="h-4 w-4" />
         </Button>
       </div>
@@ -249,24 +241,46 @@ export function SettingsConsole({
                     </div>
                   </div>
                   
-                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
                     {channelsWithMetrics.map((channel) => (
                       <div key={channel.id} className="space-y-1">
-                        <div className="flex justify-between items-center">
-                          <span className="text-xs text-sidebar-foreground/70 truncate max-w-[140px]" title={channel.name}>
+                        <div className="flex justify-between items-center gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-5 w-5 shrink-0"
+                            onClick={() => toggleChannelLock(channel.id)}
+                            title={channel.locked ? 'Unlock' : 'Lock'}
+                          >
+                            {channel.locked ? (
+                              <Lock className="h-3 w-3 text-warning" />
+                            ) : (
+                              <Unlock className="h-3 w-3 text-sidebar-foreground/40" />
+                            )}
+                          </Button>
+                          <span 
+                            className={cn(
+                              "text-xs truncate flex-1",
+                              channel.aboveCpaTarget || channel.belowRoasTarget 
+                                ? "text-destructive" 
+                                : "text-sidebar-foreground/70"
+                            )} 
+                            title={channel.name}
+                          >
                             {channel.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
                           </span>
-                          <span className="text-xs font-mono text-sidebar-foreground">
-                            {channel.currentPercentage.toFixed(1)}%
+                          <span className="text-xs font-mono text-sidebar-foreground w-12 text-right">
+                            {channel.allocationPct.toFixed(1)}%
                           </span>
                         </div>
                         <Slider
-                          value={[channel.currentPercentage]}
+                          value={[channel.allocationPct]}
                           onValueChange={([v]) => setChannelAllocation(channel.id, v)}
                           min={0}
-                          max={50}
+                          max={100}
                           step={0.5}
                           className="w-full"
+                          disabled={channel.locked}
                         />
                       </div>
                     ))}
@@ -306,20 +320,21 @@ export function SettingsConsole({
                   </div>
                 </div>
 
-                {/* CPM Override */}
+                {/* Default CPM Override */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">CPM Override (avg)</Label>
+                    <Label className="text-xs text-sidebar-foreground/70">Default CPM (€)</Label>
                     <Input
                       type="number"
-                      value={globalMultipliers.cpmOverride ?? ''}
+                      value={globalMultipliers.defaultCpmOverride ?? ''}
                       onChange={(e) => setGlobalMultipliers({ 
-                        cpmOverride: e.target.value ? parseFloat(e.target.value) : null 
+                        defaultCpmOverride: e.target.value ? parseFloat(e.target.value) : null 
                       })}
-                      placeholder="Individual"
+                      placeholder="Per-channel"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
                   </div>
+                  <p className="text-xs text-sidebar-foreground/50">Only applies to channels without CPM override</p>
                 </div>
 
                 {/* CTR Bump */}
@@ -344,10 +359,15 @@ export function SettingsConsole({
                   </div>
                 </div>
 
+                <Separator className="bg-sidebar-border" />
+
                 {/* CPA Target */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">CPA Target</Label>
+                    <div className="flex items-center gap-1">
+                      <Target className="h-3 w-3 text-sidebar-primary" />
+                      <Label className="text-xs text-sidebar-foreground/70">CPA Target (€)</Label>
+                    </div>
                     <Input
                       type="number"
                       value={globalMultipliers.cpaTarget ?? ''}
@@ -363,7 +383,10 @@ export function SettingsConsole({
                 {/* ROAS Target */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">ROAS Target</Label>
+                    <div className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3 text-sidebar-primary" />
+                      <Label className="text-xs text-sidebar-foreground/70">ROAS Target (x)</Label>
+                    </div>
                     <Input
                       type="number"
                       value={globalMultipliers.roasTarget ?? ''}
@@ -375,6 +398,19 @@ export function SettingsConsole({
                     />
                   </div>
                 </div>
+
+                {/* Rebalance Button */}
+                {hasTargets && hasPoorPerformers && (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleRebalance}
+                    className="w-full gap-2"
+                  >
+                    <Target className="h-3 w-3" />
+                    Rebalance to Meet Targets
+                  </Button>
+                )}
 
                 <Button
                   variant="outline"
@@ -399,12 +435,14 @@ export function SettingsConsole({
               </AccordionTrigger>
               <AccordionContent className="px-4 pb-4 space-y-3">
                 {/* Channel List */}
-                <div className="space-y-2 max-h-64 overflow-y-auto">
+                <div className="space-y-2 max-h-80 overflow-y-auto">
                   {channelsWithMetrics.map((channel) => (
                     <ChannelEditorItem
                       key={channel.id}
                       channel={channel}
-                      updateChannel={updateChannel}
+                      updateChannelOverride={updateChannelOverride}
+                      setImpressionMode={setImpressionMode}
+                      setFixedImpressions={setFixedImpressions}
                       deleteChannel={deleteChannel}
                     />
                   ))}
@@ -426,7 +464,7 @@ export function SettingsConsole({
                     <DialogHeader>
                       <DialogTitle>Add New Channel</DialogTitle>
                       <DialogDescription>
-                        Create a new marketing channel with custom metrics.
+                        Create a new marketing channel with custom KPIs.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -456,19 +494,12 @@ export function SettingsConsole({
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>Base Spend (€)</Label>
-                          <Input
-                            type="number"
-                            value={newChannel.baseSpend}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseSpend: parseFloat(e.target.value) || 0 }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
                           <Label>CPM (€)</Label>
                           <Input
                             type="number"
-                            value={newChannel.cpm}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, cpm: parseFloat(e.target.value) || 0 }))}
+                            step="0.1"
+                            value={newChannel.baseCpm}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCpm: parseFloat(e.target.value) || 0 }))}
                           />
                         </div>
                         <div className="space-y-2">
@@ -476,8 +507,17 @@ export function SettingsConsole({
                           <Input
                             type="number"
                             step="0.1"
-                            value={newChannel.ctr}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, ctr: parseFloat(e.target.value) || 0 }))}
+                            value={newChannel.baseCtr}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCtr: parseFloat(e.target.value) || 0 }))}
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Conv. Rate (%)</Label>
+                          <Input
+                            type="number"
+                            step="0.1"
+                            value={newChannel.baseCr}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCr: parseFloat(e.target.value) || 0 }))}
                           />
                         </div>
                         <div className="space-y-2">
@@ -485,11 +525,36 @@ export function SettingsConsole({
                           <Input
                             type="number"
                             step="0.1"
-                            value={newChannel.estimatedRoas}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, estimatedRoas: parseFloat(e.target.value) || 0 }))}
+                            value={newChannel.baseRoas}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseRoas: parseFloat(e.target.value) || 0 }))}
                           />
                         </div>
                       </div>
+                      <div className="space-y-2">
+                        <Label>Impression Mode</Label>
+                        <Select
+                          value={newChannel.impressionMode}
+                          onValueChange={(v) => setNewChannel(prev => ({ ...prev, impressionMode: v as ImpressionMode }))}
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="CPM">CPM-based (dynamic)</SelectItem>
+                            <SelectItem value="FIXED">Fixed Impressions</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {newChannel.impressionMode === 'FIXED' && (
+                        <div className="space-y-2">
+                          <Label>Fixed Impressions</Label>
+                          <Input
+                            type="number"
+                            value={newChannel.fixedImpressions}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, fixedImpressions: parseInt(e.target.value) || 0 }))}
+                          />
+                        </div>
+                      )}
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsAddChannelOpen(false)}>
@@ -535,8 +600,8 @@ export function SettingsConsole({
               <SelectValue placeholder="Load preset..." />
             </SelectTrigger>
             <SelectContent>
-              {presets.map((name) => (
-                <SelectItem key={name} value={name}>{name}</SelectItem>
+              {presets.map((preset) => (
+                <SelectItem key={preset.name} value={preset.name}>{preset.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -560,11 +625,15 @@ export function SettingsConsole({
 // Channel Editor Item Component
 function ChannelEditorItem({
   channel,
-  updateChannel,
+  updateChannelOverride,
+  setImpressionMode,
+  setFixedImpressions,
   deleteChannel,
 }: {
   channel: ChannelWithMetrics;
-  updateChannel: (id: string, updates: Partial<Omit<Channel, 'id'>>) => void;
+  updateChannelOverride: (id: string, updates: any) => void;
+  setImpressionMode: (id: string, mode: ImpressionMode) => void;
+  setFixedImpressions: (id: string, impressions: number) => void;
   deleteChannel: (id: string) => void;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -575,12 +644,14 @@ function ChannelEditorItem({
     toast({ title: 'Channel Deleted', description: `${channel.name} has been removed.` });
   };
 
+  const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
+
   return (
     <div 
       className={cn(
         "rounded-lg border transition-all",
         "bg-sidebar-accent/50 border-sidebar-border",
-        channel.warnings.length > 0 && "border-warning/50",
+        isWarning && "border-destructive/50 bg-destructive/10",
         isExpanded && "bg-sidebar-accent"
       )}
     >
@@ -593,11 +664,14 @@ function ChannelEditorItem({
             className="w-2 h-2 rounded-full shrink-0" 
             style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color }}
           />
-          <span className="text-xs text-sidebar-foreground truncate">
+          <span className={cn(
+            "text-xs truncate",
+            isWarning ? "text-destructive" : "text-sidebar-foreground"
+          )}>
             {channel.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
           </span>
-          {channel.warnings.length > 0 && (
-            <AlertTriangle className="h-3 w-3 text-warning shrink-0" />
+          {isWarning && (
+            <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
           )}
         </div>
         <Button
@@ -614,26 +688,72 @@ function ChannelEditorItem({
       </div>
 
       {isExpanded && (
-        <div className="px-2 pb-2 space-y-2 border-t border-sidebar-border/50 pt-2">
+        <div className="px-2 pb-2 space-y-3 border-t border-sidebar-border/50 pt-2">
           {/* Name */}
           <div className="space-y-1">
             <Label className="text-xs text-sidebar-foreground/60">Name</Label>
             <Input
               value={channel.name}
-              onChange={(e) => updateChannel(channel.id, { name: e.target.value })}
+              onChange={(e) => updateChannelOverride(channel.id, { name: e.target.value })}
               className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
             />
           </div>
+
+          {/* Category */}
+          <div className="space-y-1">
+            <Label className="text-xs text-sidebar-foreground/60">Category</Label>
+            <Select
+              value={channel.category}
+              onValueChange={(v) => updateChannelOverride(channel.id, { category: v as ChannelCategory })}
+            >
+              <SelectTrigger className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CATEGORY_INFO).map(([key, info]) => (
+                  <SelectItem key={key} value={key}>{info.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Impression Mode */}
+          <div className="space-y-1">
+            <Label className="text-xs text-sidebar-foreground/60">Impression Mode</Label>
+            <div className="flex items-center gap-2">
+              <Switch
+                checked={channel.impressionMode === 'FIXED'}
+                onCheckedChange={(checked) => setImpressionMode(channel.id, checked ? 'FIXED' : 'CPM')}
+              />
+              <span className="text-xs text-sidebar-foreground">
+                {channel.impressionMode === 'FIXED' ? 'Fixed Impressions' : 'CPM-based'}
+              </span>
+            </div>
+          </div>
+
+          {channel.impressionMode === 'FIXED' && (
+            <div className="space-y-1">
+              <Label className="text-xs text-sidebar-foreground/60">Fixed Impressions</Label>
+              <Input
+                type="number"
+                value={channel.fixedImpressions}
+                onChange={(e) => setFixedImpressions(channel.id, parseInt(e.target.value) || 0)}
+                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
+              />
+            </div>
+          )}
           
-          {/* Metrics Grid */}
+          {/* KPI Overrides Grid */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs text-sidebar-foreground/60">CPM (€)</Label>
               <Input
                 type="number"
                 step="0.1"
-                value={channel.cpm ?? ''}
-                onChange={(e) => updateChannel(channel.id, { cpm: parseFloat(e.target.value) || 0 })}
+                value={channel.overrideCpm ?? channel.baseCpm}
+                onChange={(e) => updateChannelOverride(channel.id, { 
+                  overrideCpm: e.target.value ? parseFloat(e.target.value) : null 
+                })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
             </div>
@@ -642,8 +762,22 @@ function ChannelEditorItem({
               <Input
                 type="number"
                 step="0.1"
-                value={channel.ctr ?? ''}
-                onChange={(e) => updateChannel(channel.id, { ctr: parseFloat(e.target.value) || 0 })}
+                value={channel.overrideCtr ?? channel.baseCtr}
+                onChange={(e) => updateChannelOverride(channel.id, { 
+                  overrideCtr: e.target.value ? parseFloat(e.target.value) : null 
+                })}
+                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-sidebar-foreground/60">Conv. Rate (%)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={channel.overrideCr ?? channel.baseCr}
+                onChange={(e) => updateChannelOverride(channel.id, { 
+                  overrideCr: e.target.value ? parseFloat(e.target.value) : null 
+                })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
             </div>
@@ -652,34 +786,33 @@ function ChannelEditorItem({
               <Input
                 type="number"
                 step="0.1"
-                value={channel.estimatedRoas ?? ''}
-                onChange={(e) => updateChannel(channel.id, { estimatedRoas: parseFloat(e.target.value) || 0 })}
+                value={channel.overrideRoas ?? channel.baseRoas}
+                onChange={(e) => updateChannelOverride(channel.id, { 
+                  overrideRoas: e.target.value ? parseFloat(e.target.value) : null 
+                })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">Category</Label>
-              <Select
-                value={channel.category}
-                onValueChange={(v) => updateChannel(channel.id, { category: v as ChannelCategory })}
-              >
-                <SelectTrigger className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                    <SelectItem key={key} value={key}>{info.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs text-sidebar-foreground/60">CPA Override (€)</Label>
+              <Input
+                type="number"
+                step="0.1"
+                value={channel.overrideCpa ?? ''}
+                onChange={(e) => updateChannelOverride(channel.id, { 
+                  overrideCpa: e.target.value ? parseFloat(e.target.value) : null 
+                })}
+                placeholder="Auto-calculated"
+                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
+              />
             </div>
           </div>
 
           {/* Warnings */}
           {channel.warnings.length > 0 && (
-            <div className="space-y-1">
+            <div className="space-y-1 pt-1">
               {channel.warnings.map((warning, i) => (
-                <div key={i} className="flex items-center gap-1 text-xs text-warning">
+                <div key={i} className="flex items-center gap-1 text-xs text-destructive">
                   <AlertTriangle className="h-3 w-3" />
                   <span>{warning}</span>
                 </div>
