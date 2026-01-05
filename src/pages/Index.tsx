@@ -6,53 +6,55 @@ import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { ChannelTable } from '@/components/dashboard/ChannelTable';
 import { ChartSection } from '@/components/dashboard/ChartSection';
 import { SettingsConsole } from '@/components/dashboard/SettingsConsole';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { 
+  useMediaPlanStore, 
+  useChannelsWithMetrics, 
+  useBlendedMetrics,
+  useCategoryTotals,
+} from '@/hooks/use-media-plan-store';
 import { formatCurrency, BudgetPresetKey } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
-  const {
-    totalBudget,
-    setTotalBudget,
-    channels,
-    channelAllocations,
-    setChannelAllocation,
-    normalizeAllocations,
-    globalMultipliers,
-    setGlobalMultipliers,
-    resetGlobalMultipliers,
-    channelsWithMetrics,
-    blendedMetrics,
-    categoryTotals,
-    addChannel,
-    updateChannel,
-    deleteChannel,
-    resetAll,
-    savePreset,
-    loadPreset,
-    deletePreset,
-    presets,
-  } = useMediaPlanStore();
-
+  const { totalBudget, setTotalBudget } = useMediaPlanStore();
+  const channelsWithMetrics = useChannelsWithMetrics();
+  const blendedMetrics = useBlendedMetrics();
+  const categoryTotals = useCategoryTotals();
+  
   const { toast } = useToast();
   const dashboardRef = useRef<HTMLDivElement>(null);
 
   // Export handlers
   const handleExport = useCallback(async (format: 'pdf' | 'csv' | 'png') => {
     if (format === 'csv') {
-      // Generate CSV
-      const headers = ['Channel', 'Category', 'Allocation %', 'Spend', 'CPM', 'Impressions', 'CTR %', 'Conversions', 'CPA', 'ROAS'];
+      // Generate CSV with all current state including overrides
+      const headers = [
+        'Channel', 
+        'Category', 
+        'Allocation %', 
+        'Spend', 
+        'CPM', 
+        'Impressions',
+        'CTR %',
+        'Conv. Rate %',
+        'Conversions', 
+        'CPA', 
+        'ROAS',
+        'Impression Mode',
+      ];
       const rows = channelsWithMetrics.map((ch) => [
         ch.name,
         ch.category,
-        ch.currentPercentage.toFixed(2),
+        ch.allocationPct.toFixed(2),
         ch.metrics.spend.toFixed(2),
-        ch.effectiveCpm?.toFixed(2) || '',
+        ch.metrics.effectiveCpm.toFixed(2),
         Math.round(ch.metrics.impressions),
-        ch.effectiveCtr?.toFixed(2) || '',
+        ch.metrics.effectiveCtr.toFixed(2),
+        ch.metrics.effectiveCr.toFixed(2),
         Math.round(ch.metrics.conversions),
         ch.metrics.cpa?.toFixed(2) || 'N/A',
         ch.metrics.roas.toFixed(2),
+        ch.impressionMode,
       ]);
 
       const csvContent = [
@@ -109,26 +111,7 @@ const Index = () => {
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Settings Console - Left Sidebar */}
-          <SettingsConsole
-            totalBudget={totalBudget}
-            setTotalBudget={setTotalBudget}
-            channels={channels}
-            channelAllocations={channelAllocations}
-            setChannelAllocation={setChannelAllocation}
-            normalizeAllocations={normalizeAllocations}
-            globalMultipliers={globalMultipliers}
-            setGlobalMultipliers={setGlobalMultipliers}
-            resetGlobalMultipliers={resetGlobalMultipliers}
-            channelsWithMetrics={channelsWithMetrics}
-            addChannel={addChannel}
-            updateChannel={updateChannel}
-            deleteChannel={deleteChannel}
-            resetAll={resetAll}
-            savePreset={savePreset}
-            presets={presets}
-            loadPreset={loadPreset}
-            deletePreset={deletePreset}
-          />
+          <SettingsConsole />
 
           {/* Dashboard Content */}
           <main className="flex-1 overflow-auto" ref={dashboardRef}>
@@ -155,11 +138,7 @@ const Index = () => {
               />
 
               {/* Channel Table */}
-              <ChannelTable
-                channels={channelsWithMetrics}
-                onAllocationChange={setChannelAllocation}
-                categoryTotals={categoryTotals}
-              />
+              <ChannelTable />
             </div>
           </main>
         </div>

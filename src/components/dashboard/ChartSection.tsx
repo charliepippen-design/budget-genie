@@ -70,7 +70,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
       .filter((ch) => ch.metrics.spend > 0)
       .sort((a, b) => b.metrics.roas - a.metrics.roas)
       .slice(0, 8)
-      .map((ch, index) => ({
+      .map((ch) => ({
         name: ch.name.replace(/^(SEO|Paid|Affiliate|Influencer) - /, ''),
         roas: ch.metrics.roas,
         spend: ch.metrics.spend,
