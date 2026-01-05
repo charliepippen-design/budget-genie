@@ -1,40 +1,41 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef } from 'react';
 import { Helmet } from 'react-helmet';
 import { DashboardHeader } from '@/components/dashboard/DashboardHeader';
 import { BudgetSlider } from '@/components/dashboard/BudgetSlider';
 import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { ChannelTable } from '@/components/dashboard/ChannelTable';
 import { ChartSection } from '@/components/dashboard/ChartSection';
-import { ScenarioSidebar } from '@/components/dashboard/ScenarioSidebar';
-import { useBudgetCalculator } from '@/hooks/use-budget-calculator';
-import { BudgetScenario, formatCurrency } from '@/lib/mediaplan-data';
+import { SettingsConsole } from '@/components/dashboard/SettingsConsole';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { formatCurrency, BudgetPresetKey } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 
 const Index = () => {
   const {
     totalBudget,
     setTotalBudget,
-    budgetPreset,
-    setBudgetPreset,
+    channels,
     channelAllocations,
     setChannelAllocation,
-    resetAllocations,
     normalizeAllocations,
+    globalMultipliers,
+    setGlobalMultipliers,
+    resetGlobalMultipliers,
     channelsWithMetrics,
     blendedMetrics,
     categoryTotals,
-  } = useBudgetCalculator();
+    addChannel,
+    updateChannel,
+    deleteChannel,
+    resetAll,
+    savePreset,
+    loadPreset,
+    deletePreset,
+    presets,
+  } = useMediaPlanStore();
 
   const { toast } = useToast();
   const dashboardRef = useRef<HTMLDivElement>(null);
-
-  // Load scenario handler
-  const handleLoadScenario = useCallback((scenario: BudgetScenario) => {
-    setTotalBudget(scenario.totalBudget);
-    Object.entries(scenario.channelAllocations).forEach(([channelId, percentage]) => {
-      setChannelAllocation(channelId, percentage);
-    });
-  }, [setTotalBudget, setChannelAllocation]);
 
   // Export handlers
   const handleExport = useCallback(async (format: 'pdf' | 'csv' | 'png') => {
@@ -46,9 +47,9 @@ const Index = () => {
         ch.category,
         ch.currentPercentage.toFixed(2),
         ch.metrics.spend.toFixed(2),
-        ch.cpm?.toFixed(2) || '',
+        ch.effectiveCpm?.toFixed(2) || '',
         Math.round(ch.metrics.impressions),
-        ch.ctr?.toFixed(2) || '',
+        ch.effectiveCtr?.toFixed(2) || '',
         Math.round(ch.metrics.conversions),
         ch.metrics.cpa?.toFixed(2) || 'N/A',
         ch.metrics.roas.toFixed(2),
@@ -100,13 +101,35 @@ const Index = () => {
       <div className="min-h-screen bg-background flex flex-col">
         {/* Header */}
         <DashboardHeader
-          budgetPreset={budgetPreset}
-          onPresetChange={setBudgetPreset}
+          budgetPreset={'custom' as BudgetPresetKey}
+          onPresetChange={() => {}}
           onExport={handleExport}
         />
 
         {/* Main Content */}
-        <div className="flex flex-1">
+        <div className="flex flex-1 overflow-hidden">
+          {/* Settings Console - Left Sidebar */}
+          <SettingsConsole
+            totalBudget={totalBudget}
+            setTotalBudget={setTotalBudget}
+            channels={channels}
+            channelAllocations={channelAllocations}
+            setChannelAllocation={setChannelAllocation}
+            normalizeAllocations={normalizeAllocations}
+            globalMultipliers={globalMultipliers}
+            setGlobalMultipliers={setGlobalMultipliers}
+            resetGlobalMultipliers={resetGlobalMultipliers}
+            channelsWithMetrics={channelsWithMetrics}
+            addChannel={addChannel}
+            updateChannel={updateChannel}
+            deleteChannel={deleteChannel}
+            resetAll={resetAll}
+            savePreset={savePreset}
+            presets={presets}
+            loadPreset={loadPreset}
+            deletePreset={deletePreset}
+          />
+
           {/* Dashboard Content */}
           <main className="flex-1 overflow-auto" ref={dashboardRef}>
             <div className="container mx-auto px-4 py-6 space-y-6">
@@ -118,7 +141,7 @@ const Index = () => {
 
               {/* Summary Cards */}
               <SummaryCards
-                totalBudget={totalBudget}
+                totalBudget={blendedMetrics.totalSpend}
                 blendedCpa={blendedMetrics.blendedCpa}
                 totalConversions={blendedMetrics.totalConversions}
                 projectedRevenue={blendedMetrics.projectedRevenue}
@@ -139,15 +162,6 @@ const Index = () => {
               />
             </div>
           </main>
-
-          {/* Sidebar */}
-          <ScenarioSidebar
-            totalBudget={totalBudget}
-            channelAllocations={channelAllocations}
-            onLoadScenario={handleLoadScenario}
-            onReset={resetAllocations}
-            onNormalize={normalizeAllocations}
-          />
         </div>
       </div>
     </>

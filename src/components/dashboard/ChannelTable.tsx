@@ -16,7 +16,7 @@ import {
   CATEGORY_INFO,
   ChannelCategory,
 } from '@/lib/mediaplan-data';
-import { ChannelWithMetrics } from '@/hooks/use-budget-calculator';
+import { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
 import { cn } from '@/lib/utils';
 import { Search, Megaphone, Users, Star } from 'lucide-react';
 
@@ -158,13 +158,13 @@ export function ChannelTable({
                         {formatCurrency(channel.metrics.spend)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                        €{channel.cpm?.toFixed(2)}
+                        €{channel.effectiveCpm?.toFixed(2)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatNumber(channel.metrics.impressions, true)}
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm text-muted-foreground">
-                        {channel.ctr?.toFixed(2)}%
+                        {channel.effectiveCtr?.toFixed(2)}%
                       </TableCell>
                       <TableCell className="text-right font-mono text-sm">
                         {formatNumber(channel.metrics.conversions)}
