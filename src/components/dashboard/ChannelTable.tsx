@@ -11,7 +11,6 @@ import {
   TableRow 
 } from '@/components/ui/table';
 import { 
-  formatCurrency, 
   formatNumber, 
   formatPercentage,
   CATEGORY_INFO,
@@ -46,6 +45,7 @@ function EditableCell({
   suffix = '',
   prefix = '',
   className,
+  formatCurrencyFn,
 }: { 
   value: number | null | undefined;
   onSave: (value: number) => void;
@@ -53,16 +53,17 @@ function EditableCell({
   suffix?: string;
   prefix?: string;
   className?: string;
+  formatCurrencyFn?: (value: number) => string;
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
 
   const displayValue = useMemo(() => {
     if (value === null || value === undefined) return 'N/A';
-    if (type === 'currency') return formatCurrency(value);
+    if (type === 'currency' && formatCurrencyFn) return formatCurrencyFn(value);
     if (type === 'percentage') return `${value.toFixed(2)}%`;
     return `${prefix}${value.toFixed(2)}${suffix}`;
-  }, [value, type, prefix, suffix]);
+  }, [value, type, prefix, suffix, formatCurrencyFn]);
 
   const handleStartEdit = useCallback(() => {
     setEditValue(value?.toString() ?? '');
@@ -119,7 +120,7 @@ export function ChannelTable() {
   const { setChannelAllocation, updateChannelOverride } = useMediaPlanStore();
   const channels = useChannelsWithMetrics();
   const categoryTotals = useCategoryTotals();
-  const { symbol } = useCurrency();
+  const { symbol, format: formatCurrency } = useCurrency();
 
   // Group channels by category
   const groupedChannels = useMemo(() => {
