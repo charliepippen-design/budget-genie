@@ -1,7 +1,50 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { z } from 'zod';
 import { ChannelMonthConfig, MonthData, GlobalPlanSettings, ProgressionPattern } from '@/hooks/use-multi-month-store';
 import { ChannelCategory } from '@/lib/mediaplan-data';
+
+// ========== CONSTANTS ==========
+
+const MAX_FILE_SIZE_MB = 5;
+const MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024;
+const MAX_ROWS = 10000;
+const MAX_COLUMNS = 100;
+const MAX_BUDGET_VALUE = 100_000_000; // 100 million
+const MIN_BUDGET_VALUE = 0;
+const MAX_PERCENTAGE = 100;
+const MIN_PERCENTAGE = 0;
+
+// ========== VALIDATION SCHEMAS ==========
+
+const numericValueSchema = z.number()
+  .min(MIN_BUDGET_VALUE, 'Value cannot be negative')
+  .max(MAX_BUDGET_VALUE, 'Value exceeds maximum allowed');
+
+const percentageSchema = z.number()
+  .min(MIN_PERCENTAGE, 'Percentage cannot be negative')
+  .max(MAX_PERCENTAGE, 'Percentage cannot exceed 100');
+
+const parsedMonthDataSchema = z.object({
+  label: z.string().max(100),
+  monthIndex: z.number().int().min(0).max(24),
+  isSoftLaunch: z.boolean(),
+  budget: numericValueSchema,
+  channels: z.record(z.string(), numericValueSchema),
+  metrics: z.object({
+    ggr: numericValueSchema.optional(),
+    conversions: z.number().int().min(0).max(1_000_000).optional(),
+    cac: numericValueSchema.optional(),
+    roas: z.number().min(-1000).max(1000).optional(),
+    cpm: numericValueSchema.optional(),
+    ctr: percentageSchema.optional(),
+  }).optional(),
+  opex: z.object({
+    bonuses: numericValueSchema.optional(),
+    platformFees: numericValueSchema.optional(),
+    paymentProcessing: numericValueSchema.optional(),
+  }).optional(),
+});
 
 // ========== TYPES ==========
 
@@ -216,16 +259,32 @@ function matchMetric(input: string): string | null {
 
 function parseNumber(value: string | number | undefined): number {
   if (value === undefined || value === null || value === '') return 0;
-  if (typeof value === 'number') return value;
+  if (typeof value === 'number') {
+    // Clamp to valid bounds
+    return Math.max(MIN_BUDGET_VALUE, Math.min(MAX_BUDGET_VALUE, value));
+  }
   
-  // Remove currency symbols, commas, spaces
+  // Sanitize string - only allow numbers, decimal point, minus sign
   const cleaned = value.toString()
     .replace(/[€$£¥₹,\s]/g, '')
     .replace(/\(([^)]+)\)/, '-$1') // Handle negative in parentheses
-    .replace(/%$/, ''); // Remove trailing %
+    .replace(/%$/, '') // Remove trailing %
+    .replace(/[^0-9.\-]/g, ''); // Remove any other non-numeric characters
   
   const num = parseFloat(cleaned);
-  return isNaN(num) ? 0 : num;
+  if (isNaN(num)) return 0;
+  
+  // Clamp to valid bounds
+  return Math.max(MIN_BUDGET_VALUE, Math.min(MAX_BUDGET_VALUE, num));
+}
+
+function sanitizeString(value: string): string {
+  if (!value || typeof value !== 'string') return '';
+  // Remove potentially dangerous characters, limit length
+  return value
+    .replace(/[<>'"&\\]/g, '')
+    .trim()
+    .slice(0, 200);
 }
 
 function isMonthHeader(value: string): boolean {
@@ -251,20 +310,82 @@ function parseMonthLabel(value: string, index: number): { label: string; isSoftL
   return { label: value, isSoftLaunch };
 }
 
+// ========== FILE VALIDATION ==========
+
+export function validateFile(file: File): { valid: boolean; error?: string } {
+  // Check file size
+  if (file.size > MAX_FILE_SIZE_BYTES) {
+    return { 
+      valid: false, 
+      error: `File size exceeds ${MAX_FILE_SIZE_MB}MB limit. Please use a smaller file.` 
+    };
+  }
+  
+  // Check file extension
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  const allowedExtensions = ['csv', 'txt', 'xlsx', 'xls', 'json'];
+  if (!ext || !allowedExtensions.includes(ext)) {
+    return { 
+      valid: false, 
+      error: `Unsupported file format. Please use: ${allowedExtensions.join(', ')}` 
+    };
+  }
+  
+  return { valid: true };
+}
+
+function validateParsedData(data: string[][]): { valid: boolean; error?: string } {
+  if (!Array.isArray(data)) {
+    return { valid: false, error: 'Invalid data structure' };
+  }
+  
+  if (data.length > MAX_ROWS) {
+    return { 
+      valid: false, 
+      error: `File contains too many rows (${data.length}). Maximum allowed: ${MAX_ROWS}` 
+    };
+  }
+  
+  if (data.some(row => Array.isArray(row) && row.length > MAX_COLUMNS)) {
+    return { 
+      valid: false, 
+      error: `File contains too many columns. Maximum allowed: ${MAX_COLUMNS}` 
+    };
+  }
+  
+  return { valid: true };
+}
+
 // ========== FILE PARSING ==========
 
 export async function parseFile(file: File): Promise<string[][]> {
-  const ext = file.name.split('.').pop()?.toLowerCase();
-  
-  if (ext === 'csv' || ext === 'txt') {
-    return parseCSV(file);
-  } else if (ext === 'xlsx' || ext === 'xls') {
-    return parseExcel(file);
-  } else if (ext === 'json') {
-    return parseJSON(file);
+  // Validate file before parsing
+  const validation = validateFile(file);
+  if (!validation.valid) {
+    throw new Error(validation.error);
   }
   
-  throw new Error(`Unsupported file format: ${ext}`);
+  const ext = file.name.split('.').pop()?.toLowerCase();
+  
+  let data: string[][];
+  
+  if (ext === 'csv' || ext === 'txt') {
+    data = await parseCSV(file);
+  } else if (ext === 'xlsx' || ext === 'xls') {
+    data = await parseExcel(file);
+  } else if (ext === 'json') {
+    data = await parseJSON(file);
+  } else {
+    throw new Error(`Unsupported file format: ${ext}`);
+  }
+  
+  // Validate parsed data
+  const dataValidation = validateParsedData(data);
+  if (!dataValidation.valid) {
+    throw new Error(dataValidation.error);
+  }
+  
+  return data;
 }
 
 async function parseCSV(file: File): Promise<string[][]> {
@@ -284,15 +405,35 @@ async function parseExcel(file: File): Promise<string[][]> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
+        // Limit parsing options to prevent resource exhaustion
+        const workbook = XLSX.read(data, { 
+          type: 'array',
+          sheetRows: MAX_ROWS, // Limit rows read
+          cellFormula: false, // Don't evaluate formulas
+          cellHTML: false, // Don't parse HTML
+        });
+        
+        if (workbook.SheetNames.length === 0) {
+          reject(new Error('Excel file contains no sheets'));
+          return;
+        }
+        
         const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
         const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
-        resolve(jsonData as string[][]);
+        
+        // Sanitize all string values and convert to strings
+        const sanitizedData = (jsonData as unknown[][]).map(row => 
+          Array.isArray(row) ? row.map(cell => 
+            typeof cell === 'string' ? sanitizeString(cell) : String(cell ?? '')
+          ) : []
+        );
+        
+        resolve(sanitizedData);
       } catch (err) {
-        reject(err);
+        reject(new Error('Failed to parse Excel file. The file may be corrupted or in an unsupported format.'));
       }
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsArrayBuffer(file);
   });
 }
@@ -302,33 +443,67 @@ async function parseJSON(file: File): Promise<string[][]> {
     const reader = new FileReader();
     reader.onload = (e) => {
       try {
-        const json = JSON.parse(e.target?.result as string);
+        const content = e.target?.result as string;
+        
+        // Basic size check for JSON content
+        if (content.length > MAX_FILE_SIZE_BYTES) {
+          reject(new Error('JSON content exceeds maximum allowed size'));
+          return;
+        }
+        
+        const json = JSON.parse(content);
+        
+        // Validate structure depth to prevent deeply nested objects
+        const maxDepth = 10;
+        const checkDepth = (obj: unknown, depth: number): boolean => {
+          if (depth > maxDepth) return false;
+          if (typeof obj !== 'object' || obj === null) return true;
+          return Object.values(obj).every(v => checkDepth(v, depth + 1));
+        };
+        
+        if (!checkDepth(json, 0)) {
+          reject(new Error('JSON structure is too deeply nested'));
+          return;
+        }
         
         // Handle structured JSON format
         if (json.plan?.months) {
           const months = json.plan.months;
+          
+          if (!Array.isArray(months) || months.length > MAX_ROWS) {
+            reject(new Error('Invalid or too many months in JSON'));
+            return;
+          }
+          
           const headers = ['Month', ...Object.keys(months[0]?.channels || {}), 'GGR', 'CAC', 'ROAS'];
           const rows = months.map((m: { month: string; channels?: Record<string, number>; kpis?: { ggr?: number; cac?: number; roas?: number } }) => [
-            m.month,
-            ...Object.values(m.channels || {}),
-            m.kpis?.ggr || 0,
-            m.kpis?.cac || 0,
-            m.kpis?.roas || 0,
+            sanitizeString(String(m.month || '')),
+            ...Object.values(m.channels || {}).map(v => String(parseNumber(v))),
+            String(parseNumber(m.kpis?.ggr)),
+            String(parseNumber(m.kpis?.cac)),
+            String(parseNumber(m.kpis?.roas)),
           ]);
           resolve([headers, ...rows]);
         } else if (Array.isArray(json)) {
+          if (json.length > MAX_ROWS) {
+            reject(new Error(`JSON array exceeds maximum rows (${MAX_ROWS})`));
+            return;
+          }
+          
           // Array of objects
-          const headers = Object.keys(json[0] || {});
-          const rows = json.map((row: Record<string, unknown>) => headers.map(h => String(row[h] ?? '')));
+          const headers = Object.keys(json[0] || {}).slice(0, MAX_COLUMNS);
+          const rows = json.map((row: Record<string, unknown>) => 
+            headers.map(h => sanitizeString(String(row[h] ?? '')))
+          );
           resolve([headers, ...rows]);
         } else {
-          reject(new Error('Unrecognized JSON structure'));
+          reject(new Error('Unrecognized JSON structure. Expected array or {plan: {months: []}} format.'));
         }
       } catch (err) {
-        reject(err);
+        reject(new Error('Failed to parse JSON file. Please check the file format.'));
       }
     };
-    reader.onerror = reject;
+    reader.onerror = () => reject(new Error('Failed to read file'));
     reader.readAsText(file);
   });
 }

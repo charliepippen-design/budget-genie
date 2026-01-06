@@ -62,10 +62,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       setResult(res);
       setStep('review');
     } catch (error) {
-      console.error('Import error:', error);
+      // Log detailed error in development only
+      if (import.meta.env.DEV) {
+        console.error('Import error:', error);
+      }
       toast({
         title: 'Import Failed',
-        description: error instanceof Error ? error.message : 'Could not parse the file',
+        description: error instanceof Error ? error.message : 'Could not parse the file. Please check the format and try again.',
         variant: 'destructive',
       });
       setStep('upload');
