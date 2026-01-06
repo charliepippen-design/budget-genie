@@ -14,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { BUDGET_PRESETS, BudgetPresetKey } from '@/lib/mediaplan-data';
+import { CurrencySelector } from '@/components/common/CurrencySelector';
 
 interface DashboardHeaderProps {
   budgetPreset: BudgetPresetKey;
@@ -47,6 +48,9 @@ export function DashboardHeader({
 
           {/* Controls */}
           <div className="flex flex-wrap items-center gap-3">
+            {/* Currency Selector */}
+            <CurrencySelector compact />
+            
             {/* Budget Type Selector */}
             <Select
               value={budgetPreset}

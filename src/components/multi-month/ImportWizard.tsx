@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
-import { useCurrencyStore, CurrencyCode } from '@/hooks/use-currency-store';
+import { useCurrencyStore, CurrencyCode, useCurrency } from '@/hooks/use-currency-store';
 import { useToast } from '@/hooks/use-toast';
 import {
   importMediaPlan,
@@ -49,6 +49,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const { toast } = useToast();
   const store = useMultiMonthStore();
   const { currency: appCurrency } = useCurrencyStore();
+  const { format: formatCurrency, symbol } = useCurrency();
   
   // Wizard state
   const [step, setStep] = useState<WizardStep>('upload');
@@ -459,7 +460,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                               </div>
                             </TableCell>
                             <TableCell className="text-xs text-right font-mono">
-                              €{m.budget.toLocaleString()}
+                              {formatCurrency(m.budget)}
                             </TableCell>
                             <TableCell className="text-xs text-right">
                               {m.channels.filter(c => c.allocationPct > 0).length} active
@@ -479,7 +480,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               <div className="grid grid-cols-3 gap-3">
                 <div className="p-3 rounded-lg border border-border bg-card/50 text-center">
                   <p className="text-2xl font-bold text-primary">
-                    €{result.months.reduce((s, m) => s + m.budget, 0).toLocaleString()}
+                    {formatCurrency(result.months.reduce((s, m) => s + m.budget, 0))}
                   </p>
                   <p className="text-xs text-muted-foreground">Total Budget</p>
                 </div>
@@ -510,7 +511,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
                 <div className="p-3 rounded-lg border border-border bg-card/50">
                   <p className="text-2xl font-bold text-primary">
-                    €{result.months.reduce((s, m) => s + m.budget, 0).toLocaleString()}
+                    {formatCurrency(result.months.reduce((s, m) => s + m.budget, 0))}
                   </p>
                   <p className="text-xs text-muted-foreground">Total Budget</p>
                 </div>

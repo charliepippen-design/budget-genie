@@ -15,8 +15,8 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatCurrency } from '@/lib/mediaplan-data';
 import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
+import { useCurrency } from '@/hooks/use-currency-store';
 
 const CHANNEL_COLORS = [
   'hsl(var(--chart-1))',
@@ -34,6 +34,7 @@ const CHANNEL_COLORS = [
 
 export function MultiMonthCharts() {
   const { months, totals } = useMultiMonthMetrics();
+  const { format: formatCurrency, symbol } = useCurrency();
 
   // Budget vs Revenue trend data
   const trendData = useMemo(() => {
@@ -103,14 +104,14 @@ export function MultiMonthCharts() {
                   yAxisId="left"
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10}
-                  tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                  tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                 />
                 <YAxis 
                   yAxisId="right"
                   orientation="right"
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10}
-                  tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                  tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -159,7 +160,7 @@ export function MultiMonthCharts() {
                 <YAxis 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10}
-                  tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                  tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                 />
                 <Tooltip
                   contentStyle={{
@@ -206,7 +207,7 @@ export function MultiMonthCharts() {
                 <YAxis 
                   stroke="hsl(var(--muted-foreground))" 
                   fontSize={10}
-                  tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                  tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                 />
                 <Tooltip
                   contentStyle={{

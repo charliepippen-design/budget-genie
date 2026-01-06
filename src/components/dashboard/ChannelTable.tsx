@@ -23,6 +23,7 @@ import {
   useCategoryTotals,
   ChannelWithMetrics,
 } from '@/hooks/use-media-plan-store';
+import { useCurrency } from '@/hooks/use-currency-store';
 import { cn } from '@/lib/utils';
 import { Search, Megaphone, Users, Star, Edit2, Check } from 'lucide-react';
 
@@ -118,6 +119,7 @@ export function ChannelTable() {
   const { setChannelAllocation, updateChannelOverride } = useMediaPlanStore();
   const channels = useChannelsWithMetrics();
   const categoryTotals = useCategoryTotals();
+  const { symbol } = useCurrency();
 
   // Group channels by category
   const groupedChannels = useMemo(() => {
@@ -249,7 +251,7 @@ export function ChannelTable() {
                           <EditableCell
                             value={channel.metrics.effectiveCpm}
                             onSave={(v) => updateChannelOverride(channel.id, { overrideCpm: v })}
-                            prefix="€"
+                            prefix={symbol}
                             className="justify-end text-muted-foreground"
                           />
                         </TableCell>
