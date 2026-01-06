@@ -55,14 +55,26 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
   const { format: formatCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
   
+  // Derive defaults for channels that may not have polymorphic fields yet
+  const defaultFamily: ChannelFamily = channel.family || 'paid_media';
+  const defaultBuyingModel: BuyingModel = channel.buyingModel || FAMILY_INFO[defaultFamily].defaultModel;
+  const defaultConfig: ChannelTypeConfig = channel.typeConfig || {
+    family: defaultFamily,
+    buyingModel: defaultBuyingModel,
+    cpm: channel.baseCpm || 5,
+    ctr: channel.baseCtr || 1,
+    cr: channel.baseCr || 2.5,
+  };
+  
   // Local state for form
-  const [family, setFamily] = useState<ChannelFamily>(channel.family);
-  const [buyingModel, setBuyingModel] = useState<BuyingModel>(channel.buyingModel);
-  const [config, setConfig] = useState<ChannelTypeConfig>(channel.typeConfig);
+  const [family, setFamily] = useState<ChannelFamily>(defaultFamily);
+  const [buyingModel, setBuyingModel] = useState<BuyingModel>(defaultBuyingModel);
+  const [config, setConfig] = useState<ChannelTypeConfig>(defaultConfig);
 
-  // Get allowed models for selected family
+  // Get allowed models for selected family (with fallback)
   const allowedModels = useMemo(() => {
-    return FAMILY_INFO[family].allowedModels;
+    const familyInfo = FAMILY_INFO[family];
+    return familyInfo?.allowedModels || ['cpm', 'cpc'];
   }, [family]);
 
   // Calculate preview metrics
