@@ -497,10 +497,10 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
     const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
     const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);
     
-    // Warnings for legacy compat
+    // Warnings for legacy compat - use generic symbol (will be formatted by UI)
     const warnings: string[] = [];
     if (aboveCpaTarget) {
-      warnings.push(`CPA €${metrics.cpa?.toFixed(0)} exceeds target €${cpaTarget}`);
+      warnings.push(`CPA ${metrics.cpa?.toFixed(0)} exceeds target ${cpaTarget}`);
     }
     if (belowRoasTarget) {
       warnings.push(`ROAS ${metrics.roas.toFixed(1)}x below target ${roasTarget}x`);

@@ -26,6 +26,7 @@ import {
   useScenarioMetrics,
   calculatePlanMetrics,
 } from '@/hooks/use-multi-month-store';
+import { useCurrency } from '@/hooks/use-currency-store';
 
 interface ComparisonMetric {
   label: string;
@@ -46,6 +47,7 @@ export function ScenarioComparison() {
     months,
   } = useMultiMonthStore();
 
+  const { symbol } = useCurrency();
   const currentMetrics = useMultiMonthMetrics();
   const comparisonScenario = scenarios.find(s => s.id === comparisonScenarioId);
   const comparisonMetrics = useMemo(() => {
@@ -255,7 +257,7 @@ export function ScenarioComparison() {
                       <YAxis 
                         stroke="hsl(var(--muted-foreground))" 
                         fontSize={10}
-                        tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                        tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                       />
                       <Tooltip
                         contentStyle={{
@@ -300,7 +302,7 @@ export function ScenarioComparison() {
                       <YAxis 
                         stroke="hsl(var(--muted-foreground))" 
                         fontSize={10}
-                        tickFormatter={(v) => `€${(v / 1000).toFixed(0)}K`}
+                        tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                       />
                       <Tooltip
                         contentStyle={{
