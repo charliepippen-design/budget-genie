@@ -24,7 +24,9 @@ import {
 } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
-import { Search, Megaphone, Users, Star, Edit2, Check } from 'lucide-react';
+import { Search, Megaphone, Users, Star, Edit2, Settings2 } from 'lucide-react';
+import { ChannelEditor } from './ChannelEditor';
+import { BUYING_MODEL_INFO } from '@/types/channel';
 
 const CategoryIcon = ({ category }: { category: ChannelCategory }) => {
   const icons = {
@@ -223,12 +225,18 @@ export function ChannelTable() {
                         )}
                       >
                         <TableCell className="font-medium">
-                          <span className={cn(
-                            "text-sm",
-                            isWarning && "text-destructive"
-                          )}>
-                            {channel.name}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={cn(
+                              "text-sm",
+                              isWarning && "text-destructive"
+                            )}>
+                              {channel.name}
+                            </span>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
+                              {BUYING_MODEL_INFO[channel.buyingModel]?.name || 'CPM'}
+                            </Badge>
+                            <ChannelEditor channel={channel} />
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-3">

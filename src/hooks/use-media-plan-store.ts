@@ -1,6 +1,15 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
+import { 
+  ChannelFamily, 
+  BuyingModel, 
+  ChannelTypeConfig, 
+  FAMILY_INFO,
+  calculateUnifiedMetrics,
+  inferChannelFamily,
+  inferBuyingModel
+} from '@/types/channel';
 
 // ========== DATA MODEL ==========
 
@@ -12,7 +21,12 @@ export interface ChannelData {
   category: ChannelCategory;
   allocationPct: number;
   
-  // Base KPI inputs (from CSV/defaults)
+  // NEW: Channel type configuration for polymorphic calculations
+  family: ChannelFamily;
+  buyingModel: BuyingModel;
+  typeConfig: ChannelTypeConfig;
+  
+  // Base KPI inputs (from CSV/defaults) - kept for backwards compatibility
   baseCpm: number;
   baseCtr: number;
   baseCr: number; // Conversion rate (%)
@@ -40,6 +54,7 @@ export interface GlobalMultipliers {
   ctrBump: number;
   cpaTarget: number | null;
   roasTarget: number | null;
+  playerValue: number; // LTV per FTD for revenue calc
 }
 
 export interface CalculatedChannelMetrics {
@@ -109,34 +124,65 @@ const DEFAULT_MULTIPLIERS: GlobalMultipliers = {
   ctrBump: 0,
   cpaTarget: null,
   roasTarget: null,
+  playerValue: 150, // Default LTV per FTD
 };
+
+// Helper to create type config from legacy channel data
+function createTypeConfigFromLegacy(ch: typeof BASE_CHANNELS_DATA[0]): ChannelTypeConfig {
+  const family = inferChannelFamily(ch.name);
+  const buyingModel = inferBuyingModel(ch.name, family);
+  
+  return {
+    family,
+    buyingModel,
+    cpm: ch.cpm,
+    ctr: ch.ctr,
+    cr: 2.5,
+    // Set defaults based on model
+    ...(buyingModel === 'flat_fee' && { fixedCost: ch.baseSpend, estFtds: 5 }),
+    ...(buyingModel === 'retainer' && { fixedCost: ch.baseSpend, estTraffic: 5000, cr: 2.5 }),
+    ...(buyingModel === 'cpa' && { targetCpa: 50, targetFtds: 10 }),
+    ...(buyingModel === 'unit_based' && { unitCount: 4, costPerUnit: 500, estReachPerUnit: 50000, ctr: ch.ctr, cr: 2.5 }),
+  };
+}
 
 function createInitialChannels(): ChannelData[] {
   const totalBaseSpend = BASE_CHANNELS_DATA.reduce((sum, ch) => sum + ch.baseSpend, 0);
   
-  return BASE_CHANNELS_DATA.map((ch) => ({
-    id: ch.id,
-    name: ch.name,
-    category: ch.category,
-    allocationPct: (ch.baseSpend / totalBaseSpend) * 100,
+  return BASE_CHANNELS_DATA.map((ch) => {
+    const family = inferChannelFamily(ch.name);
+    const buyingModel = inferBuyingModel(ch.name, family);
+    const typeConfig = createTypeConfigFromLegacy(ch);
     
-    baseCpm: ch.cpm,
-    baseCtr: ch.ctr,
-    baseCr: 2.5, // Default conversion rate
-    baseCpa: null,
-    baseRoas: ch.roas,
-    
-    overrideCpm: null,
-    overrideCtr: null,
-    overrideCr: null,
-    overrideCpa: null,
-    overrideRoas: null,
-    
-    impressionMode: (ch.category === 'influencer' || ch.id === 'affiliate-listing') ? 'FIXED' : 'CPM',
-    fixedImpressions: ch.category === 'influencer' ? 200000 : 100000,
-    
-    locked: false,
-  }));
+    return {
+      id: ch.id,
+      name: ch.name,
+      category: ch.category,
+      allocationPct: (ch.baseSpend / totalBaseSpend) * 100,
+      
+      // NEW: Channel type fields
+      family,
+      buyingModel,
+      typeConfig,
+      
+      baseCpm: ch.cpm,
+      baseCtr: ch.ctr,
+      baseCr: 2.5, // Default conversion rate
+      baseCpa: null,
+      baseRoas: ch.roas,
+      
+      overrideCpm: null,
+      overrideCtr: null,
+      overrideCr: null,
+      overrideCpa: null,
+      overrideRoas: null,
+      
+      impressionMode: (ch.category === 'influencer' || ch.id === 'affiliate-listing') ? 'FIXED' as ImpressionMode : 'CPM' as ImpressionMode,
+      fixedImpressions: ch.category === 'influencer' ? 200000 : 100000,
+      
+      locked: false,
+    };
+  });
 }
 
 // ========== CALCULATION FUNCTIONS ==========
@@ -219,6 +265,10 @@ interface MediaPlanState {
   setFixedImpressions: (channelId: string, impressions: number) => void;
   addChannel: (channel: Partial<ChannelData> & { name: string; category: ChannelCategory }) => void;
   deleteChannel: (id: string) => void;
+  
+  // Actions - Channel Types (NEW)
+  setChannelType: (channelId: string, family: ChannelFamily, buyingModel: BuyingModel) => void;
+  updateChannelTypeConfig: (channelId: string, config: Partial<ChannelTypeConfig>) => void;
   
   // Actions - Multipliers
   setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
@@ -315,11 +365,26 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       addChannel: (channelData) => {
         set((state) => {
           const id = `channel-${Date.now()}`;
+          const family = channelData.family ?? inferChannelFamily(channelData.name);
+          const buyingModel = channelData.buyingModel ?? inferBuyingModel(channelData.name, family);
+          
           const newChannel: ChannelData = {
             id,
             name: channelData.name,
             category: channelData.category,
             allocationPct: 5,
+            
+            // NEW: Channel type fields
+            family,
+            buyingModel,
+            typeConfig: channelData.typeConfig ?? {
+              family,
+              buyingModel,
+              cpm: channelData.baseCpm ?? 5,
+              ctr: channelData.baseCtr ?? 1,
+              cr: channelData.baseCr ?? 2.5,
+            },
+            
             baseCpm: channelData.baseCpm ?? 5,
             baseCtr: channelData.baseCtr ?? 1,
             baseCr: channelData.baseCr ?? 2.5,
@@ -365,6 +430,32 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             })),
           };
         });
+      },
+      
+      // Channel Type Actions (NEW)
+      setChannelType: (channelId, family, buyingModel) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId 
+              ? { 
+                  ...ch, 
+                  family, 
+                  buyingModel,
+                  typeConfig: { ...ch.typeConfig, family, buyingModel }
+                } 
+              : ch
+          ),
+        }));
+      },
+      
+      updateChannelTypeConfig: (channelId, config) => {
+        set((state) => ({
+          channels: state.channels.map((ch) =>
+            ch.id === channelId 
+              ? { ...ch, typeConfig: { ...ch.typeConfig, ...config } } 
+              : ch
+          ),
+        }));
       },
       
       // Multipliers
