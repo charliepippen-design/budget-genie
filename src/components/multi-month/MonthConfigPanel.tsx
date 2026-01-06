@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Calendar,
   TrendingUp,
@@ -9,6 +9,7 @@ import {
   BarChart3,
   Rocket,
   LayoutGrid,
+  Upload,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -33,6 +34,7 @@ import {
   useMultiMonthStore,
   ProgressionPattern,
 } from '@/hooks/use-multi-month-store';
+import { ImportWizard } from './ImportWizard';
 
 const PATTERN_INFO: Record<ProgressionPattern, { icon: React.ReactNode; label: string; description: string }> = {
   linear: { icon: <TrendingUp className="h-4 w-4" />, label: 'Linear Growth', description: 'Steady month-over-month budget increase' },
@@ -47,6 +49,8 @@ const PATTERN_INFO: Record<ProgressionPattern, { icon: React.ReactNode; label: s
 };
 
 export function MonthConfigPanel() {
+  const [importOpen, setImportOpen] = useState(false);
+  
   const {
     includeSoftLaunch,
     planningMonths,
@@ -84,116 +88,133 @@ export function MonthConfigPanel() {
   const monthOptions = generateMonthOptions();
 
   return (
-    <Card className="border-border bg-card/50">
-      <CardContent className="p-4 space-y-4">
-        <div className="flex flex-wrap items-center gap-4">
-          {/* Duration */}
-          <div className="flex items-center gap-3">
-            <Label className="text-sm font-medium text-foreground whitespace-nowrap">Plan Duration</Label>
-            <div className="flex items-center gap-2">
-              <Checkbox
-                id="soft-launch"
-                checked={includeSoftLaunch}
-                onCheckedChange={(checked) => setIncludeSoftLaunch(checked === true)}
-              />
-              <Label htmlFor="soft-launch" className="text-xs text-muted-foreground cursor-pointer">
-                Include Soft Launch
-              </Label>
+    <>
+      <Card className="border-border bg-card/50">
+        <CardContent className="p-4 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
+              {/* Duration */}
+              <div className="flex items-center gap-3">
+                <Label className="text-sm font-medium text-foreground whitespace-nowrap">Plan Duration</Label>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="soft-launch"
+                    checked={includeSoftLaunch}
+                    onCheckedChange={(checked) => setIncludeSoftLaunch(checked === true)}
+                  />
+                  <Label htmlFor="soft-launch" className="text-xs text-muted-foreground cursor-pointer">
+                    Include Soft Launch
+                  </Label>
+                </div>
+                <Select
+                  value={planningMonths.toString()}
+                  onValueChange={(v) => setPlanningMonths(parseInt(v))}
+                >
+                  <SelectTrigger className="w-24 h-8 text-sm bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
+                      <SelectItem key={n} value={n.toString()}>
+                        {n} months
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Start Month */}
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <Label className="text-sm text-muted-foreground">Start:</Label>
+                <Select value={startMonth} onValueChange={setStartMonth}>
+                  <SelectTrigger className="w-40 h-8 text-sm bg-background border-border">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Total Display */}
+              <Badge variant="secondary" className="px-3 py-1 text-sm">
+                Total: {totalMonths} months
+              </Badge>
+              {dateRange && (
+                <span className="text-xs text-muted-foreground hidden lg:inline">
+                  ({dateRange})
+                </span>
+              )}
             </div>
-            <Select
-              value={planningMonths.toString()}
-              onValueChange={(v) => setPlanningMonths(parseInt(v))}
-            >
-              <SelectTrigger className="w-24 h-8 text-sm bg-background border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((n) => (
-                  <SelectItem key={n} value={n.toString()}>
-                    {n} months
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Start Month */}
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <Label className="text-sm text-muted-foreground">Start:</Label>
-            <Select value={startMonth} onValueChange={setStartMonth}>
-              <SelectTrigger className="w-40 h-8 text-sm bg-background border-border">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((opt) => (
-                  <SelectItem key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Total Display */}
-          <Badge variant="secondary" className="px-3 py-1 text-sm">
-            Total: {totalMonths} months
-          </Badge>
-          {dateRange && (
-            <span className="text-xs text-muted-foreground hidden lg:inline">
-              ({dateRange})
-            </span>
-          )}
-        </div>
-
-        {/* Progression Pattern */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <Label className="text-sm font-medium text-foreground">Progression Pattern</Label>
+            
+            {/* Import Button */}
             <Button
-              variant="outline"
+              variant="default"
               size="sm"
-              onClick={applyPattern}
-              className="h-7 text-xs gap-1"
+              onClick={() => setImportOpen(true)}
+              className="gap-2"
             >
-              <TrendingUp className="h-3 w-3" />
-              Apply to All
+              <Upload className="h-4 w-4" />
+              Import Plan
             </Button>
           </div>
-          
-          <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
-            <TooltipProvider>
-              {(Object.keys(PATTERN_INFO) as ProgressionPattern[]).map((pattern) => {
-                const info = PATTERN_INFO[pattern];
-                return (
-                  <Tooltip key={pattern}>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => setProgressionPattern(pattern)}
-                        className={cn(
-                          "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
-                          progressionPattern === pattern
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {info.icon}
-                        <span className="text-[10px] leading-tight text-center line-clamp-1">
-                          {info.label.split(' ')[0]}
-                        </span>
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[200px]">
-                      <p className="font-medium">{info.label}</p>
-                      <p className="text-xs text-muted-foreground">{info.description}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                );
-              })}
-            </TooltipProvider>
+
+          {/* Progression Pattern */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-medium text-foreground">Progression Pattern</Label>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={applyPattern}
+                className="h-7 text-xs gap-1"
+              >
+                <TrendingUp className="h-3 w-3" />
+                Apply to All
+              </Button>
+            </div>
+            
+            <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
+              <TooltipProvider>
+                {(Object.keys(PATTERN_INFO) as ProgressionPattern[]).map((pattern) => {
+                  const info = PATTERN_INFO[pattern];
+                  return (
+                    <Tooltip key={pattern}>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => setProgressionPattern(pattern)}
+                          className={cn(
+                            "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
+                            progressionPattern === pattern
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-background hover:bg-muted/50 text-muted-foreground hover:text-foreground"
+                          )}
+                        >
+                          {info.icon}
+                          <span className="text-[10px] leading-tight text-center line-clamp-1">
+                            {info.label.split(' ')[0]}
+                          </span>
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" className="max-w-[200px]">
+                        <p className="font-medium">{info.label}</p>
+                        <p className="text-xs text-muted-foreground">{info.description}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TooltipProvider>
+            </div>
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+      
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
+    </>
   );
 }
