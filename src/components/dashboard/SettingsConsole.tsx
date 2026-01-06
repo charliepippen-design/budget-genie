@@ -47,7 +47,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { formatCurrency, ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
+import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { 
   useMediaPlanStore, 
@@ -73,7 +73,7 @@ export function SettingsConsole() {
   });
   
   const { toast } = useToast();
-  const { symbol } = useCurrency();
+  const { symbol, format: formatCurrency } = useCurrency();
   
   const {
     totalBudget,

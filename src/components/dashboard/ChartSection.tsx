@@ -3,7 +3,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from 'recha
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
-import { CATEGORY_INFO, formatCurrency, formatPercentage } from '@/lib/mediaplan-data';
+import { CATEGORY_INFO, formatPercentage } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface ChartSectionProps {
   channels: ChannelWithMetrics[];
@@ -17,43 +18,46 @@ const CHART_COLORS = [
   'hsl(38, 92%, 55%)',    // Warning amber
 ];
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-        <p className="font-semibold text-sm">{data.name}</p>
-        <p className="text-sm text-muted-foreground">
-          Spend: <span className="font-mono text-foreground">{formatCurrency(data.value)}</span>
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Allocation: <span className="font-mono text-foreground">{formatPercentage(data.percentage)}</span>
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
-const RoasTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
-        <p className="font-semibold text-sm">{data.name}</p>
-        <p className="text-sm text-muted-foreground">
-          ROAS: <span className="font-mono text-foreground">{data.roas.toFixed(2)}x</span>
-        </p>
-        <p className="text-sm text-muted-foreground">
-          Spend: <span className="font-mono text-foreground">{formatCurrency(data.spend)}</span>
-        </p>
-      </div>
-    );
-  }
-  return null;
-};
-
 export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
+  const { format: formatCurrency } = useCurrency();
+
+  // Custom tooltips defined inside component to access formatCurrency
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-sm">{data.name}</p>
+          <p className="text-sm text-muted-foreground">
+            Spend: <span className="font-mono text-foreground">{formatCurrency(data.value)}</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Allocation: <span className="font-mono text-foreground">{formatPercentage(data.percentage)}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const RoasTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-sm">{data.name}</p>
+          <p className="text-sm text-muted-foreground">
+            ROAS: <span className="font-mono text-foreground">{data.roas.toFixed(2)}x</span>
+          </p>
+          <p className="text-sm text-muted-foreground">
+            Spend: <span className="font-mono text-foreground">{formatCurrency(data.spend)}</span>
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
   // Pie chart data - by category
   const pieData = useMemo(() => {
     return Object.entries(categoryTotals).map(([category, data], index) => ({
