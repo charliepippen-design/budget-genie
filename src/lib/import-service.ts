@@ -49,7 +49,8 @@ const parsedMonthDataSchema = z.object({
 // ========== TYPES ==========
 
 export type FileFormat = 'csv' | 'xlsx' | 'json';
-export type DataStructure = 'row-based' | 'column-based' | 'monthly-summary' | 'pivot';
+export type DataStructure = 'row-based' | 'column-based' | 'monthly-summary' | 'pivot' | 'annual-totals';
+export type ImportGranularity = 'monthly' | 'annual';
 
 export interface ChannelMapping {
   sourceColumn: string;
@@ -58,9 +59,43 @@ export interface ChannelMapping {
   confidence: number;
 }
 
+export interface ColumnIssue {
+  id: string;
+  sourceColumn: string;
+  issueType: 'unmapped' | 'low-confidence' | 'duplicate';
+  message: string;
+  suggestedMapping?: string;
+  resolved: boolean;
+}
+
+export interface CellIssue {
+  column: string;
+  message: string;
+  originalValue: string;
+  issueType: 'invalid-number' | 'missing-required' | 'out-of-range' | 'date-parse';
+  suggestedValue?: number;
+  resolved: boolean;
+  resolvedValue?: number | null;
+}
+
+export interface DirtyRow {
+  rowIndex: number;
+  rawData: string[];
+  issues: CellIssue[];
+}
+
+export interface ValidationReport {
+  totalRows: number;
+  cleanRows: number;
+  dirtyRows: DirtyRow[];
+  columnIssues: ColumnIssue[];
+  healableFields: number;
+}
+
 export interface DetectedStructure {
   format: FileFormat;
   structure: DataStructure;
+  granularity: ImportGranularity;
   confidence: number;
   headerRow: number;
   dataStartRow: number;
@@ -70,6 +105,9 @@ export interface DetectedStructure {
   warnings: string[];
   rawData: string[][];
   parsedMonths: ParsedMonthData[];
+  detectedCurrency: string | null;
+  currencyConfidence: number;
+  validationReport: ValidationReport;
 }
 
 export interface ParsedMonthData {
@@ -135,7 +173,7 @@ const CHANNEL_DEFAULTS: Record<string, { category: ChannelCategory; cpm: number;
   'influencer-funds': { category: 'influencer', cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0 },
 };
 
-const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
+export const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
   'seo-tech': 'SEO - Tech Audit',
   'seo-content': 'SEO - Content',
   'seo-backlinks': 'SEO - Backlinks',
@@ -510,15 +548,131 @@ async function parseJSON(file: File): Promise<string[][]> {
 
 // ========== STRUCTURE DETECTION ==========
 
+// Currency detection helper
+function detectCurrencyFromData(rawData: string[][]): { detected: string | null; confidence: number } {
+  const currencyPatterns: Record<string, RegExp> = {
+    'EUR': /€|EUR/i,
+    'USD': /\$|USD/i,
+    'GBP': /£|GBP/i,
+    'CHF': /CHF/i,
+    'JPY': /¥|JPY/i,
+  };
+  
+  const counts: Record<string, number> = {};
+  let totalNumeric = 0;
+  
+  for (let i = 0; i < Math.min(20, rawData.length); i++) {
+    const row = rawData[i];
+    if (!row) continue;
+    for (const cell of row) {
+      if (!cell || typeof cell !== 'string' || !/\d/.test(cell)) continue;
+      totalNumeric++;
+      for (const [code, pattern] of Object.entries(currencyPatterns)) {
+        if (pattern.test(cell)) {
+          counts[code] = (counts[code] || 0) + 1;
+        }
+      }
+    }
+  }
+  
+  let maxCount = 0;
+  let detected: string | null = null;
+  for (const [code, count] of Object.entries(counts)) {
+    if (count > maxCount) {
+      maxCount = count;
+      detected = code;
+    }
+  }
+  
+  return {
+    detected,
+    confidence: totalNumeric > 0 ? Math.min(maxCount / totalNumeric, 1) : 0,
+  };
+}
+
+// Validation report builder
+function buildValidationReport(
+  rawData: string[][],
+  dataStartRow: number,
+  channelMappings: ChannelMapping[]
+): ValidationReport {
+  const dirtyRows: DirtyRow[] = [];
+  const columnIssues: ColumnIssue[] = [];
+  let healableFields = 0;
+  
+  // Check for unmapped columns (low confidence)
+  channelMappings.forEach((mapping, idx) => {
+    if (mapping.confidence < 0.7) {
+      columnIssues.push({
+        id: `col-${idx}`,
+        sourceColumn: mapping.sourceColumn,
+        issueType: 'low-confidence',
+        message: `Low confidence match (${Math.round(mapping.confidence * 100)}%)`,
+        suggestedMapping: mapping.targetChannelId,
+        resolved: false,
+      });
+    }
+  });
+  
+  // Check data rows for issues
+  rawData.slice(dataStartRow).forEach((row, rowIdx) => {
+    if (!row || row.length === 0) return;
+    
+    const issues: CellIssue[] = [];
+    
+    row.forEach((cell, colIdx) => {
+      if (colIdx === 0) return; // Skip first column (usually labels)
+      
+      const cellStr = String(cell || '').trim();
+      
+      // Check for non-numeric values in data cells
+      if (cellStr && !/^[\d.,\-+€$£¥%\s()]+$/.test(cellStr) && cellStr.toLowerCase() !== 'tbd' && cellStr !== '-') {
+        // Not a pure number - could be text like "TBD"
+        if (/tbd|pending|n\/a|null/i.test(cellStr)) {
+          issues.push({
+            column: `Column ${colIdx + 1}`,
+            message: `Found placeholder "${cellStr}" - needs a numeric value`,
+            originalValue: cellStr,
+            issueType: 'invalid-number',
+            suggestedValue: 0,
+            resolved: false,
+          });
+          healableFields++;
+        }
+      }
+    });
+    
+    if (issues.length > 0) {
+      dirtyRows.push({
+        rowIndex: dataStartRow + rowIdx,
+        rawData: row,
+        issues,
+      });
+    }
+  });
+  
+  return {
+    totalRows: rawData.length - dataStartRow,
+    cleanRows: rawData.length - dataStartRow - dirtyRows.length,
+    dirtyRows,
+    columnIssues,
+    healableFields,
+  };
+}
+
 export function detectStructure(rawData: string[][], fileName: string): DetectedStructure {
   const format: FileFormat = fileName.endsWith('.json') ? 'json' : 
                              fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ? 'xlsx' : 'csv';
   
   const warnings: string[] = [];
   let structure: DataStructure = 'row-based';
+  let granularity: ImportGranularity = 'monthly';
   let confidence = 0.5;
   let headerRow = 0;
   let dataStartRow = 1;
+  
+  // Detect currency
+  const { detected: detectedCurrency, confidence: currencyConfidence } = detectCurrencyFromData(rawData);
   
   // Find header row (first row with text, no numbers only)
   for (let i = 0; i < Math.min(5, rawData.length); i++) {
@@ -551,17 +705,30 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
     row && row[0] && isMonthHeader(String(row[0]))
   ).length;
   
+  // Check for annual/total structure (no months detected but has channel totals)
+  const hasAnnualKeywords = rawData.some(row => 
+    row && row.some(cell => /total|annual|yearly|full year|fy\d{2}/i.test(String(cell)))
+  );
+  
   if (monthColumnsInHeader >= 2 && firstColumnChannels >= 3) {
     structure = 'row-based';
+    granularity = 'monthly';
     confidence = 0.9;
   } else if (channelColumnsInHeader >= 3 && firstColumnMonths >= 2) {
     structure = 'pivot';
+    granularity = 'monthly';
     confidence = 0.9;
   } else if (monthColumnsInHeader >= 2) {
     structure = 'monthly-summary';
+    granularity = 'monthly';
     confidence = 0.7;
+  } else if (firstColumnChannels >= 3 && monthColumnsInHeader === 0 && hasAnnualKeywords) {
+    structure = 'annual-totals';
+    granularity = 'annual';
+    confidence = 0.8;
   } else if (firstColumnChannels >= 3) {
     structure = 'column-based';
+    granularity = 'monthly';
     confidence = 0.7;
   }
   
@@ -579,9 +746,12 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
         monthColumns.push(String(row[0]));
       }
     });
+  } else if (structure === 'annual-totals') {
+    // No month columns for annual totals
+    monthColumns.push('Annual Total');
   }
   
-  if (monthColumns.length === 0) {
+  if (monthColumns.length === 0 && structure !== 'annual-totals') {
     // Fallback: look for any column that could be months
     headerRowData.slice(1).forEach((cell, idx) => {
       const val = String(cell).trim();
@@ -598,7 +768,7 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
   const channelMappings: ChannelMapping[] = [];
   const seenChannels = new Set<string>();
   
-  if (structure === 'row-based' || structure === 'monthly-summary') {
+  if (structure === 'row-based' || structure === 'monthly-summary' || structure === 'annual-totals') {
     rawData.slice(dataStartRow).forEach(row => {
       if (row && row[0]) {
         const match = matchChannel(String(row[0]));
@@ -638,7 +808,7 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
   // Build metric mappings
   const metricMappings: Record<string, string> = {};
   
-  const allCells = structure === 'row-based' || structure === 'monthly-summary'
+  const allCells = structure === 'row-based' || structure === 'monthly-summary' || structure === 'annual-totals'
     ? rawData.slice(dataStartRow).map(row => String(row?.[0] || ''))
     : headerRowData.map(cell => String(cell));
   
@@ -656,9 +826,13 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
     warnings.push('No months could be parsed from the data.');
   }
   
+  // Build validation report
+  const validationReport = buildValidationReport(rawData, dataStartRow, channelMappings);
+  
   return {
     format,
     structure,
+    granularity,
     confidence,
     headerRow,
     dataStartRow,
@@ -668,6 +842,9 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
     warnings,
     rawData,
     parsedMonths,
+    detectedCurrency,
+    currencyConfidence,
+    validationReport,
   };
 }
 
