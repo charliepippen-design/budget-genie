@@ -8,7 +8,8 @@ import {
   ArrowDownRight,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
-import { formatCurrency, formatNumber } from '@/lib/mediaplan-data';
+import { formatNumber } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 
 interface SummaryCardsProps {
@@ -88,6 +89,8 @@ export function SummaryCards({
   projectedRevenue,
   blendedRoas,
 }: SummaryCardsProps) {
+  const { format: formatCurrency } = useCurrency();
+  
   const metrics = useMemo(() => [
     {
       title: 'Total Budget',

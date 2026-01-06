@@ -45,7 +45,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/mediaplan-data';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useToast } from '@/hooks/use-toast';
 

@@ -16,7 +16,7 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 const CHANNEL_COLORS = [
   'hsl(var(--chart-1))',

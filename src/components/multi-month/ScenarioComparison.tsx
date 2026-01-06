@@ -26,7 +26,7 @@ import {
   useScenarioMetrics,
   calculatePlanMetrics,
 } from '@/hooks/use-multi-month-store';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface ComparisonMetric {
   label: string;
