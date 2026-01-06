@@ -29,6 +29,7 @@ import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { exportToPdf, exportToCsv } from '@/lib/export-service';
 
 const Index = () => {
   const { totalBudget, setTotalBudget } = useMediaPlanStore();
@@ -36,7 +37,7 @@ const Index = () => {
   const blendedMetrics = useBlendedMetrics();
   const categoryTotals = useCategoryTotals();
   const { generateMonths, months } = useMultiMonthStore();
-  const { format: formatCurrency } = useCurrency();
+  const { format: formatCurrency, symbol: currencySymbol } = useCurrency();
   
   const { toast } = useToast();
 
@@ -49,47 +50,32 @@ const Index = () => {
 
   // Export handlers
   const handleExport = useCallback(async (format: 'pdf' | 'csv' | 'png') => {
-    if (format === 'csv') {
-      const headers = [
-        'Channel', 'Category', 'Allocation %', 'Spend', 'CPM', 'Impressions',
-        'CTR %', 'Conv. Rate %', 'Conversions', 'CPA', 'ROAS', 'Impression Mode',
-      ];
-      const rows = channelsWithMetrics.map((ch) => [
-        ch.name, ch.category, ch.allocationPct.toFixed(2), ch.metrics.spend.toFixed(2),
-        ch.metrics.effectiveCpm.toFixed(2), Math.round(ch.metrics.impressions),
-        ch.metrics.effectiveCtr.toFixed(2), ch.metrics.effectiveCr.toFixed(2),
-        Math.round(ch.metrics.conversions), ch.metrics.cpa?.toFixed(2) || 'N/A',
-        ch.metrics.roas.toFixed(2), ch.impressionMode,
-      ]);
-
-      const csvContent = [
-        headers.join(','),
-        ...rows.map((row) => row.join(',')),
-        '', `Total Budget,${formatCurrency(totalBudget)}`,
-        `Blended CPA,${blendedMetrics.blendedCpa ? formatCurrency(blendedMetrics.blendedCpa) : 'N/A'}`,
-        `Total Conversions,${Math.round(blendedMetrics.totalConversions)}`,
-        `Projected Revenue,${formatCurrency(blendedMetrics.projectedRevenue)}`,
-        `Blended ROAS,${blendedMetrics.blendedRoas.toFixed(2)}x`,
-      ].join('\n');
-
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `mediaplan-${new Date().toISOString().split('T')[0]}.csv`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast({ title: 'CSV Exported', description: 'Your media plan has been exported to CSV.' });
-    } else {
+    const exportOptions = {
+      currencySymbol,
+      formatCurrency,
+    };
+    
+    try {
+      if (format === 'pdf') {
+        exportToPdf(channelsWithMetrics, totalBudget, blendedMetrics, exportOptions);
+        toast({ title: 'PDF Exported', description: 'Your media plan has been exported to PDF.' });
+      } else if (format === 'csv') {
+        exportToCsv(channelsWithMetrics, totalBudget, blendedMetrics, exportOptions);
+        toast({ title: 'CSV Exported', description: 'Your media plan has been exported to CSV.' });
+      } else {
+        toast({
+          title: 'PNG Export',
+          description: 'Use your browser\'s screenshot tool (Ctrl/Cmd + Shift + S) to capture the page.',
+        });
+      }
+    } catch (error) {
       toast({
-        title: `${format.toUpperCase()} Export`,
-        description: 'Use your browser\'s print function (Ctrl/Cmd + P) to save as PDF.',
+        title: 'Export Failed',
+        description: error instanceof Error ? error.message : 'An error occurred during export.',
+        variant: 'destructive',
       });
     }
-  }, [channelsWithMetrics, totalBudget, blendedMetrics, toast]);
+  }, [channelsWithMetrics, totalBudget, blendedMetrics, formatCurrency, currencySymbol, toast]);
 
   return (
     <>
