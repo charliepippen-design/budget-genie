@@ -31,9 +31,10 @@ import {
   OptimizationGoal,
   RiskLevel,
 } from '@/hooks/use-multi-month-store';
+import { useCurrency } from '@/hooks/use-currency-store';
 
 const GOAL_OPTIONS: { value: OptimizationGoal; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: 'maximize-roas', label: 'Maximize ROAS', icon: <TrendingUp className="h-4 w-4" />, description: 'Best return per € spent' },
+  { value: 'maximize-roas', label: 'Maximize ROAS', icon: <TrendingUp className="h-4 w-4" />, description: 'Best return per spend' },
   { value: 'minimize-cac', label: 'Minimize CAC', icon: <DollarSign className="h-4 w-4" />, description: 'Lowest cost per acquisition' },
   { value: 'maximize-revenue', label: 'Maximize Revenue', icon: <BarChart3 className="h-4 w-4" />, description: 'Highest total GGR' },
   { value: 'maximize-profit', label: 'Maximize Profit', icon: <Target className="h-4 w-4" />, description: 'Highest net P&L' },
@@ -60,6 +61,8 @@ export function AutoOptimizer() {
     runOptimization,
     loadOptimizationResult,
   } = useMultiMonthStore();
+  
+  const { symbol } = useCurrency();
 
   const [progress, setProgress] = useState(0);
 
@@ -168,7 +171,7 @@ export function AutoOptimizer() {
             {/* Target Constraints */}
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <Label className="text-xs">Max CAC (€)</Label>
+                <Label className="text-xs">Max CAC ({symbol})</Label>
                 <Input
                   type="number"
                   value={constraints.maxCacTolerance ?? ''}
