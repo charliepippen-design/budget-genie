@@ -26,7 +26,8 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const format = (value: number, compact = false) => {
-    return new Intl.NumberFormat(code === 'USD' ? 'en-US' : 'de-DE', {
+    const locale = code === 'USD' ? 'en-US' : (code === 'GBP' ? 'en-GB' : 'de-DE');
+    return new Intl.NumberFormat(locale, {
       style: 'currency',
       currency: code,
       notation: compact ? 'compact' : 'standard',
