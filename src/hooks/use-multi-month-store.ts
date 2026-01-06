@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChannelCategory } from '@/lib/mediaplan-data';
+import { ChannelFamily, BuyingModel, ChannelTypeConfig } from '@/types/channel';
 
 // ========== TYPES ==========
 
@@ -37,6 +38,10 @@ export interface ChannelMonthConfig {
   impressionMode: 'CPM' | 'FIXED';
   fixedImpressions: number;
   locked: boolean;
+  // Polymorphic channel type fields
+  family?: ChannelFamily;
+  buyingModel?: BuyingModel;
+  typeConfig?: ChannelTypeConfig;
 }
 
 export interface MonthData {

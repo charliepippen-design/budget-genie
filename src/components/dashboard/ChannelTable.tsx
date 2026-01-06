@@ -233,7 +233,7 @@ export function ChannelTable() {
                               {channel.name}
                             </span>
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
-                              {BUYING_MODEL_INFO[channel.buyingModel]?.name || 'CPM'}
+                              {(channel.buyingModel && BUYING_MODEL_INFO[channel.buyingModel]?.name) || 'CPM'}
                             </Badge>
                             <ChannelEditor channel={channel} />
                           </div>

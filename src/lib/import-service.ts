@@ -3,6 +3,14 @@ import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { ChannelMonthConfig, MonthData, GlobalPlanSettings, ProgressionPattern } from '@/hooks/use-multi-month-store';
 import { ChannelCategory } from '@/lib/mediaplan-data';
+import { 
+  ChannelFamily, 
+  BuyingModel, 
+  ChannelTypeConfig, 
+  FAMILY_INFO,
+  inferChannelFamily, 
+  inferBuyingModel 
+} from '@/types/channel';
 
 // ========== CONSTANTS ==========
 
@@ -1011,15 +1019,34 @@ export function convertToMonthData(
   const months: MonthData[] = parsedMonths.map((pm, idx) => {
     const totalBudget = pm.budget || Object.values(pm.channels).reduce((sum, v) => sum + v, 0);
     
-    // Build channel configs
+    // Build channel configs with polymorphic type fields
     const channels: ChannelMonthConfig[] = Object.keys(CHANNEL_DEFAULTS).map(channelId => {
       const spend = pm.channels[channelId] || 0;
       const allocationPct = totalBudget > 0 ? (spend / totalBudget) * 100 : 0;
       const defaults = CHANNEL_DEFAULTS[channelId];
+      const channelName = CHANNEL_DISPLAY_NAMES[channelId];
+      
+      // Infer family and buying model from channel name
+      const family = inferChannelFamily(channelName);
+      const buyingModel = inferBuyingModel(channelName, family);
+      
+      // Build type config with appropriate defaults
+      const typeConfig: ChannelTypeConfig = {
+        family,
+        buyingModel,
+        cpm: defaults.cpm,
+        ctr: defaults.ctr,
+        cr: defaults.cr,
+        // Set model-specific defaults
+        ...(buyingModel === 'flat_fee' && { fixedCost: spend || 1000, estFtds: 5 }),
+        ...(buyingModel === 'retainer' && { fixedCost: spend || 1000, estTraffic: 5000, cr: defaults.cr }),
+        ...(buyingModel === 'cpa' && { targetCpa: 50, targetFtds: 10 }),
+        ...(buyingModel === 'unit_based' && { unitCount: 4, costPerUnit: 500, estReachPerUnit: 50000, ctr: defaults.ctr, cr: defaults.cr }),
+      };
       
       return {
         channelId,
-        name: CHANNEL_DISPLAY_NAMES[channelId],
+        name: channelName,
         category: defaults.category,
         allocationPct,
         cpm: defaults.cpm,
@@ -1029,6 +1056,10 @@ export function convertToMonthData(
         impressionMode: channelId.includes('influencer') || channelId === 'affiliate-listing' ? 'FIXED' : 'CPM',
         fixedImpressions: 100000,
         locked: false,
+        // NEW: Polymorphic fields
+        family,
+        buyingModel,
+        typeConfig,
       };
     });
     
