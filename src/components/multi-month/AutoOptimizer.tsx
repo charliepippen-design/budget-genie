@@ -196,16 +196,16 @@ export function AutoOptimizer() {
             <div>
               <Label className="text-xs">Break-even by Month</Label>
               <Select
-                value={constraints.breakEvenByMonth?.toString() ?? ''}
+                value={constraints.breakEvenByMonth?.toString() ?? 'none'}
                 onValueChange={(v) => setConstraints({ 
-                  breakEvenByMonth: v ? parseInt(v) : null 
+                  breakEvenByMonth: v === 'none' ? null : parseInt(v) 
                 })}
               >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue placeholder="No constraint" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">No constraint</SelectItem>
+                  <SelectItem value="none">No constraint</SelectItem>
                   {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
                     <SelectItem key={m} value={m.toString()}>Month {m}</SelectItem>
                   ))}
