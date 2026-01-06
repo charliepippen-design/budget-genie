@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, FileJson, FileText, CheckCircle2, AlertTriangle, ChevronRight, ChevronLeft, Loader2, X, ArrowRight, RefreshCw } from 'lucide-react';
+import { Upload, FileSpreadsheet, FileJson, FileText, CheckCircle2, AlertTriangle, ChevronRight, Loader2, RefreshCw, Sparkles, DollarSign, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
@@ -9,21 +9,25 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
+import { useCurrencyStore, CurrencyCode } from '@/hooks/use-currency-store';
 import { useToast } from '@/hooks/use-toast';
 import {
   importMediaPlan,
   DetectedStructure,
   ImportResult,
-  ChannelMapping,
   FileFormat,
+  ValidationReport,
 } from '@/lib/import-service';
+import { ReconciliationTable } from './ReconciliationTable';
+import { GranularitySelector, ImportGranularity, DistributionStrategy } from './GranularitySelector';
+import { CurrencyConflictDialog, CurrencyConflictResolution } from './CurrencyConflictDialog';
 
 interface ImportWizardProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-type WizardStep = 'upload' | 'detecting' | 'review' | 'mapping' | 'confirm' | 'success';
+type WizardStep = 'upload' | 'detecting' | 'analyze' | 'reconcile' | 'preview' | 'success';
 
 const FORMAT_INFO: Record<FileFormat | 'txt', { icon: React.ReactNode; label: string; extensions: string }> = {
   csv: { icon: <FileText className="h-6 w-6" />, label: 'CSV', extensions: '.csv' },
@@ -32,10 +36,21 @@ const FORMAT_INFO: Record<FileFormat | 'txt', { icon: React.ReactNode; label: st
   json: { icon: <FileJson className="h-6 w-6" />, label: 'JSON', extensions: '.json' },
 };
 
+const STEP_LABELS: Record<WizardStep, string> = {
+  upload: 'Upload',
+  detecting: 'Detecting',
+  analyze: 'Analyze',
+  reconcile: 'Review',
+  preview: 'Preview',
+  success: 'Done',
+};
+
 export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const { toast } = useToast();
   const store = useMultiMonthStore();
+  const { currency: appCurrency } = useCurrencyStore();
   
+  // Wizard state
   const [step, setStep] = useState<WizardStep>('upload');
   const [file, setFile] = useState<File | null>(null);
   const [detected, setDetected] = useState<DetectedStructure | null>(null);
@@ -43,12 +58,39 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   
+  // Analysis state
+  const [granularity, setGranularity] = useState<ImportGranularity>('monthly');
+  const [distribution, setDistribution] = useState<DistributionStrategy>('even');
+  const [targetMonths, setTargetMonths] = useState(12);
+  const [currencyResolution, setCurrencyResolution] = useState<CurrencyConflictResolution>('keep-numbers');
+  const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
+  
+  const hasIssues = validationReport && (
+    validationReport.dirtyRows.length > 0 || 
+    validationReport.columnIssues.length > 0
+  );
+  
+  const pendingIssues = validationReport 
+    ? validationReport.dirtyRows.reduce((c, r) => c + r.issues.filter(i => !i.resolved).length, 0) +
+      validationReport.columnIssues.filter(i => !i.resolved).length
+    : 0;
+  
+  const hasCurrencyConflict = detected && 
+    detected.detectedCurrency && 
+    detected.detectedCurrency !== appCurrency &&
+    detected.currencyConfidence > 0.3;
+  
   const resetWizard = useCallback(() => {
     setStep('upload');
     setFile(null);
     setDetected(null);
     setResult(null);
     setIsProcessing(false);
+    setGranularity('monthly');
+    setDistribution('even');
+    setTargetMonths(12);
+    setCurrencyResolution('keep-numbers');
+    setValidationReport(null);
   }, []);
   
   const handleFileSelect = useCallback(async (selectedFile: File) => {
@@ -60,9 +102,10 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       const { detected: det, result: res } = await importMediaPlan(selectedFile);
       setDetected(det);
       setResult(res);
-      setStep('review');
+      setGranularity(det.granularity);
+      setValidationReport(det.validationReport);
+      setStep('analyze');
     } catch (error) {
-      // Log detailed error in development only
       if (import.meta.env.DEV) {
         console.error('Import error:', error);
       }
@@ -86,6 +129,36 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       handleFileSelect(droppedFile);
     }
   }, [handleFileSelect]);
+  
+  const handleHealData = useCallback(() => {
+    if (!validationReport) return;
+    
+    // Auto-resolve all healable issues
+    const updatedDirtyRows = validationReport.dirtyRows.map(row => ({
+      ...row,
+      issues: row.issues.map(issue => ({
+        ...issue,
+        resolved: true,
+        resolvedValue: issue.suggestedValue ?? 0,
+      })),
+    }));
+    
+    const updatedColumnIssues = validationReport.columnIssues.map(issue => ({
+      ...issue,
+      resolved: true,
+    }));
+    
+    setValidationReport({
+      ...validationReport,
+      dirtyRows: updatedDirtyRows,
+      columnIssues: updatedColumnIssues,
+    });
+    
+    toast({
+      title: 'Data Healed',
+      description: `Auto-resolved ${validationReport.healableFields} issues with estimated values`,
+    });
+  }, [validationReport, toast]);
   
   const handleConfirmImport = useCallback(() => {
     if (!result || !result.success) return;
@@ -128,32 +201,48 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     onOpenChange(false);
   }, [onOpenChange, resetWizard]);
   
+  const canProceedFromAnalyze = !hasCurrencyConflict || currencyResolution === 'keep-numbers';
+  const canProceedFromReconcile = pendingIssues === 0;
+  
+  const getNextStep = (current: WizardStep): WizardStep => {
+    switch (current) {
+      case 'analyze':
+        return hasIssues ? 'reconcile' : 'preview';
+      case 'reconcile':
+        return 'preview';
+      default:
+        return current;
+    }
+  };
+  
+  const visibleSteps: WizardStep[] = ['upload', 'analyze', hasIssues ? 'reconcile' : null, 'preview', 'success'].filter(Boolean) as WizardStep[];
+  
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Upload className="h-5 w-5 text-primary" />
-            Import Media Plan
+            <Sparkles className="h-5 w-5 text-accent" />
+            Import Genius
           </DialogTitle>
           <DialogDescription>
-            Upload your existing media plan and we'll auto-detect the structure
+            Upload your media plan and let me help you import it perfectly
           </DialogDescription>
         </DialogHeader>
         
         {/* Progress Indicator */}
         <div className="flex items-center gap-2 px-2 py-3">
-          {(['upload', 'review', 'confirm', 'success'] as const).map((s, idx) => (
+          {visibleSteps.map((s, idx) => (
             <div key={s} className="flex items-center gap-2 flex-1">
               <div className={cn(
                 "flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-colors",
                 step === s 
                   ? "bg-primary text-primary-foreground" 
-                  : step === 'success' || (['upload', 'review', 'confirm'].indexOf(step) > idx)
+                  : step === 'success' || visibleSteps.indexOf(step) > idx
                     ? "bg-primary/20 text-primary"
                     : "bg-muted text-muted-foreground"
               )}>
-                {step === 'success' || (['upload', 'review', 'confirm'].indexOf(step) > idx) ? (
+                {step === 'success' || visibleSteps.indexOf(step) > idx ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   idx + 1
@@ -163,9 +252,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 "text-xs hidden sm:inline",
                 step === s ? "text-foreground font-medium" : "text-muted-foreground"
               )}>
-                {s === 'upload' ? 'Upload' : s === 'review' ? 'Review' : s === 'confirm' ? 'Confirm' : 'Done'}
+                {STEP_LABELS[s]}
               </span>
-              {idx < 3 && <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden sm:inline" />}
+              {idx < visibleSteps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden sm:inline" />}
             </div>
           ))}
         </div>
@@ -226,15 +315,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               <div>
                 <p className="text-sm font-medium">Analyzing file structure...</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Detecting channels, months, and metrics
+                  Detecting channels, months, currency, and metrics
                 </p>
               </div>
               <Progress value={66} className="w-48 mx-auto" />
             </div>
           )}
           
-          {/* Step: Review */}
-          {step === 'review' && detected && result && (
+          {/* Step: Analyze (Currency + Granularity) */}
+          {step === 'analyze' && detected && result && (
             <div className="space-y-4">
               {/* Detection Summary */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -247,8 +336,8 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                   <p className="text-sm font-medium capitalize">{detected.structure.replace('-', ' ')}</p>
                 </div>
                 <div className="p-3 rounded-lg border border-border bg-card/50">
-                  <p className="text-xs text-muted-foreground">Months Found</p>
-                  <p className="text-sm font-medium">{result.months.length}</p>
+                  <p className="text-xs text-muted-foreground">Data Points</p>
+                  <p className="text-sm font-medium">{result.months.length} months</p>
                 </div>
                 <div className="p-3 rounded-lg border border-border bg-card/50">
                   <p className="text-xs text-muted-foreground">Confidence</p>
@@ -256,82 +345,110 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 </div>
               </div>
               
+              {/* Currency Conflict */}
+              {hasCurrencyConflict && detected.detectedCurrency && (
+                <CurrencyConflictDialog
+                  fileCurrency={detected.detectedCurrency as CurrencyCode}
+                  appCurrency={appCurrency}
+                  samples={[]}
+                  resolution={currencyResolution}
+                  onResolutionChange={setCurrencyResolution}
+                />
+              )}
+              
+              {/* Granularity Selection */}
+              <GranularitySelector
+                granularity={granularity}
+                distribution={distribution}
+                targetMonths={targetMonths}
+                onGranularityChange={setGranularity}
+                onDistributionChange={setDistribution}
+                onTargetMonthsChange={setTargetMonths}
+              />
+              
+              {/* Channel Mappings */}
+              {detected.channelMappings.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium mb-2 flex items-center gap-2">
+                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
+                    Detected Channels ({detected.channelMappings.length})
+                  </h4>
+                  <div className="flex flex-wrap gap-1.5">
+                    {detected.channelMappings.map((m, i) => (
+                      <Badge 
+                        key={i} 
+                        variant={m.confidence >= 0.9 ? 'default' : 'secondary'}
+                        className="text-xs"
+                      >
+                        {m.targetChannelName}
+                        {m.confidence < 0.9 && (
+                          <span className="ml-1 opacity-60">{Math.round(m.confidence * 100)}%</span>
+                        )}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
               {/* Warnings */}
-              {(detected.warnings.length > 0 || result.warnings.length > 0) && (
-                <Alert variant="default" className="border-yellow-500/50 bg-yellow-500/10">
-                  <AlertTriangle className="h-4 w-4 text-yellow-500" />
-                  <AlertTitle className="text-yellow-600">Warnings</AlertTitle>
+              {detected.warnings.length > 0 && (
+                <Alert variant="default" className="border-warning/50 bg-warning/10">
+                  <AlertTriangle className="h-4 w-4 text-warning" />
+                  <AlertTitle className="text-warning">Notes</AlertTitle>
                   <AlertDescription>
                     <ul className="text-xs space-y-1 mt-2">
-                      {[...detected.warnings, ...result.warnings].map((w, i) => (
+                      {detected.warnings.map((w, i) => (
                         <li key={i}>• {w}</li>
                       ))}
                     </ul>
                   </AlertDescription>
                 </Alert>
               )}
-              
-              {/* Channel Mappings */}
-              <div>
-                <h4 className="text-sm font-medium mb-2">Channel Mappings</h4>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="bg-muted/50">
-                        <TableHead className="text-xs">Source Column</TableHead>
-                        <TableHead className="text-xs">Maps To</TableHead>
-                        <TableHead className="text-xs w-24">Confidence</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {detected.channelMappings.length === 0 ? (
-                        <TableRow>
-                          <TableCell colSpan={3} className="text-center text-muted-foreground text-sm py-4">
-                            No channels detected. Using default allocations.
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        detected.channelMappings.map((m, i) => (
-                          <TableRow key={i}>
-                            <TableCell className="text-xs font-mono">{m.sourceColumn}</TableCell>
-                            <TableCell className="text-xs">
-                              <div className="flex items-center gap-1">
-                                <ArrowRight className="h-3 w-3 text-muted-foreground" />
-                                {m.targetChannelName}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Badge
-                                variant={m.confidence >= 0.9 ? 'default' : m.confidence >= 0.7 ? 'secondary' : 'outline'}
-                                className="text-xs"
-                              >
-                                {Math.round(m.confidence * 100)}%
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      )}
-                    </TableBody>
-                  </Table>
+            </div>
+          )}
+          
+          {/* Step: Reconcile (Fix Issues) */}
+          {step === 'reconcile' && validationReport && (
+            <ReconciliationTable
+              report={validationReport}
+              onResolve={setValidationReport}
+              onHealData={handleHealData}
+            />
+          )}
+          
+          {/* Step: Preview */}
+          {step === 'preview' && detected && result && (
+            <div className="space-y-4">
+              <div className="flex items-start gap-3 p-4 rounded-lg bg-success/10 border border-success/30">
+                <div className="w-10 h-10 rounded-full bg-success/20 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 className="h-5 w-5 text-success" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Ready to Import</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">
+                    All data has been validated and is ready to load into your plan
+                  </p>
                 </div>
               </div>
               
-              {/* Preview Data */}
-              <div>
-                <h4 className="text-sm font-medium mb-2">Data Preview</h4>
-                <div className="border rounded-lg overflow-hidden">
-                  <ScrollArea className="h-48">
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="bg-muted/50">
-                          <TableHead className="text-xs">Month</TableHead>
-                          <TableHead className="text-xs text-right">Budget</TableHead>
-                          <TableHead className="text-xs text-right">Channels</TableHead>
-                          <TableHead className="text-xs text-right">GGR</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {result.months.map((m, i) => (
+              {/* Data Preview */}
+              <div className="border rounded-lg overflow-hidden">
+                <ScrollArea className="h-64">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="bg-muted/50">
+                        <TableHead className="text-xs">Month</TableHead>
+                        <TableHead className="text-xs text-right">Budget</TableHead>
+                        <TableHead className="text-xs text-right">Channels</TableHead>
+                        <TableHead className="text-xs text-right">Top Channel</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {result.months.map((m, i) => {
+                        const topChannel = m.channels.reduce((top, ch) => 
+                          ch.allocationPct > (top?.allocationPct || 0) ? ch : top
+                        , m.channels[0]);
+                        return (
                           <TableRow key={i}>
                             <TableCell className="text-xs">
                               <div className="flex items-center gap-1">
@@ -347,14 +464,32 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                             <TableCell className="text-xs text-right">
                               {m.channels.filter(c => c.allocationPct > 0).length} active
                             </TableCell>
-                            <TableCell className="text-xs text-right font-mono">
-                              {result.months[i] ? '—' : '—'}
+                            <TableCell className="text-xs text-right">
+                              {topChannel?.name} ({Math.round(topChannel?.allocationPct || 0)}%)
                             </TableCell>
                           </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </ScrollArea>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
+              
+              {/* Summary Stats */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3 rounded-lg border border-border bg-card/50 text-center">
+                  <p className="text-2xl font-bold text-primary">
+                    €{result.months.reduce((s, m) => s + m.budget, 0).toLocaleString()}
+                  </p>
+                  <p className="text-xs text-muted-foreground">Total Budget</p>
+                </div>
+                <div className="p-3 rounded-lg border border-border bg-card/50 text-center">
+                  <p className="text-2xl font-bold">{result.months.length}</p>
+                  <p className="text-xs text-muted-foreground">Months</p>
+                </div>
+                <div className="p-3 rounded-lg border border-border bg-card/50 text-center">
+                  <p className="text-2xl font-bold">{detected.channelMappings.length}</p>
+                  <p className="text-xs text-muted-foreground">Channels</p>
                 </div>
               </div>
             </div>
@@ -363,13 +498,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
           {/* Step: Success */}
           {step === 'success' && result && (
             <div className="py-8 text-center space-y-4">
-              <div className="w-16 h-16 rounded-full bg-green-500/20 flex items-center justify-center mx-auto">
-                <CheckCircle2 className="h-8 w-8 text-green-500" />
+              <div className="w-16 h-16 rounded-full bg-success/20 flex items-center justify-center mx-auto">
+                <CheckCircle2 className="h-8 w-8 text-success" />
               </div>
               <div>
                 <p className="text-lg font-medium">Import Successful!</p>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {result.months.length} months of data have been imported
+                  {result.months.length} months of data have been loaded into your plan
                 </p>
               </div>
               <div className="grid grid-cols-3 gap-3 max-w-md mx-auto">
@@ -399,28 +534,45 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
             </Button>
           )}
           
-          {step === 'review' && (
+          {step === 'analyze' && (
             <>
               <Button variant="outline" onClick={resetWizard}>
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Try Another File
               </Button>
-              <Button onClick={() => setStep('confirm')}>
+              <Button 
+                onClick={() => setStep(getNextStep('analyze'))}
+                disabled={!canProceedFromAnalyze}
+              >
                 Continue
-                <ChevronRight className="h-4 w-4 ml-1" />
+                <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
             </>
           )}
           
-          {step === 'confirm' && result && (
+          {step === 'reconcile' && (
             <>
-              <Button variant="outline" onClick={() => setStep('review')}>
-                <ChevronLeft className="h-4 w-4 mr-1" />
+              <Button variant="outline" onClick={() => setStep('analyze')}>
                 Back
               </Button>
-              <Button onClick={handleConfirmImport} disabled={!result.success}>
-                <CheckCircle2 className="h-4 w-4 mr-2" />
-                Import {result.months.length} Months
+              <Button 
+                onClick={() => setStep('preview')}
+                disabled={!canProceedFromReconcile}
+              >
+                {pendingIssues > 0 ? `${pendingIssues} issues remaining` : 'Continue'}
+                <ChevronRight className="h-4 w-4 ml-2" />
+              </Button>
+            </>
+          )}
+          
+          {step === 'preview' && (
+            <>
+              <Button variant="outline" onClick={() => setStep(hasIssues ? 'reconcile' : 'analyze')}>
+                Back
+              </Button>
+              <Button onClick={handleConfirmImport}>
+                Import Plan
+                <CheckCircle2 className="h-4 w-4 ml-2" />
               </Button>
             </>
           )}

@@ -10,6 +10,7 @@ import {
   Rocket,
   LayoutGrid,
   Upload,
+  Sparkles,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,7 @@ import {
   ProgressionPattern,
 } from '@/hooks/use-multi-month-store';
 import { ImportWizard } from './ImportWizard';
+import { CurrencySelector } from './CurrencySelector';
 
 const PATTERN_INFO: Record<ProgressionPattern, { icon: React.ReactNode; label: string; description: string }> = {
   linear: { icon: <TrendingUp className="h-4 w-4" />, label: 'Linear Growth', description: 'Steady month-over-month budget increase' },
@@ -152,16 +154,19 @@ export function MonthConfigPanel() {
               )}
             </div>
             
-            {/* Import Button */}
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() => setImportOpen(true)}
-              className="gap-2"
-            >
-              <Upload className="h-4 w-4" />
-              Import Plan
-            </Button>
+            {/* Currency + Import */}
+            <div className="flex items-center gap-2">
+              <CurrencySelector compact />
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() => setImportOpen(true)}
+                className="gap-2"
+              >
+                <Sparkles className="h-4 w-4" />
+                Import Genius
+              </Button>
+            </div>
           </div>
 
           {/* Progression Pattern */}
