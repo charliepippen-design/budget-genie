@@ -31,7 +31,7 @@ import {
   OptimizationGoal,
   RiskLevel,
 } from '@/hooks/use-multi-month-store';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 const GOAL_OPTIONS: { value: OptimizationGoal; label: string; icon: React.ReactNode; description: string }[] = [
   { value: 'maximize-roas', label: 'Maximize ROAS', icon: <TrendingUp className="h-4 w-4" />, description: 'Best return per spend' },

@@ -48,7 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatCurrency, ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { 
   useMediaPlanStore, 
   useChannelsWithMetrics,

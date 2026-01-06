@@ -23,7 +23,7 @@ import {
   useCategoryTotals,
   ChannelWithMetrics,
 } from '@/hooks/use-media-plan-store';
-import { useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 import { Search, Megaphone, Users, Star, Edit2, Check } from 'lucide-react';
 

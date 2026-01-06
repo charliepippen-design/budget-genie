@@ -26,8 +26,9 @@ import {
   useCategoryTotals,
 } from '@/hooks/use-media-plan-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
-import { formatCurrency, BudgetPresetKey } from '@/lib/mediaplan-data';
+import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrency } from '@/contexts/CurrencyContext';
 
 const Index = () => {
   const { totalBudget, setTotalBudget } = useMediaPlanStore();
@@ -35,6 +36,7 @@ const Index = () => {
   const blendedMetrics = useBlendedMetrics();
   const categoryTotals = useCategoryTotals();
   const { generateMonths, months } = useMultiMonthStore();
+  const { format: formatCurrency } = useCurrency();
   
   const { toast } = useToast();
 

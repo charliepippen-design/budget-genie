@@ -9,7 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
-import { useCurrencyStore, CurrencyCode, useCurrency } from '@/hooks/use-currency-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { useCurrencyStore, CurrencyCode } from '@/hooks/use-currency-store';
 import { useToast } from '@/hooks/use-toast';
 import {
   importMediaPlan,

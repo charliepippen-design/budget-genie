@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState, useEffect } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import { formatCurrency } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 
 interface BudgetSliderProps {
@@ -19,6 +19,7 @@ export function BudgetSlider({
   max = 500000,
   step = 1000,
 }: BudgetSliderProps) {
+  const { format: formatCurrency } = useCurrency();
   const [isEditing, setIsEditing] = useState(false);
   const [inputValue, setInputValue] = useState(value.toString());
   const inputRef = useRef<HTMLInputElement>(null);

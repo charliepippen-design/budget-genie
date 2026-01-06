@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -28,7 +28,8 @@ import {
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatNumber } from '@/lib/mediaplan-data';
+import { formatNumber } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import {
   useMultiMonthStore,
   useMultiMonthMetrics,
@@ -38,11 +39,13 @@ import {
 function MonthRow({ 
   month, 
   isExpanded, 
-  onToggle 
+  onToggle,
+  formatCurrency,
 }: { 
   month: MonthData & { totalSpend?: number; totalConversions?: number; revenue?: number; operatingCosts?: number; netProfit?: number; cumulativeProfit?: number };
   isExpanded: boolean;
   onToggle: () => void;
+  formatCurrency: (value: number, compact?: boolean) => string;
 }) {
   const { 
     updateMonth, 
@@ -215,8 +218,9 @@ function MonthRow({
 export function PLTable() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const { months: planMetrics, totals } = useMultiMonthMetrics();
+  const { format: formatCurrency } = useCurrency();
 
-  const toggleMonth = (monthId: string) => {
+  const toggleMonth = useCallback((monthId: string) => {
     setExpandedMonths((prev) => {
       const next = new Set(prev);
       if (next.has(monthId)) {
@@ -226,7 +230,7 @@ export function PLTable() {
       }
       return next;
     });
-  };
+  }, []);
 
   return (
     <Card className="border-border">
@@ -251,6 +255,7 @@ export function PLTable() {
                 month={month}
                 isExpanded={expandedMonths.has(month.id)}
                 onToggle={() => toggleMonth(month.id)}
+                formatCurrency={formatCurrency}
               />
             ))}
             {/* Summary Row */}
