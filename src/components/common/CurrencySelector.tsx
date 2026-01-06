@@ -1,6 +1,5 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCurrencyStore, CURRENCIES, CurrencyCode } from '@/hooks/use-currency-store';
-import { DollarSign } from 'lucide-react';
 
 interface CurrencySelectorProps {
   compact?: boolean;
@@ -8,18 +7,22 @@ interface CurrencySelectorProps {
 
 export function CurrencySelector({ compact = false }: CurrencySelectorProps) {
   const { currency, setCurrency } = useCurrencyStore();
+  const info = CURRENCIES[currency];
   
   return (
     <Select value={currency} onValueChange={(v) => setCurrency(v as CurrencyCode)}>
-      <SelectTrigger className={compact ? "w-[80px] h-8" : "w-[140px]"}>
+      <SelectTrigger className={compact ? "w-[90px] h-8" : "w-[140px]"}>
         <SelectValue>
           <div className="flex items-center gap-1.5">
             {compact ? (
-              <span className="font-medium">{CURRENCIES[currency].symbol}</span>
+              <>
+                <span>{info.flag}</span>
+                <span className="font-medium">{info.code}</span>
+              </>
             ) : (
               <>
-                <DollarSign className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{CURRENCIES[currency].code}</span>
+                <span>{info.flag}</span>
+                <span>{info.code}</span>
               </>
             )}
           </div>
@@ -27,13 +30,15 @@ export function CurrencySelector({ compact = false }: CurrencySelectorProps) {
       </SelectTrigger>
       <SelectContent className="bg-popover border-border">
         {(Object.keys(CURRENCIES) as CurrencyCode[]).map((code) => {
-          const info = CURRENCIES[code];
+          const currencyInfo = CURRENCIES[code];
           return (
             <SelectItem key={code} value={code}>
               <div className="flex items-center gap-2">
-                <span className="font-mono text-xs w-6">{info.symbol}</span>
-                <span>{info.code}</span>
-                <span className="text-muted-foreground text-xs">- {info.name}</span>
+                <span>{currencyInfo.flag}</span>
+                <span className="font-medium">{currencyInfo.code}</span>
+                {!compact && (
+                  <span className="text-muted-foreground text-xs">- {currencyInfo.name}</span>
+                )}
               </div>
             </SelectItem>
           );

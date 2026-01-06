@@ -36,7 +36,7 @@ import {
   ProgressionPattern,
 } from '@/hooks/use-multi-month-store';
 import { ImportWizard } from './ImportWizard';
-import { CurrencySelector } from './CurrencySelector';
+import { CurrencySelector } from '@/components/common/CurrencySelector';
 
 const PATTERN_INFO: Record<ProgressionPattern, { icon: React.ReactNode; label: string; description: string }> = {
   linear: { icon: <TrendingUp className="h-4 w-4" />, label: 'Linear Growth', description: 'Steady month-over-month budget increase' },

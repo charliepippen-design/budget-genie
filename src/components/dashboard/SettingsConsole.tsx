@@ -48,6 +48,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatCurrency, ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/hooks/use-currency-store';
 import { 
   useMediaPlanStore, 
   useChannelsWithMetrics,
@@ -72,6 +73,7 @@ export function SettingsConsole() {
   });
   
   const { toast } = useToast();
+  const { symbol } = useCurrency();
   
   const {
     totalBudget,
@@ -214,8 +216,8 @@ export function SettingsConsole() {
                     className="w-full"
                   />
                   <div className="flex justify-between text-xs text-sidebar-foreground/50">
-                    <span>€10K</span>
-                    <span>€1M</span>
+                    <span>{symbol}10K</span>
+                    <span>{symbol}1M</span>
                   </div>
                 </div>
 
@@ -323,7 +325,7 @@ export function SettingsConsole() {
                 {/* Default CPM Override */}
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">Default CPM (€)</Label>
+                    <Label className="text-xs text-sidebar-foreground/70">Default CPM ({symbol})</Label>
                     <Input
                       type="number"
                       value={globalMultipliers.defaultCpmOverride ?? ''}
@@ -366,7 +368,7 @@ export function SettingsConsole() {
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-1">
                       <Target className="h-3 w-3 text-sidebar-primary" />
-                      <Label className="text-xs text-sidebar-foreground/70">CPA Target (€)</Label>
+                      <Label className="text-xs text-sidebar-foreground/70">CPA Target ({symbol})</Label>
                     </div>
                     <Input
                       type="number"
@@ -494,7 +496,7 @@ export function SettingsConsole() {
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label>CPM (€)</Label>
+                          <Label>CPM ({symbol})</Label>
                           <Input
                             type="number"
                             step="0.1"
@@ -638,6 +640,7 @@ function ChannelEditorItem({
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
+  const { symbol } = useCurrency();
 
   const handleDelete = () => {
     deleteChannel(channel.id);
@@ -746,7 +749,7 @@ function ChannelEditorItem({
           {/* KPI Overrides Grid */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">CPM (€)</Label>
+              <Label className="text-xs text-sidebar-foreground/60">CPM ({symbol})</Label>
               <Input
                 type="number"
                 step="0.1"
@@ -794,7 +797,7 @@ function ChannelEditorItem({
               />
             </div>
             <div className="space-y-1 col-span-2">
-              <Label className="text-xs text-sidebar-foreground/60">CPA Override (€)</Label>
+              <Label className="text-xs text-sidebar-foreground/60">CPA Override ({symbol})</Label>
               <Input
                 type="number"
                 step="0.1"

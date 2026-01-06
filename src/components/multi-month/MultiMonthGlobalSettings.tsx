@@ -45,6 +45,7 @@ import {
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { formatCurrency } from '@/lib/mediaplan-data';
+import { useCurrency } from '@/hooks/use-currency-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useToast } from '@/hooks/use-toast';
 
@@ -54,6 +55,7 @@ export function MultiMonthGlobalSettings() {
   const [cloneName, setCloneName] = useState('');
   const [cloneId, setCloneId] = useState<string | null>(null);
   const { toast } = useToast();
+  const { symbol } = useCurrency();
 
   const {
     globalSettings,
@@ -158,8 +160,8 @@ export function MultiMonthGlobalSettings() {
                     className="w-full"
                   />
                   <div className="flex justify-between text-[10px] text-sidebar-foreground/50">
-                    <span>€1K</span>
-                    <span>€500K</span>
+                    <span>{symbol}1K</span>
+                    <span>{symbol}500K</span>
                   </div>
                 </div>
 
@@ -235,7 +237,7 @@ export function MultiMonthGlobalSettings() {
                 {/* Global CPM Override */}
                 <div className="space-y-1">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">Default CPM (€)</Label>
+                    <Label className="text-xs text-sidebar-foreground/70">Default CPM ({symbol})</Label>
                     <Input
                       type="number"
                       value={globalSettings.defaultCpmOverride ?? ''}
@@ -272,7 +274,7 @@ export function MultiMonthGlobalSettings() {
                 <div className="flex justify-between items-center">
                   <div className="flex items-center gap-1">
                     <Target className="h-3 w-3 text-sidebar-primary" />
-                    <Label className="text-xs text-sidebar-foreground/70">CPA Target (€)</Label>
+                    <Label className="text-xs text-sidebar-foreground/70">CPA Target ({symbol})</Label>
                   </div>
                   <Input
                     type="number"

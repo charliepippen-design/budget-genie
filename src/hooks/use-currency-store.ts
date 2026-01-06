@@ -11,19 +11,20 @@ export interface CurrencyInfo {
   name: string;
   locale: string;
   symbolPosition: 'before' | 'after';
+  flag: string;
 }
 
 // ========== CURRENCY DATA ==========
 
 export const CURRENCIES: Record<CurrencyCode, CurrencyInfo> = {
-  EUR: { code: 'EUR', symbol: '€', name: 'Euro', locale: 'de-DE', symbolPosition: 'after' },
-  USD: { code: 'USD', symbol: '$', name: 'US Dollar', locale: 'en-US', symbolPosition: 'before' },
-  GBP: { code: 'GBP', symbol: '£', name: 'British Pound', locale: 'en-GB', symbolPosition: 'before' },
-  CHF: { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', locale: 'de-CH', symbolPosition: 'after' },
-  CAD: { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', locale: 'en-CA', symbolPosition: 'before' },
-  AUD: { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', locale: 'en-AU', symbolPosition: 'before' },
-  JPY: { code: 'JPY', symbol: '¥', name: 'Japanese Yen', locale: 'ja-JP', symbolPosition: 'before' },
-  CNY: { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', locale: 'zh-CN', symbolPosition: 'before' },
+  EUR: { code: 'EUR', symbol: '€', name: 'Euro', locale: 'de-DE', symbolPosition: 'after', flag: '🇪🇺' },
+  USD: { code: 'USD', symbol: '$', name: 'US Dollar', locale: 'en-US', symbolPosition: 'before', flag: '🇺🇸' },
+  GBP: { code: 'GBP', symbol: '£', name: 'British Pound', locale: 'en-GB', symbolPosition: 'before', flag: '🇬🇧' },
+  CHF: { code: 'CHF', symbol: 'CHF', name: 'Swiss Franc', locale: 'de-CH', symbolPosition: 'after', flag: '🇨🇭' },
+  CAD: { code: 'CAD', symbol: 'C$', name: 'Canadian Dollar', locale: 'en-CA', symbolPosition: 'before', flag: '🇨🇦' },
+  AUD: { code: 'AUD', symbol: 'A$', name: 'Australian Dollar', locale: 'en-AU', symbolPosition: 'before', flag: '🇦🇺' },
+  JPY: { code: 'JPY', symbol: '¥', name: 'Japanese Yen', locale: 'ja-JP', symbolPosition: 'before', flag: '🇯🇵' },
+  CNY: { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', locale: 'zh-CN', symbolPosition: 'before', flag: '🇨🇳' },
 };
 
 // ========== DETECTION ==========
@@ -113,17 +114,47 @@ export function detectCurrencyFromData(data: string[][]): {
   };
 }
 
-// ========== FORMATTING ==========
+// ========== STORE ==========
 
-export function formatCurrency(value: number, currency: CurrencyCode, compact = false): string {
-  const info = CURRENCIES[currency];
+interface CurrencyState {
+  currency: CurrencyCode;
+  setCurrency: (currency: CurrencyCode) => void;
+}
+
+export const useCurrencyStore = create<CurrencyState>()(
+  persist(
+    (set, get) => ({
+      currency: 'EUR',
+      setCurrency: (currency) => {
+        set({ currency });
+        // Sync to window for legacy formatCurrency function
+        (window as any).__CURRENCY_STORE_STATE__ = { currency };
+      },
+    }),
+    {
+      name: 'media-plan-currency',
+      onRehydrateStorage: () => (state) => {
+        // Sync to window on rehydration
+        if (state) {
+          (window as any).__CURRENCY_STORE_STATE__ = { currency: state.currency };
+        }
+      },
+    }
+  )
+);
+
+// ========== FORMATTING FUNCTIONS ==========
+
+export function formatCurrencyValue(value: number, currencyCode: CurrencyCode, compact = false): string {
+  const info = CURRENCIES[currencyCode];
   
   if (compact && Math.abs(value) >= 1000) {
-    const formatter = new Intl.NumberFormat(info.locale, {
-      notation: 'compact',
-      maximumFractionDigits: 1,
-    });
-    const formatted = formatter.format(value);
+    let formatted: string;
+    if (Math.abs(value) >= 1000000) {
+      formatted = `${(value / 1000000).toFixed(1)}M`;
+    } else {
+      formatted = `${(value / 1000).toFixed(1)}K`;
+    }
     return info.symbolPosition === 'before' 
       ? `${info.symbol}${formatted}` 
       : `${formatted}${info.symbol}`;
@@ -137,27 +168,8 @@ export function formatCurrency(value: number, currency: CurrencyCode, compact = 
   const formatted = formatter.format(value);
   return info.symbolPosition === 'before' 
     ? `${info.symbol}${formatted}` 
-    : `${formatted}${info.symbol}`;
+    : `${formatted} ${info.symbol}`;
 }
-
-// ========== STORE ==========
-
-interface CurrencyState {
-  currency: CurrencyCode;
-  setCurrency: (currency: CurrencyCode) => void;
-}
-
-export const useCurrencyStore = create<CurrencyState>()(
-  persist(
-    (set) => ({
-      currency: 'EUR',
-      setCurrency: (currency) => set({ currency }),
-    }),
-    {
-      name: 'media-plan-currency',
-    }
-  )
-);
 
 // ========== HOOK ==========
 
@@ -165,7 +177,7 @@ export function useCurrency() {
   const { currency, setCurrency } = useCurrencyStore();
   const info = CURRENCIES[currency];
   
-  const format = (value: number, compact = false) => formatCurrency(value, currency, compact);
+  const format = (value: number, compact = false) => formatCurrencyValue(value, currency, compact);
   
   return {
     currency,
@@ -173,5 +185,6 @@ export function useCurrency() {
     info,
     format,
     symbol: info.symbol,
+    flag: info.flag,
   };
 }
