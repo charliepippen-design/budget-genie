@@ -1,4 +1,4 @@
-import { DollarSign, Download, FileText, Image, ChevronDown } from 'lucide-react';
+import { DollarSign, Download, FileText, Image, ChevronDown, Trash2, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -15,17 +15,22 @@ import {
 } from '@/components/ui/select';
 import { BUDGET_PRESETS, BudgetPresetKey } from '@/lib/mediaplan-data';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
+import { ProjectManager } from '@/components/dashboard/ProjectManager';
 
 interface DashboardHeaderProps {
   budgetPreset: BudgetPresetKey;
   onPresetChange: (preset: BudgetPresetKey) => void;
   onExport: (format: 'pdf' | 'csv' | 'png') => void;
+  onImport: () => void;
+  onReset: () => void;
 }
 
 export function DashboardHeader({
   budgetPreset,
   onPresetChange,
   onExport,
+  onImport,
+  onReset,
 }: DashboardHeaderProps) {
   return (
     <header className="glass border-b border-border/50 sticky top-0 z-50">
@@ -38,7 +43,7 @@ export function DashboardHeader({
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight">
-                MediaPlan <span className="gradient-text">Pro</span>
+                MediaPlanner <span className="gradient-text">Pro</span>
               </h1>
               <p className="text-xs text-muted-foreground">
                 Interactive Budget Scaler
@@ -50,7 +55,7 @@ export function DashboardHeader({
           <div className="flex flex-wrap items-center gap-3">
             {/* Currency Selector */}
             <CurrencySelector compact />
-            
+
             {/* Budget Type Selector */}
             <Select
               value={budgetPreset}
@@ -69,6 +74,20 @@ export function DashboardHeader({
                 ))}
               </SelectContent>
             </Select>
+
+            {/* Reset Button */}
+            <Button variant="outline" size="icon" onClick={onReset} title="Reset Plan">
+              <Trash2 className="h-4 w-4 text-muted-foreground" />
+            </Button>
+
+            {/* Import Button */}
+            <Button variant="default" onClick={onImport} className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0">
+              <span className="text-xs">✨</span>
+              Import Genius
+            </Button>
+
+            {/* Projects Manager */}
+            <ProjectManager />
 
             {/* Export Dropdown */}
             <DropdownMenu>
@@ -94,6 +113,10 @@ export function DashboardHeader({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            {/* Settings Link */}
+            <a href="/settings" className="inline-flex items-center justify-center p-2 rounded-md hover:bg-slate-800 transition-colors" title="Account Settings">
+              <Settings className="h-5 w-5 text-slate-400 hover:text-white" />
+            </a>
           </div>
         </div>
       </div>

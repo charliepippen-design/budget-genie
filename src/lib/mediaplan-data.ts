@@ -212,25 +212,10 @@ export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: strin
 };
 
 // Utility functions
-// NOTE: This is a legacy function kept for backwards compatibility
-// For new code, use useCurrency().format() hook instead
 export function formatCurrency(value: number, compact = false): string {
-  // Import the store state directly for non-React contexts
-  const currencyStore = (window as any).__CURRENCY_STORE_STATE__;
-  const currency = currencyStore?.currency || 'EUR';
-  const currencies: Record<string, { symbol: string; locale: string; symbolPosition: 'before' | 'after' }> = {
-    EUR: { symbol: '€', locale: 'de-DE', symbolPosition: 'after' },
-    USD: { symbol: '$', locale: 'en-US', symbolPosition: 'before' },
-    GBP: { symbol: '£', locale: 'en-GB', symbolPosition: 'before' },
-    CHF: { symbol: 'CHF', locale: 'de-CH', symbolPosition: 'after' },
-    CAD: { symbol: 'C$', locale: 'en-CA', symbolPosition: 'before' },
-    AUD: { symbol: 'A$', locale: 'en-AU', symbolPosition: 'before' },
-    JPY: { symbol: '¥', locale: 'ja-JP', symbolPosition: 'before' },
-    CNY: { symbol: '¥', locale: 'zh-CN', symbolPosition: 'before' },
-  };
-  
-  const info = currencies[currency] || currencies.EUR;
-  
+  // Default to EUR for legacy/fallback usage
+  const info = { symbol: '€', locale: 'de-DE', symbolPosition: 'after' };
+
   if (compact) {
     let formatted: string;
     if (value >= 1000000) {
@@ -240,20 +225,19 @@ export function formatCurrency(value: number, compact = false): string {
     } else {
       formatted = value.toFixed(0);
     }
-    return info.symbolPosition === 'before' 
-      ? `${info.symbol}${formatted}` 
+    return info.symbolPosition === 'before'
+      ? `${info.symbol}${formatted}`
       : `${formatted}${info.symbol}`;
   }
-  
+
   const formatter = new Intl.NumberFormat(info.locale, {
+    style: 'currency',
+    currency: 'EUR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
   });
-  
-  const formatted = formatter.format(value);
-  return info.symbolPosition === 'before' 
-    ? `${info.symbol}${formatted}` 
-    : `${formatted} ${info.symbol}`;
+
+  return formatter.format(value);
 }
 
 export function formatNumber(value: number, compact = false): string {

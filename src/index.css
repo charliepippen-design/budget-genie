@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* MediaPlan Pro Design System - Professional Dashboard Theme */
 
@@ -66,7 +66,7 @@
     --gradient-primary: linear-gradient(135deg, hsl(224 76% 40%), hsl(187 92% 35%));
     --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 20% 98%));
     --gradient-accent: linear-gradient(135deg, hsl(187 92% 35%), hsl(224 76% 40%));
-    
+
     /* Shadows */
     --shadow-sm: 0 1px 2px 0 hsl(224 71% 10% / 0.05);
     --shadow-md: 0 4px 6px -1px hsl(224 71% 10% / 0.1), 0 2px 4px -2px hsl(224 71% 10% / 0.1);
@@ -128,7 +128,7 @@
     --gradient-primary: linear-gradient(135deg, hsl(224 76% 48%), hsl(187 92% 42%));
     --gradient-card: linear-gradient(180deg, hsl(224 50% 10%), hsl(224 50% 8%));
     --gradient-accent: linear-gradient(135deg, hsl(187 92% 42%), hsl(224 76% 48%));
-    
+
     --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
     --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
     --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
@@ -146,7 +146,32 @@
     font-family: 'Inter', system-ui, sans-serif;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  /* Custom Scrollbar Scaling for all browsers */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+  }
+
+  /* Firefox Support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     @apply font-semibold tracking-tight;
   }
 
@@ -203,6 +228,7 @@
     opacity: 0;
     transform: translateY(10px);
   }
+
   to {
     opacity: 1;
     transform: translateY(0);
@@ -210,8 +236,13 @@
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
 }
 
 @keyframes scaleIn {
@@ -219,6 +250,7 @@
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -226,17 +258,20 @@
 }
 
 @keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
 }
 
 .shimmer {
-  background: linear-gradient(
-    90deg,
-    hsl(var(--muted)) 0%,
-    hsl(var(--background)) 50%,
-    hsl(var(--muted)) 100%
-  );
+  background: linear-gradient(90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--background)) 50%,
+      hsl(var(--muted)) 100%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }

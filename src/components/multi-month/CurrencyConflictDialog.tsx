@@ -2,7 +2,7 @@ import { AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { CURRENCIES, CurrencyCode } from '@/hooks/use-currency-store';
+import { CURRENCIES, CurrencyCode } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 
 export type CurrencyConflictResolution = 'keep-numbers' | 'convert';
@@ -24,7 +24,7 @@ export function CurrencyConflictDialog({
 }: CurrencyConflictDialogProps) {
   const fileInfo = CURRENCIES[fileCurrency];
   const appInfo = CURRENCIES[appCurrency];
-  
+
   return (
     <div className="space-y-4 p-4 rounded-lg bg-warning/10 border border-warning/30">
       <div className="flex items-start gap-3">
@@ -38,7 +38,7 @@ export function CurrencyConflictDialog({
           </p>
         </div>
       </div>
-      
+
       {samples.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {samples.slice(0, 3).map((sample, i) => (
@@ -48,7 +48,7 @@ export function CurrencyConflictDialog({
           ))}
         </div>
       )}
-      
+
       <RadioGroup
         value={resolution}
         onValueChange={(v) => onResolutionChange(v as CurrencyConflictResolution)}
@@ -58,8 +58,8 @@ export function CurrencyConflictDialog({
           htmlFor="keep-numbers"
           className={cn(
             "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-            resolution === 'keep-numbers' 
-              ? "border-primary bg-primary/5" 
+            resolution === 'keep-numbers'
+              ? "border-primary bg-primary/5"
               : "border-border hover:bg-muted/50"
           )}
         >
@@ -74,13 +74,13 @@ export function CurrencyConflictDialog({
             </p>
           </div>
         </Label>
-        
+
         <Label
           htmlFor="convert"
           className={cn(
             "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors opacity-50",
-            resolution === 'convert' 
-              ? "border-primary bg-primary/5" 
+            resolution === 'convert'
+              ? "border-primary bg-primary/5"
               : "border-border"
           )}
         >

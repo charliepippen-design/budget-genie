@@ -52,7 +52,7 @@ const PATTERN_INFO: Record<ProgressionPattern, { icon: React.ReactNode; label: s
 
 export function MonthConfigPanel() {
   const [importOpen, setImportOpen] = useState(false);
-  
+
   const {
     includeSoftLaunch,
     planningMonths,
@@ -153,7 +153,7 @@ export function MonthConfigPanel() {
                 </span>
               )}
             </div>
-            
+
             {/* Currency + Import */}
             <div className="flex items-center gap-2">
               <CurrencySelector compact />
@@ -183,7 +183,7 @@ export function MonthConfigPanel() {
                 Apply to All
               </Button>
             </div>
-            
+
             <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-9 gap-2">
               <TooltipProvider>
                 {(Object.keys(PATTERN_INFO) as ProgressionPattern[]).map((pattern) => {
@@ -192,7 +192,13 @@ export function MonthConfigPanel() {
                     <Tooltip key={pattern}>
                       <TooltipTrigger asChild>
                         <button
-                          onClick={() => setProgressionPattern(pattern)}
+                          onClick={() => {
+                            setProgressionPattern(pattern);
+                            // We need to wait for state to update, or just force apply with the new pattern?
+                            // The store's applyPattern uses get() so it should see the update if we sequence it.
+                            // But setState in Zustand is synchronous for simple updates, so this should work.
+                            setTimeout(() => applyPattern(), 0);
+                          }}
                           className={cn(
                             "flex flex-col items-center gap-1 p-2 rounded-lg border transition-all",
                             progressionPattern === pattern
@@ -218,7 +224,7 @@ export function MonthConfigPanel() {
           </div>
         </CardContent>
       </Card>
-      
+
       <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
     </>
   );

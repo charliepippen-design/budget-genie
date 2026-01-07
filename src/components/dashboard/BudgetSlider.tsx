@@ -15,7 +15,7 @@ interface BudgetSliderProps {
 export function BudgetSlider({
   value,
   onChange,
-  min = 10000,
+  min = 0,
   max = 500000,
   step = 1000,
 }: BudgetSliderProps) {
@@ -67,7 +67,7 @@ export function BudgetSlider({
     <div className="relative">
       {/* Background decoration */}
       <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/5 via-accent/5 to-primary/5 -z-10" />
-      
+
       <div className="p-6 rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm card-shadow">
         <div className="flex flex-col gap-6">
           {/* Header */}
@@ -80,7 +80,7 @@ export function BudgetSlider({
                 Drag to scale all channel allocations proportionally
               </p>
             </div>
-            
+
             {/* Editable Budget Display */}
             <div className="relative">
               {isEditing ? (

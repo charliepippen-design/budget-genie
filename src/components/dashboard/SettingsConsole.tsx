@@ -15,6 +15,9 @@ import {
   Unlock,
   Target,
   TrendingUp,
+  MoreHorizontal,
+  Minimize2,
+  Wand2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,11 +49,20 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
+import { DistributionWizard } from './DistributionWizard';
 import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { 
-  useMediaPlanStore, 
+import {
+  useMediaPlanStore,
   useChannelsWithMetrics,
   ChannelWithMetrics,
   ImpressionMode,
@@ -61,6 +73,7 @@ export function SettingsConsole() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
   const [isAddChannelOpen, setIsAddChannelOpen] = useState(false);
+  const [isDistributeWizardOpen, setIsDistributeWizardOpen] = useState(false);
   const [newChannel, setNewChannel] = useState({
     name: '',
     category: 'paid' as ChannelCategory,
@@ -71,10 +84,10 @@ export function SettingsConsole() {
     impressionMode: 'CPM' as ImpressionMode,
     fixedImpressions: 100000,
   });
-  
+
   const { toast } = useToast();
   const { symbol, format: formatCurrency } = useCurrency();
-  
+
   const {
     totalBudget,
     setTotalBudget,
@@ -83,6 +96,7 @@ export function SettingsConsole() {
     setGlobalMultipliers,
     resetGlobalMultipliers,
     setChannelAllocation,
+    setAllocations,
     normalizeAllocations,
     toggleChannelLock,
     updateChannelOverride,
@@ -97,9 +111,9 @@ export function SettingsConsole() {
     deletePreset,
     presets,
   } = useMediaPlanStore();
-  
+
   const channelsWithMetrics = useChannelsWithMetrics();
-  
+
   const allocationTotal = channels.reduce((sum, ch) => sum + ch.allocationPct, 0);
   const hasTargets = globalMultipliers.cpaTarget !== null || globalMultipliers.roasTarget !== null;
   const hasPoorPerformers = channelsWithMetrics.some((ch) => ch.aboveCpaTarget || ch.belowRoasTarget);
@@ -109,13 +123,13 @@ export function SettingsConsole() {
       toast({ title: 'Error', description: 'Channel name is required', variant: 'destructive' });
       return;
     }
-    
+
     addChannel(newChannel);
-    setNewChannel({ 
-      name: '', 
-      category: 'paid', 
-      baseCpm: 5, 
-      baseCtr: 1, 
+    setNewChannel({
+      name: '',
+      category: 'paid',
+      baseCpm: 5,
+      baseCtr: 1,
       baseCr: 2.5,
       baseRoas: 2,
       impressionMode: 'CPM',
@@ -191,7 +205,7 @@ export function SettingsConsole() {
         <div className="p-4">
           <Accordion type="multiple" defaultValue={['budget', 'multipliers', 'channels']} className="space-y-2">
             {/* Budget Controls */}
-            <AccordionItem value="budget" className="border border-sidebar-border rounded-lg overflow-hidden bg-sidebar-accent/30">
+            <AccordionItem value="budget" className="border border-sidebar-border rounded-lg bg-sidebar-accent/30">
               <AccordionTrigger className="px-4 py-3 hover:bg-sidebar-accent/50 hover:no-underline">
                 <div className="flex items-center gap-2">
                   <DollarSign className="h-4 w-4 text-sidebar-primary" />
@@ -224,25 +238,45 @@ export function SettingsConsole() {
                 {/* Channel Allocations */}
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <Label className="text-xs text-sidebar-foreground/70">Channel Allocations</Label>
                     <div className="flex items-center gap-2">
-                      <Badge 
+                      <Label className="text-xs text-sidebar-foreground/70">Channel Allocations</Label>
+                      <Badge
                         variant={Math.abs(allocationTotal - 100) < 0.1 ? "default" : "destructive"}
                         className="font-mono text-xs"
                       >
                         {allocationTotal.toFixed(1)}%
                       </Badge>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={normalizeAllocations}
-                        className="h-6 px-2 text-xs text-sidebar-foreground hover:bg-sidebar-accent"
-                      >
-                        Normalize
-                      </Button>
                     </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-6 w-6">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={normalizeAllocations}>
+                          <Minimize2 className="mr-2 h-4 w-4" />
+                          <span>Normalize</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsDistributeWizardOpen(true)}>
+                          <Wand2 className="mr-2 h-4 w-4" />
+                          <span>Auto-Distribute</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <DistributionWizard
+                      channels={channels}
+                      onApply={setAllocations}
+                      open={isDistributeWizardOpen}
+                      onOpenChange={setIsDistributeWizardOpen}
+                      showTrigger={false}
+                    />
                   </div>
-                  
+
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {channelsWithMetrics.map((channel) => (
                       <div key={channel.id} className="space-y-1">
@@ -260,13 +294,13 @@ export function SettingsConsole() {
                               <Unlock className="h-3 w-3 text-sidebar-foreground/40" />
                             )}
                           </Button>
-                          <span 
+                          <span
                             className={cn(
                               "text-xs truncate flex-1",
-                              channel.aboveCpaTarget || channel.belowRoasTarget 
-                                ? "text-destructive" 
+                              channel.aboveCpaTarget || channel.belowRoasTarget
+                                ? "text-destructive"
                                 : "text-sidebar-foreground/70"
-                            )} 
+                            )}
                             title={channel.name}
                           >
                             {channel.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
@@ -329,8 +363,8 @@ export function SettingsConsole() {
                     <Input
                       type="number"
                       value={globalMultipliers.defaultCpmOverride ?? ''}
-                      onChange={(e) => setGlobalMultipliers({ 
-                        defaultCpmOverride: e.target.value ? parseFloat(e.target.value) : null 
+                      onChange={(e) => setGlobalMultipliers({
+                        defaultCpmOverride: e.target.value ? parseFloat(e.target.value) : null
                       })}
                       placeholder="Per-channel"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
@@ -373,8 +407,8 @@ export function SettingsConsole() {
                     <Input
                       type="number"
                       value={globalMultipliers.cpaTarget ?? ''}
-                      onChange={(e) => setGlobalMultipliers({ 
-                        cpaTarget: e.target.value ? parseFloat(e.target.value) : null 
+                      onChange={(e) => setGlobalMultipliers({
+                        cpaTarget: e.target.value ? parseFloat(e.target.value) : null
                       })}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
@@ -392,8 +426,8 @@ export function SettingsConsole() {
                     <Input
                       type="number"
                       value={globalMultipliers.roasTarget ?? ''}
-                      onChange={(e) => setGlobalMultipliers({ 
-                        roasTarget: e.target.value ? parseFloat(e.target.value) : null 
+                      onChange={(e) => setGlobalMultipliers({
+                        roasTarget: e.target.value ? parseFloat(e.target.value) : null
                       })}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
@@ -650,7 +684,7 @@ function ChannelEditorItem({
   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
 
   return (
-    <div 
+    <div
       className={cn(
         "rounded-lg border transition-all",
         "bg-sidebar-accent/50 border-sidebar-border",
@@ -658,13 +692,13 @@ function ChannelEditorItem({
         isExpanded && "bg-sidebar-accent"
       )}
     >
-      <div 
+      <div
         className="flex items-center justify-between p-2 cursor-pointer"
         onClick={() => setIsExpanded(!isExpanded)}
       >
         <div className="flex items-center gap-2 min-w-0">
-          <div 
-            className="w-2 h-2 rounded-full shrink-0" 
+          <div
+            className="w-2 h-2 rounded-full shrink-0"
             style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color }}
           />
           <span className={cn(
@@ -745,7 +779,7 @@ function ChannelEditorItem({
               />
             </div>
           )}
-          
+
           {/* KPI Overrides Grid */}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
@@ -754,8 +788,8 @@ function ChannelEditorItem({
                 type="number"
                 step="0.1"
                 value={channel.overrideCpm ?? channel.baseCpm}
-                onChange={(e) => updateChannelOverride(channel.id, { 
-                  overrideCpm: e.target.value ? parseFloat(e.target.value) : null 
+                onChange={(e) => updateChannelOverride(channel.id, {
+                  overrideCpm: e.target.value ? parseFloat(e.target.value) : null
                 })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
@@ -766,8 +800,8 @@ function ChannelEditorItem({
                 type="number"
                 step="0.1"
                 value={channel.overrideCtr ?? channel.baseCtr}
-                onChange={(e) => updateChannelOverride(channel.id, { 
-                  overrideCtr: e.target.value ? parseFloat(e.target.value) : null 
+                onChange={(e) => updateChannelOverride(channel.id, {
+                  overrideCtr: e.target.value ? parseFloat(e.target.value) : null
                 })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
@@ -778,8 +812,8 @@ function ChannelEditorItem({
                 type="number"
                 step="0.1"
                 value={channel.overrideCr ?? channel.baseCr}
-                onChange={(e) => updateChannelOverride(channel.id, { 
-                  overrideCr: e.target.value ? parseFloat(e.target.value) : null 
+                onChange={(e) => updateChannelOverride(channel.id, {
+                  overrideCr: e.target.value ? parseFloat(e.target.value) : null
                 })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
@@ -790,8 +824,8 @@ function ChannelEditorItem({
                 type="number"
                 step="0.1"
                 value={channel.overrideRoas ?? channel.baseRoas}
-                onChange={(e) => updateChannelOverride(channel.id, { 
-                  overrideRoas: e.target.value ? parseFloat(e.target.value) : null 
+                onChange={(e) => updateChannelOverride(channel.id, {
+                  overrideRoas: e.target.value ? parseFloat(e.target.value) : null
                 })}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
@@ -802,8 +836,8 @@ function ChannelEditorItem({
                 type="number"
                 step="0.1"
                 value={channel.overrideCpa ?? ''}
-                onChange={(e) => updateChannelOverride(channel.id, { 
-                  overrideCpa: e.target.value ? parseFloat(e.target.value) : null 
+                onChange={(e) => updateChannelOverride(channel.id, {
+                  overrideCpa: e.target.value ? parseFloat(e.target.value) : null
                 })}
                 placeholder="Auto-calculated"
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"

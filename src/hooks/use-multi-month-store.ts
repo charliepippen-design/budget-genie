@@ -2,10 +2,11 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChannelCategory } from '@/lib/mediaplan-data';
 import { ChannelFamily, BuyingModel, ChannelTypeConfig } from '@/types/channel';
+import { useMediaPlanStore } from './use-media-plan-store';
 
 // ========== TYPES ==========
 
-export type ProgressionPattern = 
+export type ProgressionPattern =
   | 'linear'
   | 'exponential'
   | 'u-shaped'
@@ -16,7 +17,7 @@ export type ProgressionPattern =
   | 'flat'
   | 'custom';
 
-export type OptimizationGoal = 
+export type OptimizationGoal =
   | 'maximize-roas'
   | 'minimize-cac'
   | 'maximize-revenue'
@@ -49,21 +50,21 @@ export interface MonthData {
   label: string; // e.g., "March 2025"
   monthIndex: number; // 0 = soft launch, 1 = month 1, etc.
   isSoftLaunch: boolean;
-  
+
   // Budget
   budget: number;
   budgetMultiplier: number;
   budgetLocked: boolean;
-  
+
   // Scaling overrides (null = use global)
   spendMultiplier: number | null;
   cpmOverride: number | null;
   ctrBump: number | null;
-  
+
   // Channel allocations
   channels: ChannelMonthConfig[];
   useGlobalChannels: boolean;
-  
+
   // Calculated metrics (populated by selectors)
   totalSpend?: number;
   totalConversions?: number;
@@ -112,7 +113,8 @@ export interface OptimizationResult {
   scenario: Partial<PlanScenario>;
   score: number;
   metrics: {
-    totalBudget: number;
+    totalAllocatedBudget: number;
+    totalSpend: number;
     totalRevenue: number;
     netProfit: number;
     avgRoas: number;
@@ -163,75 +165,87 @@ const DEFAULT_CONSTRAINTS: OptimizationConstraints = {
 
 // ========== PROGRESSION FORMULAS ==========
 
-export function calculateProgressionBudgets(
+export function calculateDistribution(
   pattern: ProgressionPattern,
-  baseBudget: number,
+  totalBudget: number,
   months: number,
   params: Record<string, number> = {}
 ): number[] {
-  const budgets: number[] = [];
-  const growthRate = params.growthRate ?? 10;
-  
+  if (months <= 0) return [];
+  if (months === 1) return [totalBudget];
+
+  let weights: number[] = [];
+  const growthRate = params.growthRate ?? 10; // Default 10% per step
+
   for (let i = 0; i < months; i++) {
     switch (pattern) {
       case 'linear':
-        budgets.push(baseBudget * (1 + (growthRate / 100) * i));
+        weights.push(1);
         break;
       case 'exponential':
-        budgets.push(baseBudget * Math.pow(1 + growthRate / 100, i));
+        // Start low, grow by rate
+        weights.push(Math.pow(1 + growthRate / 100, i));
         break;
       case 'u-shaped': {
+        // y = a(x-h)^2 + k
+        // High at ends, low in middle
         const mid = (months - 1) / 2;
-        const dip = params.dipFactor ?? 0.3;
-        const factor = 1 - dip * (1 - Math.pow((i - mid) / mid, 2));
-        budgets.push(baseBudget * factor);
+        const x = (i - mid) / mid; // -1 to 1
+        weights.push(Math.pow(x, 2) + 0.5); // +0.5 to keep center non-zero
         break;
       }
       case 'inverse-u': {
-        const peak = params.peakMonth ?? Math.floor(months / 3);
-        const declineRate = params.declineRate ?? 10;
-        if (i <= peak) {
-          budgets.push(baseBudget * (1 + (growthRate / 100) * i));
-        } else {
-          const peakBudget = baseBudget * (1 + (growthRate / 100) * peak);
-          budgets.push(peakBudget * (1 - (declineRate / 100) * (i - peak)));
-        }
+        // High in middle, low at ends
+        const mid = (months - 1) / 2;
+        const x = (i - mid) / mid; // -1 to 1
+        weights.push(1 - Math.pow(x, 2) + 0.1);
         break;
       }
       case 'seasonal': {
-        const peakMonths = params.peakMonths ?? [1, 4];
-        const peakMultiplier = params.peakMultiplier ?? 1.5;
-        const isPeak = Array.isArray(peakMonths) && peakMonths.includes(i);
-        budgets.push(baseBudget * (isPeak ? peakMultiplier : 1));
+        // Simple sine wave simulation + baseline
+        // Peak at index 1 and 7? Just generic seasonality
+        const x = (i / months) * Math.PI * 2; // 0 to 2PI
+        weights.push(Math.sin(x) + 1.5); // Ensure positive
         break;
       }
       case 'step': {
-        const stepSize = params.stepSize ?? 3;
-        const stepIncrease = params.stepIncrease ?? 50;
-        const steps = Math.floor(i / stepSize);
-        budgets.push(baseBudget * (1 + (stepIncrease / 100) * steps));
+        // Step up every 3 months
+        const step = Math.floor(i / 3);
+        weights.push(1 + step * 0.5);
         break;
       }
       case 'aggressive-launch': {
-        const launchMultiplier = params.launchMultiplier ?? 2.5;
-        const stabilizeMonth = params.stabilizeMonth ?? 3;
-        if (i === 0) {
-          budgets.push(baseBudget * launchMultiplier);
-        } else if (i < stabilizeMonth) {
-          const decay = (launchMultiplier - 1) * (1 - i / stabilizeMonth);
-          budgets.push(baseBudget * (1 + decay));
-        } else {
-          budgets.push(baseBudget);
-        }
+        // High start, then decay
+        // 1 / (1 + i) decay
+        weights.push(10 / (2 + i));
         break;
       }
       case 'flat':
       default:
-        budgets.push(baseBudget);
+        weights.push(1);
     }
   }
-  
-  return budgets.map(b => Math.max(0, Math.round(b)));
+
+  // Normalize and distribute
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  let distributedTotal = 0;
+
+  const budgets = weights.map(w => {
+    const amount = Math.floor((w / totalWeight) * totalBudget);
+    distributedTotal += amount;
+    return amount;
+  });
+
+  // Distribute remainder to avoid rounding errors
+  let remainder = totalBudget - distributedTotal;
+  let i = 0;
+  while (remainder > 0) {
+    budgets[i % months]++;
+    remainder--;
+    i++;
+  }
+
+  return budgets;
 }
 
 // ========== MONTH GENERATION ==========
@@ -279,36 +293,36 @@ export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPl
 } {
   const spendMultiplier = month.spendMultiplier ?? globalSettings.spendMultiplier;
   const actualBudget = month.budget * month.budgetMultiplier * spendMultiplier;
-  
+
   let totalSpend = 0;
   let totalImpressions = 0;
   let totalClicks = 0;
   let totalConversions = 0;
   let totalRevenue = 0;
-  
+
   month.channels.forEach(ch => {
     const spend = (ch.allocationPct / 100) * actualBudget;
     const cpm = ch.cpm;
     const ctr = ch.ctr + (month.ctrBump ?? globalSettings.ctrBump);
-    
+
     let impressions: number;
     if (ch.impressionMode === 'FIXED') {
       impressions = ch.fixedImpressions;
     } else {
       impressions = cpm > 0 ? (spend / cpm) * 1000 : 0;
     }
-    
+
     const clicks = impressions * (Math.max(0.01, ctr) / 100);
     const conversions = clicks * (ch.cr / 100);
     const revenue = spend * ch.roas;
-    
+
     totalSpend += spend;
     totalImpressions += impressions;
     totalClicks += clicks;
     totalConversions += conversions;
     totalRevenue += revenue;
   });
-  
+
   return {
     totalSpend,
     totalImpressions,
@@ -323,7 +337,8 @@ export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPl
 export function calculatePlanMetrics(months: MonthData[], globalSettings: GlobalPlanSettings): {
   months: MonthData[];
   totals: {
-    totalBudget: number;
+    totalAllocatedBudget: number;
+    totalSpend: number;
     totalConversions: number;
     totalRevenue: number;
     operatingCosts: number;
@@ -332,21 +347,22 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
     avgCpa: number | null;
     avgRoas: number;
     breakEvenMonth: number | null;
+    endingCumulativeProfit: number;
   };
 } {
   let cumulativeProfit = 0;
   let breakEvenMonth: number | null = null;
-  
+
   const enrichedMonths = months.map((month, idx) => {
     const metrics = calculateMonthMetrics(month, globalSettings);
     const operatingCosts = metrics.revenue * 0.15; // 15% operating costs
     const netProfit = metrics.revenue - metrics.totalSpend - operatingCosts;
     cumulativeProfit += netProfit;
-    
+
     if (breakEvenMonth === null && cumulativeProfit >= 0) {
       breakEvenMonth = idx;
     }
-    
+
     return {
       ...month,
       totalSpend: metrics.totalSpend,
@@ -357,24 +373,28 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
       cumulativeProfit,
     };
   });
-  
-  const totalBudget = enrichedMonths.reduce((sum, m) => sum + (m.totalSpend || 0), 0);
+
+  const totalAllocatedBudget = enrichedMonths.reduce((sum, m) => sum + (m.budget || 0), 0);
+  const totalSpend = enrichedMonths.reduce((sum, m) => sum + (m.totalSpend || 0), 0);
   const totalConversions = enrichedMonths.reduce((sum, m) => sum + (m.totalConversions || 0), 0);
   const totalRevenue = enrichedMonths.reduce((sum, m) => sum + (m.revenue || 0), 0);
   const totalOperatingCosts = enrichedMonths.reduce((sum, m) => sum + (m.operatingCosts || 0), 0);
-  
+  const endingCumulativeProfit = enrichedMonths.length > 0 ? enrichedMonths[enrichedMonths.length - 1].cumulativeProfit : 0;
+
   return {
     months: enrichedMonths,
     totals: {
-      totalBudget,
+      totalAllocatedBudget,
+      totalSpend,
       totalConversions,
       totalRevenue,
       operatingCosts: totalOperatingCosts,
-      netProfit: totalRevenue - totalBudget - totalOperatingCosts,
-      avgMonthlyBudget: enrichedMonths.length > 0 ? totalBudget / enrichedMonths.length : 0,
-      avgCpa: totalConversions > 0 ? totalBudget / totalConversions : null,
-      avgRoas: totalBudget > 0 ? totalRevenue / totalBudget : 0,
+      netProfit: totalRevenue - totalSpend - totalOperatingCosts,
+      avgMonthlyBudget: enrichedMonths.length > 0 ? totalAllocatedBudget / enrichedMonths.length : 0, // Keeping for backward compat if needed
+      avgCpa: totalConversions > 0 ? totalSpend / totalConversions : null,
+      avgRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
       breakEvenMonth,
+      endingCumulativeProfit,
     },
   };
 }
@@ -388,25 +408,25 @@ interface MultiMonthState {
   startMonth: string;
   progressionPattern: ProgressionPattern;
   patternParams: Record<string, number>;
-  
+
   // Global Settings
   globalSettings: GlobalPlanSettings;
-  
+
   // Months Data
   months: MonthData[];
-  
+
   // Scenarios
   scenarios: PlanScenario[];
   activeScenarioId: string | null;
   comparisonScenarioId: string | null;
-  
+
   // Optimization
   optimizationGoal: OptimizationGoal;
   riskLevel: RiskLevel;
   constraints: OptimizationConstraints;
   optimizationResults: OptimizationResult[];
   isOptimizing: boolean;
-  
+
   // PDF Export options
   pdfSections: {
     executiveSummary: boolean;
@@ -418,27 +438,27 @@ interface MultiMonthState {
     financialProjections: boolean;
   };
   userNotes: string;
-  
+
   // Actions - Configuration
   setIncludeSoftLaunch: (include: boolean) => void;
   setPlanningMonths: (months: number) => void;
   setStartMonth: (month: string) => void;
   setProgressionPattern: (pattern: ProgressionPattern) => void;
   setPatternParams: (params: Record<string, number>) => void;
-  
+
   // Actions - Global Settings
   setGlobalSettings: (updates: Partial<GlobalPlanSettings>) => void;
-  
+
   // Actions - Month Management
-  generateMonths: () => void;
-  applyPattern: () => void;
+  generateMonths: (totalBudget?: number) => void;
+  applyPattern: () => void; // Uses CURRENT total budget
   updateMonth: (monthId: string, updates: Partial<MonthData>) => void;
   updateMonthChannel: (monthId: string, channelId: string, updates: Partial<ChannelMonthConfig>) => void;
   copyFromPreviousMonth: (monthId: string) => void;
   resetMonthToGlobal: (monthId: string) => void;
   applyToRemainingMonths: (fromMonthId: string) => void;
   applyGlobalChannelsToAll: () => void;
-  
+
   // Actions - Scenarios
   saveScenario: (name: string) => void;
   loadScenario: (id: string) => void;
@@ -446,18 +466,18 @@ interface MultiMonthState {
   cloneScenario: (id: string, newName: string) => void;
   setActiveScenario: (id: string | null) => void;
   setComparisonScenario: (id: string | null) => void;
-  
+
   // Actions - Optimization
   setOptimizationGoal: (goal: OptimizationGoal) => void;
   setRiskLevel: (level: RiskLevel) => void;
   setConstraints: (updates: Partial<OptimizationConstraints>) => void;
   runOptimization: () => Promise<void>;
   loadOptimizationResult: (index: number) => void;
-  
+
   // Actions - PDF
   setPdfSections: (sections: Partial<MultiMonthState['pdfSections']>) => void;
   setUserNotes: (notes: string) => void;
-  
+
   // Actions - Reset
   resetPlan: () => void;
 }
@@ -491,77 +511,131 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         financialProjections: true,
       },
       userNotes: '',
-      
+
       // Configuration Actions
       setIncludeSoftLaunch: (include) => {
         set({ includeSoftLaunch: include });
         get().generateMonths();
       },
-      
+
       setPlanningMonths: (months) => {
         set({ planningMonths: Math.max(3, Math.min(12, months)) });
         get().generateMonths();
       },
-      
+
       setStartMonth: (month) => {
         set({ startMonth: month });
         get().generateMonths();
       },
-      
+
       setProgressionPattern: (pattern) => {
         set({ progressionPattern: pattern });
       },
-      
+
       setPatternParams: (params) => {
         set({ patternParams: params });
       },
-      
+
       // Global Settings
       setGlobalSettings: (updates) => {
-        set(state => ({
-          globalSettings: { ...state.globalSettings, ...updates },
-        }));
+        const state = get();
+        const prevSettings = state.globalSettings;
+        const newSettings = { ...prevSettings, ...updates };
+
+        set({ globalSettings: newSettings });
+
+        // React to changes
+        const budgetChanged = updates.baseMonthlyBudget !== undefined && updates.baseMonthlyBudget !== prevSettings.baseMonthlyBudget;
+        const growthChanged = (updates.growthRate !== undefined && updates.growthRate !== prevSettings.growthRate) ||
+          (updates.growthType !== undefined && updates.growthType !== prevSettings.growthType);
+
+        // If Budget or Growth params change, we should re-distribute
+        // BUT, we need to decide if we keep the "Distribution Shape" or "Total Budget".
+        // If the user changes "Base Monthly Budget", they probably expect the new Base * Months to be the new Total.
+        if (budgetChanged || growthChanged) {
+          // Recalculate based on new params
+          // We'll treat Base Budget as the "Source of Truth" when these sliders move
+          const totalMonths = state.months.length || state.planningMonths;
+          const newTotalBudget = newSettings.baseMonthlyBudget * totalMonths;
+
+          const budgets = calculateDistribution(
+            state.progressionPattern,
+            newTotalBudget,
+            totalMonths,
+            { ...state.patternParams, growthRate: newSettings.growthRate }
+          );
+
+          set(curr => ({
+            months: curr.months.map((m, i) => ({
+              ...m,
+              budget: budgets[i] || m.budget,
+            }))
+          }));
+        }
       },
-      
+
       // Month Management
-      generateMonths: () => {
+      generateMonths: (totalBudgetOverride?: number) => {
         const state = get();
         const totalMonths = state.planningMonths + (state.includeSoftLaunch ? 1 : 0);
         const startDate = new Date(state.startMonth + '-01');
-        const budgets = calculateProgressionBudgets(
+
+        // Logic: Use passed budget, OR fetch from global store, OR fallback to base
+        let targetBudget = totalBudgetOverride;
+
+        if (targetBudget === undefined) {
+          // Try to pull from global store if available
+          try {
+            targetBudget = useMediaPlanStore.getState().totalBudget;
+          } catch (e) {
+            console.warn('Could not access MediaPlanStore', e);
+          }
+        }
+
+        // Fallback to internal settings if still 0 or undefined
+        if (!targetBudget) {
+          targetBudget = state.globalSettings.baseMonthlyBudget * totalMonths;
+        }
+
+        const budgets = calculateDistribution(
           state.progressionPattern,
-          state.globalSettings.baseMonthlyBudget,
+          targetBudget,
           totalMonths,
           { ...state.patternParams, growthRate: state.globalSettings.growthRate }
         );
-        
+
         const newMonths: MonthData[] = [];
         for (let i = 0; i < totalMonths; i++) {
           const isSoftLaunch = state.includeSoftLaunch && i === 0;
           newMonths.push(createMonth(i, startDate, isSoftLaunch, budgets[i], DEFAULT_CHANNELS));
         }
-        
+
         set({ months: newMonths });
       },
-      
+
       applyPattern: () => {
         const state = get();
-        const budgets = calculateProgressionBudgets(
+        // Calculate CURRENT Total Budget from existing months
+        const currentTotalBudget = state.months.reduce((sum, m) => sum + m.budget, 0);
+
+        if (currentTotalBudget === 0) return;
+
+        const budgets = calculateDistribution(
           state.progressionPattern,
-          state.globalSettings.baseMonthlyBudget,
+          currentTotalBudget,
           state.months.length,
           { ...state.patternParams, growthRate: state.globalSettings.growthRate }
         );
-        
+
         set({
           months: state.months.map((month, idx) => ({
             ...month,
-            budget: budgets[idx],
+            budget: budgets[idx] || 0, // Safety fallback
             budgetMultiplier: 1.0,
           })),
         });
       },
-      
+
       updateMonth: (monthId, updates) => {
         set(state => ({
           months: state.months.map(m =>
@@ -569,94 +643,106 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           ),
         }));
       },
-      
+
       updateMonthChannel: (monthId, channelId, updates) => {
         set(state => ({
           months: state.months.map(m =>
             m.id === monthId
               ? {
-                  ...m,
-                  useGlobalChannels: false,
-                  channels: m.channels.map(ch =>
-                    ch.channelId === channelId ? { ...ch, ...updates } : ch
-                  ),
-                }
+                ...m,
+                useGlobalChannels: false,
+                channels: m.channels.map(ch =>
+                  ch.channelId === channelId ? { ...ch, ...updates } : ch
+                ),
+              }
               : m
           ),
         }));
       },
-      
+
       copyFromPreviousMonth: (monthId) => {
         const state = get();
         const monthIndex = state.months.findIndex(m => m.id === monthId);
         if (monthIndex <= 0) return;
-        
+
         const prevMonth = state.months[monthIndex - 1];
         set({
           months: state.months.map((m, idx) =>
             idx === monthIndex
               ? {
-                  ...m,
-                  spendMultiplier: prevMonth.spendMultiplier,
-                  cpmOverride: prevMonth.cpmOverride,
-                  ctrBump: prevMonth.ctrBump,
-                  channels: JSON.parse(JSON.stringify(prevMonth.channels)),
-                  useGlobalChannels: prevMonth.useGlobalChannels,
-                }
+                ...m,
+                spendMultiplier: prevMonth.spendMultiplier,
+                cpmOverride: prevMonth.cpmOverride,
+                ctrBump: prevMonth.ctrBump,
+                channels: JSON.parse(JSON.stringify(prevMonth.channels)),
+                useGlobalChannels: prevMonth.useGlobalChannels,
+              }
               : m
           ),
         });
       },
-      
+
       resetMonthToGlobal: (monthId) => {
         set(state => ({
           months: state.months.map(m =>
             m.id === monthId
               ? {
-                  ...m,
-                  spendMultiplier: null,
-                  cpmOverride: null,
-                  ctrBump: null,
-                  channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
-                  useGlobalChannels: true,
-                }
+                ...m,
+                spendMultiplier: null,
+                cpmOverride: null,
+                ctrBump: null,
+                channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
+                useGlobalChannels: true,
+              }
               : m
           ),
         }));
       },
-      
+
       applyToRemainingMonths: (fromMonthId) => {
         const state = get();
         const fromIndex = state.months.findIndex(m => m.id === fromMonthId);
         if (fromIndex < 0) return;
-        
+
         const sourceMonth = state.months[fromIndex];
         set({
           months: state.months.map((m, idx) =>
             idx > fromIndex
               ? {
-                  ...m,
-                  spendMultiplier: sourceMonth.spendMultiplier,
-                  cpmOverride: sourceMonth.cpmOverride,
-                  ctrBump: sourceMonth.ctrBump,
-                  channels: JSON.parse(JSON.stringify(sourceMonth.channels)),
-                  useGlobalChannels: sourceMonth.useGlobalChannels,
-                }
+                ...m,
+                spendMultiplier: sourceMonth.spendMultiplier,
+                cpmOverride: sourceMonth.cpmOverride,
+                ctrBump: sourceMonth.ctrBump,
+                channels: JSON.parse(JSON.stringify(sourceMonth.channels)),
+                useGlobalChannels: sourceMonth.useGlobalChannels,
+              }
               : m
           ),
         });
       },
-      
+
       applyGlobalChannelsToAll: () => {
-        set(state => ({
-          months: state.months.map(m => ({
-            ...m,
-            channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
-            useGlobalChannels: true,
-          })),
-        }));
+        // Logic: Take the first "real" month (index 0 if no soft launch, index 1 if soft launch)
+        // copy its channel config to all other months.
+        const state = get();
+        if (state.months.length === 0) return;
+
+        const sourceIndex = state.includeSoftLaunch && state.months.length > 1 ? 1 : 0;
+        const sourceMonth = state.months[sourceIndex];
+        const sourceChannels = JSON.parse(JSON.stringify(sourceMonth.channels));
+
+        set({
+          months: state.months.map((m, idx) => {
+            if (idx === sourceIndex) return m; // Skip source
+            return {
+              ...m,
+              channels: JSON.parse(JSON.stringify(sourceChannels)),
+              useGlobalChannels: true, // Reset override flag
+            };
+          })
+        });
       },
-      
+
       // Scenarios
       saveScenario: (name) => {
         const state = get();
@@ -672,17 +758,17 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           globalSettings: { ...state.globalSettings },
           months: JSON.parse(JSON.stringify(state.months)),
         };
-        
+
         set(s => ({
           scenarios: [...s.scenarios.filter(sc => sc.name !== name), scenario],
           activeScenarioId: scenario.id,
         }));
       },
-      
+
       loadScenario: (id) => {
         const scenario = get().scenarios.find(s => s.id === id);
         if (!scenario) return;
-        
+
         set({
           includeSoftLaunch: scenario.includeSoftLaunch,
           planningMonths: scenario.planningMonths,
@@ -694,7 +780,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           activeScenarioId: id,
         });
       },
-      
+
       deleteScenario: (id) => {
         set(state => ({
           scenarios: state.scenarios.filter(s => s.id !== id),
@@ -702,54 +788,58 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           comparisonScenarioId: state.comparisonScenarioId === id ? null : state.comparisonScenarioId,
         }));
       },
-      
+
       cloneScenario: (id, newName) => {
         const scenario = get().scenarios.find(s => s.id === id);
         if (!scenario) return;
-        
+
         const cloned: PlanScenario = {
           ...JSON.parse(JSON.stringify(scenario)),
           id: `scenario-${Date.now()}`,
           name: newName,
           createdAt: new Date(),
         };
-        
+
         set(s => ({ scenarios: [...s.scenarios, cloned] }));
       },
-      
+
       setActiveScenario: (id) => set({ activeScenarioId: id }),
       setComparisonScenario: (id) => set({ comparisonScenarioId: id }),
-      
+
       // Optimization
       setOptimizationGoal: (goal) => set({ optimizationGoal: goal }),
       setRiskLevel: (level) => set({ riskLevel: level }),
       setConstraints: (updates) => set(s => ({
         constraints: { ...s.constraints, ...updates },
       })),
-      
+
       runOptimization: async () => {
         set({ isOptimizing: true, optimizationResults: [] });
-        
+
         // Simulate optimization with different patterns
         const state = get();
         const patterns: ProgressionPattern[] = ['linear', 'exponential', 'aggressive-launch', 'flat', 'step'];
         const results: OptimizationResult[] = [];
-        
+
+        // We need a baseline total budget to optimize against? 
+        // Or assume use current base * months?
+        const baseTotal = state.globalSettings.baseMonthlyBudget * state.months.length;
+
         for (const pattern of patterns) {
-          const budgets = calculateProgressionBudgets(
+          const budgets = calculateDistribution(
             pattern,
-            state.globalSettings.baseMonthlyBudget,
+            baseTotal,
             state.months.length,
             { growthRate: state.globalSettings.growthRate }
           );
-          
+
           const testMonths = state.months.map((m, idx) => ({
             ...m,
             budget: budgets[idx],
           }));
-          
+
           const metrics = calculatePlanMetrics(testMonths, state.globalSettings);
-          
+
           let score = 0;
           switch (state.optimizationGoal) {
             case 'maximize-roas':
@@ -770,12 +860,13 @@ export const useMultiMonthStore = create<MultiMonthState>()(
             default:
               score = (metrics.totals.avgRoas * 20) + (metrics.totals.netProfit / 5000);
           }
-          
+
           results.push({
             scenario: { progressionPattern: pattern },
             score,
             metrics: {
-              totalBudget: metrics.totals.totalBudget,
+              totalAllocatedBudget: metrics.totals.totalAllocatedBudget,
+              totalSpend: metrics.totals.totalSpend,
               totalRevenue: metrics.totals.totalRevenue,
               netProfit: metrics.totals.netProfit,
               avgRoas: metrics.totals.avgRoas,
@@ -786,27 +877,28 @@ export const useMultiMonthStore = create<MultiMonthState>()(
             confidence: Math.min(95, 60 + score / 10),
           });
         }
-        
+
         // Sort by score descending
         results.sort((a, b) => b.score - a.score);
-        
+
         set({ optimizationResults: results.slice(0, 3), isOptimizing: false });
       },
-      
+
       loadOptimizationResult: (index) => {
         const result = get().optimizationResults[index];
         if (!result?.scenario.progressionPattern) return;
-        
+
         set({ progressionPattern: result.scenario.progressionPattern });
+
         get().applyPattern();
       },
-      
+
       // PDF
       setPdfSections: (sections) => set(s => ({
         pdfSections: { ...s.pdfSections, ...sections },
       })),
       setUserNotes: (notes) => set({ userNotes: notes }),
-      
+
       // Reset
       resetPlan: () => {
         set({
@@ -815,7 +907,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           startMonth: new Date().toISOString().slice(0, 7),
           progressionPattern: 'linear',
           patternParams: { growthRate: 10 },
-          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
+          globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, baseMonthlyBudget: 0 },
           months: [],
           activeScenarioId: null,
           optimizationResults: [],

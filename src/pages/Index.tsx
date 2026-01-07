@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Helmet } from 'react-helmet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LayoutGrid, Calendar } from 'lucide-react';
@@ -10,6 +10,7 @@ import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { ChannelTable } from '@/components/dashboard/ChannelTable';
 import { ChartSection } from '@/components/dashboard/ChartSection';
 import { SettingsConsole } from '@/components/dashboard/SettingsConsole';
+import { BudgetGenieAI } from '@/components/dashboard/BudgetGenieAI'; // <--- We added this
 
 // Multi-Month Components
 import { MonthConfigPanel } from '@/components/multi-month/MonthConfigPanel';
@@ -17,36 +18,38 @@ import { MultiMonthGlobalSettings } from '@/components/multi-month/MultiMonthGlo
 import { PLTable } from '@/components/multi-month/PLTable';
 import { MultiMonthCharts } from '@/components/multi-month/MultiMonthCharts';
 import { ScenarioComparison } from '@/components/multi-month/ScenarioComparison';
+import { ImportWizard } from '@/components/multi-month/ImportWizard';
 import { AutoOptimizer } from '@/components/multi-month/AutoOptimizer';
 
-import { 
-  useMediaPlanStore, 
-  useChannelsWithMetrics, 
+import {
+  useMediaPlanStore,
+  useChannelsWithMetrics,
   useBlendedMetrics,
   useCategoryTotals,
 } from '@/hooks/use-media-plan-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
-import { BudgetPresetKey } from '@/lib/mediaplan-data';
+import { BudgetPresetKey, BUDGET_PRESETS } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { exportToPdf, exportToCsv } from '@/lib/export-service';
 
 const Index = () => {
-  const { totalBudget, setTotalBudget } = useMediaPlanStore();
+  const { totalBudget, setTotalBudget, applyCategoryMultipliers } = useMediaPlanStore();
+  const [currentPreset, setCurrentPreset] = useState<BudgetPresetKey>('custom');
+  const [importOpen, setImportOpen] = useState(false);
+
   const channelsWithMetrics = useChannelsWithMetrics();
   const blendedMetrics = useBlendedMetrics();
   const categoryTotals = useCategoryTotals();
   const { generateMonths, months } = useMultiMonthStore();
   const { format: formatCurrency, symbol: currencySymbol } = useCurrency();
-  
+
   const { toast } = useToast();
 
-  // Generate months on first load if empty
+  // Generate months whenever budget changes or on first load
   useEffect(() => {
-    if (months.length === 0) {
-      generateMonths();
-    }
-  }, []);
+    generateMonths(totalBudget);
+  }, [totalBudget, generateMonths]);
 
   // Export handlers
   const handleExport = useCallback(async (format: 'pdf' | 'csv' | 'png') => {
@@ -54,7 +57,7 @@ const Index = () => {
       currencySymbol,
       formatCurrency,
     };
-    
+
     try {
       if (format === 'pdf') {
         exportToPdf(channelsWithMetrics, totalBudget, blendedMetrics, exportOptions);
@@ -77,18 +80,50 @@ const Index = () => {
     }
   }, [channelsWithMetrics, totalBudget, blendedMetrics, formatCurrency, currencySymbol, toast]);
 
+  const handlePresetChange = (preset: BudgetPresetKey) => {
+    setCurrentPreset(preset);
+    if (preset === 'custom') return;
+
+    const config = BUDGET_PRESETS[preset];
+    if (config) {
+      applyCategoryMultipliers(config.multipliers);
+      toast({
+        title: `${config.name} Preset Applied`,
+        description: config.description,
+      });
+    }
+  };
+
+  const handleReset = useCallback(() => {
+    if (confirm('BRUTAL RESET: This will wipe all data and reset the budget to $0. Are you sure?')) {
+      useMediaPlanStore.getState().resetAll();
+      useMultiMonthStore.getState().resetPlan();
+
+      toast({
+        title: 'Resetting...',
+        description: 'Wiping data and reloading...',
+      });
+
+      setTimeout(() => {
+        window.location.reload();
+      }, 500);
+    }
+  }, [toast]);
+
   return (
     <>
       <Helmet>
-        <title>MediaPlan Pro - Interactive Budget Scaler | iGaming Media Planning</title>
+        <title>MediaPlanner Pro - Interactive Budget Scaler | iGaming Media Planning</title>
         <meta name="description" content="Professional media plan budget calibrator for iGaming and digital marketing. Scale budgets, analyze ROI, and optimize channel allocation in real-time." />
       </Helmet>
 
       <div className="min-h-screen bg-background flex flex-col">
         <DashboardHeader
-          budgetPreset={'custom' as BudgetPresetKey}
-          onPresetChange={() => {}}
+          budgetPreset={currentPreset}
+          onPresetChange={handlePresetChange}
           onExport={handleExport}
+          onImport={() => setImportOpen(true)}
+          onReset={handleReset}
         />
 
         <Tabs defaultValue="quick" className="flex-1 flex flex-col">
@@ -132,23 +167,23 @@ const Index = () => {
             <main className="flex-1 overflow-auto">
               <div className="container mx-auto px-4 py-6 space-y-6">
                 <MonthConfigPanel />
-                
+
                 <Tabs defaultValue="overview" className="w-full">
                   <TabsList className="mb-4">
                     <TabsTrigger value="overview">Plan Overview</TabsTrigger>
                     <TabsTrigger value="comparison">Scenario Comparison</TabsTrigger>
                     <TabsTrigger value="optimizer">Auto-Optimizer</TabsTrigger>
                   </TabsList>
-                  
+
                   <TabsContent value="overview" className="space-y-6">
                     <PLTable />
                     <MultiMonthCharts />
                   </TabsContent>
-                  
+
                   <TabsContent value="comparison">
                     <ScenarioComparison />
                   </TabsContent>
-                  
+
                   <TabsContent value="optimizer">
                     <AutoOptimizer />
                   </TabsContent>
@@ -158,6 +193,11 @@ const Index = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* The AI Button is right here! */}
+      <BudgetGenieAI />
+
+      <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
 };
