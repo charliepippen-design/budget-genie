@@ -12,7 +12,15 @@ export interface Channel {
   estimatedRoas?: number; // Return on ad spend
 }
 
-export type ChannelCategory = 'seo' | 'paid' | 'affiliate' | 'influencer';
+export type ChannelCategory =
+  | 'Paid Search'
+  | 'Paid Social'
+  | 'Display/Programmatic'
+  | 'Affiliate'
+  | 'SEO/Content'
+  | 'Offline/TV'
+  | 'Email/SMS'
+  | 'Other';
 
 export interface BudgetScenario {
   id: string;
@@ -39,7 +47,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'seo-tech',
     name: 'SEO - Tech Audit & On-Page',
-    category: 'seo',
+    category: 'SEO/Content',
     baseSpend: 500,
     basePercentage: 0,
     cpm: 2.5,
@@ -49,7 +57,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'seo-content',
     name: 'SEO - Content Production',
-    category: 'seo',
+    category: 'SEO/Content',
     baseSpend: 1500,
     basePercentage: 0,
     cpm: 1.8,
@@ -59,7 +67,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'seo-backlinks',
     name: 'SEO - Backlinks / Guest Posts',
-    category: 'seo',
+    category: 'SEO/Content',
     baseSpend: 1000,
     basePercentage: 0,
     cpm: 3.5,
@@ -70,7 +78,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'paid-native',
     name: 'Paid - Native Ads (Adult/Crypto)',
-    category: 'paid',
+    category: 'Display/Programmatic',
     baseSpend: 2500,
     basePercentage: 0,
     cpm: 4.2,
@@ -80,7 +88,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'paid-push',
     name: 'Paid - Push Notifications',
-    category: 'paid',
+    category: 'Display/Programmatic',
     baseSpend: 1500,
     basePercentage: 0,
     cpm: 1.2,
@@ -90,7 +98,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'paid-programmatic',
     name: 'Paid - Programmatic / Display',
-    category: 'paid',
+    category: 'Display/Programmatic',
     baseSpend: 1000,
     basePercentage: 0,
     cpm: 5.5,
@@ -100,7 +108,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'paid-retargeting',
     name: 'Paid - Retargeting (Pixel)',
-    category: 'paid',
+    category: 'Display/Programmatic',
     baseSpend: 500,
     basePercentage: 0,
     cpm: 8.0,
@@ -111,7 +119,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'affiliate-listing',
     name: 'Affiliate - Listing Fees (Fixed)',
-    category: 'affiliate',
+    category: 'Affiliate',
     baseSpend: 1000,
     basePercentage: 0,
     cpm: 15.0,
@@ -121,7 +129,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'affiliate-cpa',
     name: 'Affiliate - CPA Commissions',
-    category: 'affiliate',
+    category: 'Affiliate',
     baseSpend: 8500,
     basePercentage: 0,
     cpm: 25.0,
@@ -132,7 +140,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'influencer-retainers',
     name: 'Influencer - Monthly Retainers',
-    category: 'influencer',
+    category: 'Paid Social',
     baseSpend: 2000,
     basePercentage: 0,
     cpm: 12.0,
@@ -142,7 +150,7 @@ export const CHANNELS: Channel[] = [
   {
     id: 'influencer-funds',
     name: 'Influencer - Play Funds (Bal)',
-    category: 'influencer',
+    category: 'Paid Social',
     baseSpend: 1500,
     basePercentage: 0,
     cpm: 10.0,
@@ -205,10 +213,14 @@ export type BudgetPresetKey = keyof typeof BUDGET_PRESETS;
 
 // Category metadata
 export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: string; icon: string }> = {
-  seo: { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
-  paid: { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
-  affiliate: { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
-  influencer: { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
+  'SEO/Content': { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
+  'Display/Programmatic': { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
+  'Affiliate': { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
+  'Paid Social': { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
+  'Paid Search': { name: 'Paid Search', color: 'hsl(var(--chart-5))', icon: 'Search' },
+  'Offline/TV': { name: 'Offline/TV', color: 'hsl(var(--muted-foreground))', icon: 'Tv' },
+  'Email/SMS': { name: 'Email/SMS', color: 'hsl(var(--primary))', icon: 'Mail' },
+  'Other': { name: 'Other', color: 'hsl(var(--secondary))', icon: 'HelpCircle' },
 };
 
 // Utility functions

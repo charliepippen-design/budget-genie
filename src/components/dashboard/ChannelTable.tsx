@@ -2,21 +2,21 @@ import { useMemo, useState, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow
 } from '@/components/ui/table';
-import { 
-  formatNumber, 
+import {
+  formatNumber,
   formatPercentage,
   CATEGORY_INFO,
   ChannelCategory,
 } from '@/lib/mediaplan-data';
-import { 
+import {
   useMediaPlanStore,
   useChannelsWithMetrics,
   useCategoryTotals,
@@ -29,26 +29,30 @@ import { ChannelEditor } from './ChannelEditor';
 import { BUYING_MODEL_INFO } from '@/types/channel';
 
 const CategoryIcon = ({ category }: { category: ChannelCategory }) => {
-  const icons = {
-    seo: Search,
-    paid: Megaphone,
-    affiliate: Users,
-    influencer: Star,
+  const icons: Partial<Record<ChannelCategory, any>> = {
+    'SEO/Content': Search,
+    'Paid Search': Search,
+    'Paid Social': Star,
+    'Offline/TV': Megaphone, // Fallback icon
+    'Display/Programmatic': Megaphone,
+    'Affiliate': Users,
+    'Email/SMS': Users, // Fallback
+    'Other': Settings2,
   };
-  const Icon = icons[category];
+  const Icon = icons[category] || Settings2;
   return <Icon className="h-3.5 w-3.5" />;
 };
 
 // Inline editable cell component
-function EditableCell({ 
-  value, 
+function EditableCell({
+  value,
   onSave,
   type = 'number',
   suffix = '',
   prefix = '',
   className,
   formatCurrencyFn,
-}: { 
+}: {
   value: number | null | undefined;
   onSave: (value: number) => void;
   type?: 'number' | 'currency' | 'percentage';
@@ -105,7 +109,7 @@ function EditableCell({
   }
 
   return (
-    <div 
+    <div
       className={cn(
         "flex items-center gap-1 cursor-pointer group",
         className
@@ -126,18 +130,27 @@ export function ChannelTable() {
 
   // Group channels by category
   const groupedChannels = useMemo(() => {
-    const groups: Record<ChannelCategory, ChannelWithMetrics[]> = {
-      seo: [],
-      paid: [],
-      affiliate: [],
-      influencer: [],
-    };
-    
-    channels.forEach((ch) => {
-      groups[ch.category].push(ch);
+    // Initialize groups based on the actual CATEGORY_INFO keys to ensure we match the schema
+    const groups: Partial<Record<ChannelCategory, ChannelWithMetrics[]>> = {};
+
+    // Pre-fill groups to ensure order based on CATEGORY_INFO if desired, or dynamic
+    (Object.keys(CATEGORY_INFO) as ChannelCategory[]).forEach(cat => {
+      groups[cat] = [];
     });
-    
-    return groups;
+
+    channels.forEach((ch) => {
+      // Defensive check for invalid/legacy categories
+      if (!ch.category || !groups[ch.category]) {
+        console.warn(`Channel ${ch.id} has invalid category: ${ch.category}`);
+        // Fallback to 'Other' if possible, or create the key dynamically
+        if (!groups['Other']) groups['Other'] = [];
+        groups['Other']?.push(ch);
+        return;
+      }
+      groups[ch.category]?.push(ch);
+    });
+
+    return groups as Record<ChannelCategory, ChannelWithMetrics[]>;
   }, [channels]);
 
   const handleSliderChange = useCallback(
@@ -148,7 +161,7 @@ export function ChannelTable() {
   );
 
   // Calculate total allocation
-  const totalAllocation = useMemo(() => 
+  const totalAllocation = useMemo(() =>
     channels.reduce((sum, ch) => sum + ch.allocationPct, 0),
     [channels]
   );
@@ -160,7 +173,7 @@ export function ChannelTable() {
         <h3 className="font-semibold">Channel Allocation</h3>
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Total:</span>
-          <Badge 
+          <Badge
             variant={Math.abs(totalAllocation - 100) < 0.1 ? 'default' : 'destructive'}
             className="font-mono"
           >
@@ -190,20 +203,20 @@ export function ChannelTable() {
               ([category, categoryChannels]) => (
                 <>
                   {/* Category Header Row */}
-                  <TableRow 
-                    key={`header-${category}`} 
+                  <TableRow
+                    key={`header-${category}`}
                     className="bg-muted/40 hover:bg-muted/40"
                   >
                     <TableCell colSpan={9} className="py-2">
                       <div className="flex items-center gap-2">
-                        <div 
+                        <div
                           className="flex h-6 w-6 items-center justify-center rounded-md"
-                          style={{ backgroundColor: CATEGORY_INFO[category].color + '20' }}
+                          style={{ backgroundColor: (CATEGORY_INFO[category]?.color || '#888') + '20' }}
                         >
                           <CategoryIcon category={category} />
                         </div>
                         <span className="font-semibold text-sm">
-                          {CATEGORY_INFO[category].name}
+                          {CATEGORY_INFO[category]?.name || category}
                         </span>
                         <Badge variant="outline" className="ml-auto font-mono text-xs">
                           {formatPercentage(categoryTotals[category]?.percentage || 0)} • {formatCurrency(categoryTotals[category]?.spend || 0)}
@@ -211,13 +224,13 @@ export function ChannelTable() {
                       </div>
                     </TableCell>
                   </TableRow>
-                  
+
                   {/* Channel Rows */}
                   {categoryChannels.map((channel) => {
                     const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
-                    
+
                     return (
-                      <TableRow 
+                      <TableRow
                         key={channel.id}
                         className={cn(
                           "group transition-colors hover:bg-muted/20",
@@ -285,7 +298,7 @@ export function ChannelTable() {
                           {channel.metrics.cpa ? formatCurrency(channel.metrics.cpa) : 'N/A'}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge 
+                          <Badge
                             variant="outline"
                             className={cn(
                               "font-mono text-xs",
@@ -314,13 +327,13 @@ export function ChannelTable() {
             <div key={category} className="p-4">
               {/* Category Header */}
               <div className="flex items-center gap-2 mb-4">
-                <div 
+                <div
                   className="flex h-7 w-7 items-center justify-center rounded-lg"
-                  style={{ backgroundColor: CATEGORY_INFO[category].color + '20' }}
+                  style={{ backgroundColor: (CATEGORY_INFO[category]?.color || '#888') + '20' }}
                 >
                   <CategoryIcon category={category} />
                 </div>
-                <span className="font-semibold">{CATEGORY_INFO[category].name}</span>
+                <span className="font-semibold">{CATEGORY_INFO[category]?.name || category}</span>
                 <Badge variant="outline" className="ml-auto font-mono text-xs">
                   {formatCurrency(categoryTotals[category]?.spend || 0)}
                 </Badge>
@@ -330,9 +343,9 @@ export function ChannelTable() {
               <div className="space-y-3">
                 {categoryChannels.map((channel) => {
                   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
-                  
+
                   return (
-                    <div 
+                    <div
                       key={channel.id}
                       className={cn(
                         "p-3 rounded-lg bg-muted/20 border border-border/30",
@@ -346,7 +359,7 @@ export function ChannelTable() {
                         )}>
                           {channel.name}
                         </span>
-                        <Badge 
+                        <Badge
                           variant="outline"
                           className={cn(
                             "font-mono text-xs",
@@ -357,7 +370,7 @@ export function ChannelTable() {
                           {channel.metrics.roas.toFixed(1)}x ROAS
                         </Badge>
                       </div>
-                      
+
                       {/* Slider */}
                       <div className="flex items-center gap-3 mb-3">
                         <Slider

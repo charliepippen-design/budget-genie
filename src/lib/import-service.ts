@@ -168,17 +168,17 @@ const CHANNEL_ALIASES: Record<string, string[]> = {
 };
 
 const CHANNEL_DEFAULTS: Record<string, { category: ChannelCategory; cpm: number; ctr: number; cr: number; roas: number }> = {
-  'seo-tech': { category: 'seo', cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2 },
-  'seo-content': { category: 'seo', cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5 },
-  'seo-backlinks': { category: 'seo', cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8 },
-  'paid-native': { category: 'paid', cpm: 4.2, ctr: 0.35, cr: 2.5, roas: 1.8 },
-  'paid-push': { category: 'paid', cpm: 1.2, ctr: 2.5, cr: 2.5, roas: 2.2 },
-  'paid-programmatic': { category: 'paid', cpm: 5.5, ctr: 0.15, cr: 2.5, roas: 1.5 },
-  'paid-retargeting': { category: 'paid', cpm: 8.0, ctr: 1.8, cr: 2.5, roas: 4.2 },
-  'affiliate-listing': { category: 'affiliate', cpm: 15.0, ctr: 3.5, cr: 2.5, roas: 2.0 },
-  'affiliate-cpa': { category: 'affiliate', cpm: 25.0, ctr: 4.2, cr: 2.5, roas: 3.5 },
-  'influencer-retainers': { category: 'influencer', cpm: 12.0, ctr: 1.5, cr: 2.5, roas: 2.5 },
-  'influencer-funds': { category: 'influencer', cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0 },
+  'seo-tech': { category: 'SEO/Content', cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2 },
+  'seo-content': { category: 'SEO/Content', cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5 },
+  'seo-backlinks': { category: 'SEO/Content', cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8 },
+  'paid-native': { category: 'Display/Programmatic', cpm: 4.2, ctr: 0.35, cr: 2.5, roas: 1.8 },
+  'paid-push': { category: 'Display/Programmatic', cpm: 1.2, ctr: 2.5, cr: 2.5, roas: 2.2 },
+  'paid-programmatic': { category: 'Display/Programmatic', cpm: 5.5, ctr: 0.15, cr: 2.5, roas: 1.5 },
+  'paid-retargeting': { category: 'Display/Programmatic', cpm: 8.0, ctr: 1.8, cr: 2.5, roas: 4.2 },
+  'affiliate-listing': { category: 'Affiliate', cpm: 15.0, ctr: 3.5, cr: 2.5, roas: 2.0 },
+  'affiliate-cpa': { category: 'Affiliate', cpm: 25.0, ctr: 4.2, cr: 2.5, roas: 3.5 },
+  'influencer-retainers': { category: 'Paid Social', cpm: 12.0, ctr: 1.5, cr: 2.5, roas: 2.5 },
+  'influencer-funds': { category: 'Paid Social', cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0 },
 };
 
 export const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
@@ -958,7 +958,7 @@ export function convertToMonthData(
       const spend = pm.channels[channelId] || 0;
       const allocationPct = totalBudget > 0 ? (spend / totalBudget) * 100 : 0;
       const defaults = CHANNEL_DEFAULTS[channelId] || {
-        category: 'paid', // Fallback to 'paid' as 'other' is not valid
+        category: 'Display/Programmatic', // Fallback to 'Display/Programmatic'
         cpm: 10,
         ctr: 1.0,
         cr: 2.0,

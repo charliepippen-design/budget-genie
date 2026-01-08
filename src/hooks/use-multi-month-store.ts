@@ -128,17 +128,17 @@ export interface OptimizationResult {
 // ========== DEFAULT DATA ==========
 
 const DEFAULT_CHANNELS: ChannelMonthConfig[] = [
-  { channelId: 'seo-tech', name: 'SEO - Tech Audit', category: 'seo', allocationPct: 2.33, cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'seo-content', name: 'SEO - Content', category: 'seo', allocationPct: 6.98, cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'seo-backlinks', name: 'SEO - Backlinks', category: 'seo', allocationPct: 4.65, cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-native', name: 'Paid - Native Ads', category: 'paid', allocationPct: 11.63, cpm: 4.2, ctr: 0.35, cr: 2.5, roas: 1.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-push', name: 'Paid - Push', category: 'paid', allocationPct: 6.98, cpm: 1.2, ctr: 2.5, cr: 2.5, roas: 2.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-programmatic', name: 'Paid - Display', category: 'paid', allocationPct: 4.65, cpm: 5.5, ctr: 0.15, cr: 2.5, roas: 1.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-retargeting', name: 'Paid - Retargeting', category: 'paid', allocationPct: 2.33, cpm: 8.0, ctr: 1.8, cr: 2.5, roas: 4.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'affiliate-listing', name: 'Affiliate - Listing', category: 'affiliate', allocationPct: 4.65, cpm: 15.0, ctr: 3.5, cr: 2.5, roas: 2.0, impressionMode: 'FIXED', fixedImpressions: 100000, locked: false },
-  { channelId: 'affiliate-cpa', name: 'Affiliate - CPA', category: 'affiliate', allocationPct: 39.53, cpm: 25.0, ctr: 4.2, cr: 2.5, roas: 3.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'influencer-retainers', name: 'Influencer - Retainers', category: 'influencer', allocationPct: 9.30, cpm: 12.0, ctr: 1.5, cr: 2.5, roas: 2.5, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
-  { channelId: 'influencer-funds', name: 'Influencer - Play Funds', category: 'influencer', allocationPct: 6.98, cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
+  { channelId: 'seo-tech', name: 'SEO - Tech Audit', category: 'SEO/Content', allocationPct: 2.33, cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'seo-content', name: 'SEO - Content', category: 'SEO/Content', allocationPct: 6.98, cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'seo-backlinks', name: 'SEO - Backlinks', category: 'SEO/Content', allocationPct: 4.65, cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'paid-native', name: 'Paid - Native Ads', category: 'Display/Programmatic', allocationPct: 11.63, cpm: 4.2, ctr: 0.35, cr: 2.5, roas: 1.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'paid-push', name: 'Paid - Push', category: 'Display/Programmatic', allocationPct: 6.98, cpm: 1.2, ctr: 2.5, cr: 2.5, roas: 2.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'paid-programmatic', name: 'Paid - Display', category: 'Display/Programmatic', allocationPct: 4.65, cpm: 5.5, ctr: 0.15, cr: 2.5, roas: 1.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'paid-retargeting', name: 'Paid - Retargeting', category: 'Display/Programmatic', allocationPct: 2.33, cpm: 8.0, ctr: 1.8, cr: 2.5, roas: 4.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'affiliate-listing', name: 'Affiliate - Listing', category: 'Affiliate', allocationPct: 4.65, cpm: 15.0, ctr: 3.5, cr: 2.5, roas: 2.0, impressionMode: 'FIXED', fixedImpressions: 100000, locked: false },
+  { channelId: 'affiliate-cpa', name: 'Affiliate - CPA', category: 'Affiliate', allocationPct: 39.53, cpm: 25.0, ctr: 4.2, cr: 2.5, roas: 3.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
+  { channelId: 'influencer-retainers', name: 'Influencer - Retainers', category: 'Paid Social', allocationPct: 9.30, cpm: 12.0, ctr: 1.5, cr: 2.5, roas: 2.5, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
+  { channelId: 'influencer-funds', name: 'Influencer - Play Funds', category: 'Paid Social', allocationPct: 6.98, cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
 ];
 
 const DEFAULT_GLOBAL_SETTINGS: GlobalPlanSettings = {

@@ -102,20 +102,20 @@ export interface Preset {
 
 const BASE_CHANNELS_DATA = [
   // SEO & Content
-  { id: 'seo-tech', name: 'SEO - Tech Audit & On-Page', category: 'seo' as ChannelCategory, baseSpend: 500, cpm: 2.5, ctr: 0.8, roas: 3.2 },
-  { id: 'seo-content', name: 'SEO - Content Production', category: 'seo' as ChannelCategory, baseSpend: 1500, cpm: 1.8, ctr: 1.2, roas: 4.5 },
-  { id: 'seo-backlinks', name: 'SEO - Backlinks / Guest Posts', category: 'seo' as ChannelCategory, baseSpend: 1000, cpm: 3.5, ctr: 0.5, roas: 2.8 },
+  { id: 'seo-tech', name: 'SEO - Tech Audit & On-Page', category: 'SEO/Content' as ChannelCategory, baseSpend: 500, cpm: 2.5, ctr: 0.8, roas: 3.2 },
+  { id: 'seo-content', name: 'SEO - Content Production', category: 'SEO/Content' as ChannelCategory, baseSpend: 1500, cpm: 1.8, ctr: 1.2, roas: 4.5 },
+  { id: 'seo-backlinks', name: 'SEO - Backlinks / Guest Posts', category: 'SEO/Content' as ChannelCategory, baseSpend: 1000, cpm: 3.5, ctr: 0.5, roas: 2.8 },
   // Paid Media
-  { id: 'paid-native', name: 'Paid - Native Ads (Adult/Crypto)', category: 'paid' as ChannelCategory, baseSpend: 2500, cpm: 4.2, ctr: 0.35, roas: 1.8 },
-  { id: 'paid-push', name: 'Paid - Push Notifications', category: 'paid' as ChannelCategory, baseSpend: 1500, cpm: 1.2, ctr: 2.5, roas: 2.2 },
-  { id: 'paid-programmatic', name: 'Paid - Programmatic / Display', category: 'paid' as ChannelCategory, baseSpend: 1000, cpm: 5.5, ctr: 0.15, roas: 1.5 },
-  { id: 'paid-retargeting', name: 'Paid - Retargeting (Pixel)', category: 'paid' as ChannelCategory, baseSpend: 500, cpm: 8.0, ctr: 1.8, roas: 4.2 },
+  { id: 'paid-native', name: 'Paid - Native Ads (Adult/Crypto)', category: 'Display/Programmatic' as ChannelCategory, baseSpend: 2500, cpm: 4.2, ctr: 0.35, roas: 1.8 },
+  { id: 'paid-push', name: 'Paid - Push Notifications', category: 'Display/Programmatic' as ChannelCategory, baseSpend: 1500, cpm: 1.2, ctr: 2.5, roas: 2.2 },
+  { id: 'paid-programmatic', name: 'Paid - Programmatic / Display', category: 'Display/Programmatic' as ChannelCategory, baseSpend: 1000, cpm: 5.5, ctr: 0.15, roas: 1.5 },
+  { id: 'paid-retargeting', name: 'Paid - Retargeting (Pixel)', category: 'Display/Programmatic' as ChannelCategory, baseSpend: 500, cpm: 8.0, ctr: 1.8, roas: 4.2 },
   // Affiliates
-  { id: 'affiliate-listing', name: 'Affiliate - Listing Fees (Fixed)', category: 'affiliate' as ChannelCategory, baseSpend: 1000, cpm: 15.0, ctr: 3.5, roas: 2.0 },
-  { id: 'affiliate-cpa', name: 'Affiliate - CPA Commissions', category: 'affiliate' as ChannelCategory, baseSpend: 8500, cpm: 25.0, ctr: 4.2, roas: 3.5 },
+  { id: 'affiliate-listing', name: 'Affiliate - Listing Fees (Fixed)', category: 'Affiliate' as ChannelCategory, baseSpend: 1000, cpm: 15.0, ctr: 3.5, roas: 2.0 },
+  { id: 'affiliate-cpa', name: 'Affiliate - CPA Commissions', category: 'Affiliate' as ChannelCategory, baseSpend: 8500, cpm: 25.0, ctr: 4.2, roas: 3.5 },
   // Influencers
-  { id: 'influencer-retainers', name: 'Influencer - Monthly Retainers', category: 'influencer' as ChannelCategory, baseSpend: 2000, cpm: 12.0, ctr: 1.5, roas: 2.5 },
-  { id: 'influencer-funds', name: 'Influencer - Play Funds (Bal)', category: 'influencer' as ChannelCategory, baseSpend: 1500, cpm: 10.0, ctr: 2.0, roas: 3.0 },
+  { id: 'influencer-retainers', name: 'Influencer - Monthly Retainers', category: 'Paid Social' as ChannelCategory, baseSpend: 2000, cpm: 12.0, ctr: 1.5, roas: 2.5 },
+  { id: 'influencer-funds', name: 'Influencer - Play Funds (Bal)', category: 'Paid Social' as ChannelCategory, baseSpend: 1500, cpm: 10.0, ctr: 2.0, roas: 3.0 },
 ];
 
 const DEFAULT_MULTIPLIERS: GlobalMultipliers = {
@@ -177,8 +177,8 @@ function createInitialChannels(): ChannelData[] {
       overrideCpa: null,
       overrideRoas: null,
 
-      impressionMode: (ch.category === 'influencer' || ch.id === 'affiliate-listing') ? 'FIXED' as ImpressionMode : 'CPM' as ImpressionMode,
-      fixedImpressions: ch.category === 'influencer' ? 200000 : 100000,
+      impressionMode: (ch.category === 'Paid Social' || ch.id === 'affiliate-listing') ? 'FIXED' as ImpressionMode : 'CPM' as ImpressionMode,
+      fixedImpressions: ch.category === 'Paid Social' ? 200000 : 100000,
 
       locked: false,
     };
@@ -622,6 +622,27 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
       }),
+      version: 1,
+      migrate: (persistedState: any, version) => {
+        if (version === 0) {
+          // Migration from version 0 to 1
+          // Update legacy categories
+          const mapping: Record<string, ChannelCategory> = {
+            'seo': 'SEO/Content',
+            'paid': 'Display/Programmatic',
+            'affiliate': 'Affiliate',
+            'influencer': 'Paid Social',
+          };
+
+          const newChannels = persistedState.channels.map((ch: any) => ({
+            ...ch,
+            category: mapping[ch.category] || ch.category
+          }));
+
+          return { ...persistedState, channels: newChannels };
+        }
+        return persistedState as MediaPlanState;
+      },
     }
   )
 );

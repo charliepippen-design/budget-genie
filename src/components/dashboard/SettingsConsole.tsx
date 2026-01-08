@@ -76,7 +76,7 @@ export function SettingsConsole() {
   const [isDistributeWizardOpen, setIsDistributeWizardOpen] = useState(false);
   const [newChannel, setNewChannel] = useState({
     name: '',
-    category: 'paid' as ChannelCategory,
+    category: 'Display/Programmatic' as ChannelCategory,
     baseCpm: 5,
     baseCtr: 1,
     baseCr: 2.5,
@@ -127,7 +127,7 @@ export function SettingsConsole() {
     addChannel(newChannel);
     setNewChannel({
       name: '',
-      category: 'paid',
+      category: 'Display/Programmatic',
       baseCpm: 5,
       baseCtr: 1,
       baseCr: 2.5,

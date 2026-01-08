@@ -24,42 +24,42 @@ export const DISTRIBUTION_CONFIG: WeightConfig = {
         affiliate_dominant: {
             description: 'Heavy focus on Affiliate and CPA channels for secure ROI',
             weights: {
-                'affiliate': 8,
+                'Affiliate': 8,
                 'cpa': 8,
-                'paid': 1,
-                'influencer': 1,
-                'seo': 1
+                'Display/Programmatic': 1,
+                'Paid Social': 1,
+                'SEO/Content': 1
             }
         },
         influencer_dominant: {
             description: 'Maximize brand awareness via Influencers and Display',
             weights: {
-                'influencer': 8,
+                'Paid Social': 8,
                 'display': 5,
                 'programmatic': 5,
-                'paid': 2
+                'Display/Programmatic': 2
             }
         },
         hybrid_growth: {
             description: 'Balanced mix of Influencer reach and Affiliate performance',
             weights: {
-                'influencer': 6,
-                'affiliate': 6,
-                'paid': 3,
-                'seo': 2
+                'Paid Social': 6,
+                'Affiliate': 6,
+                'Display/Programmatic': 3,
+                'SEO/Content': 2
             }
         },
         // New Presets
         seo_foundation: {
             description: 'Prioritize long-term authority. Sacrifices short-term volume to build sustainable organic traffic infrastructure.',
             weights: {
-                'seo': 8,
+                'SEO/Content': 8,
                 'content': 10,
                 'backlinks': 9,
                 'tech': 8,
                 'audit': 8,
                 'display': 1,
-                'paid': 1
+                'Display/Programmatic': 1
             }
         },
         conversion_max: {
@@ -79,8 +79,8 @@ export const DISTRIBUTION_CONFIG: WeightConfig = {
                 'native': 8,
                 'display': 8,
                 'push': 8,
-                'affiliate': 1,
-                'seo': 1
+                'Affiliate': 1,
+                'SEO/Content': 1
             }
         },
         retention_ltv: {
