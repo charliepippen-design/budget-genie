@@ -1,4 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   Settings,
   ChevronLeft,
@@ -281,19 +286,23 @@ export function SettingsConsole() {
                     {channelsWithMetrics.map((channel) => (
                       <div key={channel.id} className="space-y-1">
                         <div className="flex justify-between items-center gap-1">
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-5 w-5 shrink-0"
-                            onClick={() => toggleChannelLock(channel.id)}
-                            title={channel.locked ? 'Unlock' : 'Lock'}
-                          >
-                            {channel.locked ? (
-                              <Lock className="h-3 w-3 text-warning" />
-                            ) : (
-                              <Unlock className="h-3 w-3 text-sidebar-foreground/40" />
-                            )}
-                          </Button>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-5 w-5 shrink-0"
+                                onClick={() => toggleChannelLock(channel.id)}
+                              >
+                                {channel.locked ? (
+                                  <Lock className="h-3 w-3 text-warning" />
+                                ) : (
+                                  <Unlock className="h-3 w-3 text-sidebar-foreground/40" />
+                                )}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>Locks allocation % during budget scaling.</TooltipContent>
+                          </Tooltip>
                           <span
                             className={cn(
                               "text-xs truncate flex-1",
@@ -682,14 +691,22 @@ function ChannelEditorItem({
   };
 
   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
+  const [isMounting, setIsMounting] = useState(true);
+
+  useEffect(() => {
+    // Remove mounting class after animation
+    const t = setTimeout(() => setIsMounting(false), 500);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <div
       className={cn(
-        "rounded-lg border transition-all",
+        "rounded-lg border transition-all duration-500",
         "bg-sidebar-accent/50 border-sidebar-border",
         isWarning && "border-destructive/50 bg-destructive/10",
-        isExpanded && "bg-sidebar-accent"
+        isExpanded && "bg-sidebar-accent",
+        isMounting && "animate-pulse scale-[1.02] bg-blue-500/20 border-blue-500/50"
       )}
     >
       <div

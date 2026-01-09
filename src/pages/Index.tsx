@@ -65,11 +65,21 @@ const Index = () => {
       } else if (format === 'csv') {
         exportToCsv(channelsWithMetrics, totalBudget, blendedMetrics, exportOptions);
         toast({ title: 'CSV Exported', description: 'Your media plan has been exported to CSV.' });
-      } else {
-        toast({
-          title: 'PNG Export',
-          description: 'Use your browser\'s screenshot tool (Ctrl/Cmd + Shift + S) to capture the page.',
-        });
+      } else if (format === 'png') {
+        const html2canvas = (await import('html2canvas')).default;
+        const element = document.querySelector('.dashboard-container') as HTMLElement;
+        if (!element) throw new Error('Dashboard container not found');
+
+        toast({ title: 'Generating Image', description: 'Capturing high-res dashboard screenshot...' });
+
+        const canvas = await html2canvas(element, { scale: 2, useCORS: true });
+        const image = canvas.toDataURL("image/png");
+        const link = document.createElement("a");
+        link.href = image;
+        link.download = `MediaPlan-Pro-${new Date().toISOString().split('T')[0]}.png`;
+        link.click();
+
+        toast({ title: 'Export Complete', description: 'PNG saved to downloads.' });
       }
     } catch (error) {
       toast({
@@ -117,7 +127,7 @@ const Index = () => {
         <meta name="description" content="Professional media plan budget calibrator for iGaming and digital marketing. Scale budgets, analyze ROI, and optimize channel allocation in real-time." />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex flex-col">
+      <div className="min-h-screen bg-background flex flex-col dashboard-container">
         <DashboardHeader
           budgetPreset={currentPreset}
           onPresetChange={handlePresetChange}

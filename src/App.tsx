@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,18 +9,18 @@ import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
+import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
-
 
 const queryClient = new QueryClient();
 
-// Production Lock Component
-import { MaintenanceLock } from "@/components/MaintenanceLock";
-
 const App = () => {
-  // If in production, show maintenance lock
-  if (import.meta.env.PROD) {
-    return <MaintenanceLock />;
+  // Check for maintenance mode
+  const isMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
+  const isBypass = new URLSearchParams(window.location.search).get('dev') === 'bypass';
+
+  if (isMaintenance && !isBypass) {
+    return <MaintenanceMode />;
   }
 
   return (
