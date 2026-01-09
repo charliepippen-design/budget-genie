@@ -24,7 +24,8 @@ import {
 } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
-import { Search, Megaphone, Users, Star, Edit2, Settings2 } from 'lucide-react';
+import { Search, Megaphone, Users, Star, Edit2, Settings2, Lock, Unlock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { ChannelEditor } from './ChannelEditor';
 import { BUYING_MODEL_INFO } from '@/types/channel';
 
@@ -79,7 +80,7 @@ function EditableCell({
   const handleSave = useCallback(() => {
     const numValue = parseFloat(editValue);
     if (!isNaN(numValue)) {
-      onSave(numValue);
+      onSave(Math.max(0, numValue));
     }
     setIsEditing(false);
   }, [editValue, onSave]);
@@ -252,7 +253,15 @@ export function ChannelTable() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-3">
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-6 w-6 shrink-0"
+                              onClick={() => useMediaPlanStore.getState().toggleChannelLock(channel.id)}
+                            >
+                              {channel.locked ? <Lock className="h-3 w-3 text-red-500" /> : <Unlock className="h-3 w-3 text-gray-400" />}
+                            </Button>
                             <Slider
                               value={[channel.allocationPct]}
                               onValueChange={(values) => handleSliderChange(channel.id, values)}
@@ -260,6 +269,7 @@ export function ChannelTable() {
                               max={100}
                               step={0.5}
                               className="w-20 [&_[role=slider]]:h-4 [&_[role=slider]]:w-4"
+                              disabled={channel.locked}
                             />
                             <span className="font-mono text-sm w-12 text-right">
                               {formatPercentage(channel.allocationPct)}
@@ -310,7 +320,7 @@ export function ChannelTable() {
                             {channel.metrics.roas.toFixed(1)}x
                           </Badge>
                         </TableCell>
-                      </TableRow>
+                      </TableRow >
                     );
                   })}
                 </>
@@ -409,6 +419,6 @@ export function ChannelTable() {
           )
         )}
       </div>
-    </div>
+    </div >
   );
 }

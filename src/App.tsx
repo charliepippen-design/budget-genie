@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
+import { NetworkStatus } from "./components/NetworkStatus";
 import { useStoreSync } from "./hooks/use-store-sync";
 
 const queryClient = new QueryClient();
@@ -33,7 +34,7 @@ const App = () => {
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <CurrencyProvider>
-            <CloudStatus />
+            <NetworkStatus />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />

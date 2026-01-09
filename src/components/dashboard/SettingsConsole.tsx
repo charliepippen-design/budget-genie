@@ -554,36 +554,40 @@ export function SettingsConsole() {
                           <Label>CPM ({symbol})</Label>
                           <Input
                             type="number"
+                            min="0"
                             step="0.1"
                             value={newChannel.baseCpm}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCpm: parseFloat(e.target.value) || 0 }))}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCpm: Math.max(0, parseFloat(e.target.value) || 0) }))}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>CTR (%)</Label>
                           <Input
                             type="number"
+                            min="0"
                             step="0.1"
                             value={newChannel.baseCtr}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCtr: parseFloat(e.target.value) || 0 }))}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCtr: Math.max(0, parseFloat(e.target.value) || 0) }))}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>Conv. Rate (%)</Label>
                           <Input
                             type="number"
+                            min="0"
                             step="0.1"
                             value={newChannel.baseCr}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCr: parseFloat(e.target.value) || 0 }))}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCr: Math.max(0, parseFloat(e.target.value) || 0) }))}
                           />
                         </div>
                         <div className="space-y-2">
                           <Label>ROAS (x)</Label>
                           <Input
                             type="number"
+                            min="0"
                             step="0.1"
                             value={newChannel.baseRoas}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseRoas: parseFloat(e.target.value) || 0 }))}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseRoas: Math.max(0, parseFloat(e.target.value) || 0) }))}
                           />
                         </div>
                       </div>
@@ -607,8 +611,9 @@ export function SettingsConsole() {
                           <Label>Fixed Impressions</Label>
                           <Input
                             type="number"
+                            min="0"
                             value={newChannel.fixedImpressions}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, fixedImpressions: parseInt(e.target.value) || 0 }))}
+                            onChange={(e) => setNewChannel(prev => ({ ...prev, fixedImpressions: Math.max(0, parseInt(e.target.value) || 0) }))}
                           />
                         </div>
                       )}
@@ -802,8 +807,9 @@ function ChannelEditorItem({
               <Label className="text-xs text-sidebar-foreground/60">Fixed Impressions</Label>
               <Input
                 type="number"
+                min="0"
                 value={channel.fixedImpressions}
-                onChange={(e) => setFixedImpressions(channel.id, parseInt(e.target.value) || 0)}
+                onChange={(e) => setFixedImpressions(channel.id, Math.max(0, parseInt(e.target.value) || 0))}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
             </div>
