@@ -505,6 +505,8 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         const good: string[] = [];
 
         channelsWithMetrics.forEach((ch) => {
+          if (ch.locked) return; // REPAIR 4: Explicitly skip locked channels from being sources/destinations
+
           const aboveCpa = cpaTarget && ch.metrics.cpa && ch.metrics.cpa > cpaTarget;
           const belowRoas = roasTarget && ch.metrics.roas < roasTarget;
 

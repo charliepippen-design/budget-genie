@@ -25,38 +25,8 @@ export function NetworkStatus() {
     const displayStatus = !isOnline ? 'error' : status;
 
     return (
-        <div className={cn(
-            "fixed bottom-4 left-4 z-[9999] bg-[#0f172a] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
-            // REPAIR 3: Debug Visibility - Hide via CSS when online if desired, or just show status. 
-            // User asked to "remove if (!isOnline) return null". We didn't have it, but we'll ensure it stays.
-            // If we want to hide it when online:
-            isOnline ? "opacity-0 pointer-events-none translate-y-10" : "opacity-100 translate-y-0",
-            displayStatus === 'error' ? "border-red-500/50 bg-red-950/20" : "border-blue-500/20"
-        )}>
-            {displayStatus === 'syncing' && (
-                <>
-                    <RefreshCw className="h-3 w-3 text-blue-400 animate-spin" />
-                    <span className="text-[10px] font-medium text-slate-300">Syncing...</span>
-                </>
-            )}
-
-            {displayStatus === 'idle' && (
-                <>
-                    <Cloud className="h-3 w-3 text-slate-400" />
-                    <span className="text-[10px] font-medium text-slate-400">
-                        {lastSaved ? 'Saved' : 'Ready'}
-                    </span>
-                </>
-            )}
-
-            {displayStatus === 'error' && (
-                <>
-                    <CloudOff className="h-3 w-3 text-red-400" />
-                    <span className="text-[10px] font-medium text-red-400">
-                        {!isOnline ? 'No Internet' : 'Offline'}
-                    </span>
-                </>
-            )}
+        <div className="fixed bottom-4 right-4 z-[9999] bg-blue-600 text-white px-4 py-2 rounded shadow-xl font-mono text-xs font-bold">
+            Network: {isOnline ? 'ONLINE' : 'OFFLINE'}
         </div>
     );
 }
