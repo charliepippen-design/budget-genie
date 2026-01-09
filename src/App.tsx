@@ -34,7 +34,6 @@ const App = () => {
         <Sonner />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <CurrencyProvider>
-            <NetworkStatus />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
@@ -43,6 +42,8 @@ const App = () => {
             </Routes>
           </CurrencyProvider>
         </BrowserRouter>
+        {/* REPAIR 3: Force-Mount outside of everything else */}
+        <NetworkStatus />
       </TooltipProvider>
     </QueryClientProvider>
   );

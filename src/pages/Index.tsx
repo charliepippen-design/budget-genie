@@ -106,17 +106,18 @@ const Index = () => {
 
   const handleReset = useCallback(() => {
     if (confirm('BRUTAL RESET: This will wipe all data and reset the budget to $0. Are you sure?')) {
+      // REPAIR 2: "Atomic" Action sequence
       useMediaPlanStore.getState().resetAll();
       useMultiMonthStore.getState().resetPlan();
 
-      toast({
-        title: 'Resetting...',
-        description: 'Wiping data and reloading...',
-      });
+      // Explicitly clear local storage keys for safety
+      localStorage.removeItem('mediaplan-store-v2');
+      localStorage.removeItem('multi-month-plan-store');
 
-      setTimeout(() => {
-        window.location.reload();
-      }, 500);
+      toast({
+        title: 'Project Reset',
+        description: 'All data has been wiped and restored to defaults.',
+      });
     }
   }, [toast]);
 

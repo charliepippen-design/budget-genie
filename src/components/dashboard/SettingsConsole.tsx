@@ -74,6 +74,76 @@ import {
 } from '@/hooks/use-media-plan-store';
 import { useToast } from '@/hooks/use-toast';
 
+// Helper component for "Breathing Room" inputs
+function SmartInput({
+  value,
+  onChange,
+  min = 0,
+  max,
+  className,
+  placeholder,
+  type = "number",
+  disabled = false
+}: {
+  value: number | null | undefined;
+  onChange: (val: number | null) => void;
+  min?: number;
+  max?: number;
+  className?: string;
+  placeholder?: string;
+  type?: string;
+  disabled?: boolean;
+}) {
+  const [localValue, setLocalValue] = useState<string>(value?.toString() ?? '');
+
+  // Sync local value when external value changes (unless we are editing)
+  useEffect(() => {
+    // Only update if the parsed local value is different from new value
+    // to avoid cursor jumping or overwrite if they are equivalent
+    const parsed = parseFloat(localValue);
+    if (value === null || value === undefined) {
+      if (localValue !== '') setLocalValue('');
+    } else if (parsed !== value) {
+      setLocalValue(value.toString());
+    }
+  }, [value]); // relying only on value change
+
+  const handleBlur = () => {
+    if (localValue === '') {
+      onChange(null);
+      return;
+    }
+    let num = parseFloat(localValue);
+    if (isNaN(num)) {
+      // Revert to original
+      setLocalValue(value?.toString() ?? '');
+      return;
+    }
+
+    // Clamp
+    if (min !== undefined) num = Math.max(min, num);
+    if (max !== undefined) num = Math.min(max, num);
+
+    // Update parent
+    onChange(num);
+    // Update local to match clamped
+    setLocalValue(num.toString());
+  };
+
+  return (
+    <Input
+      type={type}
+      value={localValue}
+      onChange={(e) => setLocalValue(e.target.value)}
+      onBlur={handleBlur}
+      onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
+      className={className}
+      placeholder={placeholder}
+      disabled={disabled}
+    />
+  );
+}
+
 export function SettingsConsole() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [newPresetName, setNewPresetName] = useState('');
@@ -369,16 +439,9 @@ export function SettingsConsole() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <Label className="text-xs text-sidebar-foreground/70">Default CPM ({symbol})</Label>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={globalMultipliers.defaultCpmOverride ?? ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setGlobalMultipliers({
-                          defaultCpmOverride: e.target.value ? Math.max(0, val) : null
-                        });
-                      }}
+                    <SmartInput
+                      value={globalMultipliers.defaultCpmOverride}
+                      onChange={(val) => setGlobalMultipliers({ defaultCpmOverride: val })}
                       placeholder="Per-channel"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
@@ -417,16 +480,9 @@ export function SettingsConsole() {
                       <Target className="h-3 w-3 text-sidebar-primary" />
                       <Label className="text-xs text-sidebar-foreground/70">CPA Target ({symbol})</Label>
                     </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={globalMultipliers.cpaTarget ?? ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setGlobalMultipliers({
-                          cpaTarget: e.target.value ? Math.max(0, val) : null
-                        });
-                      }}
+                    <SmartInput
+                      value={globalMultipliers.cpaTarget}
+                      onChange={(val) => setGlobalMultipliers({ cpaTarget: val })}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
@@ -440,16 +496,9 @@ export function SettingsConsole() {
                       <TrendingUp className="h-3 w-3 text-sidebar-primary" />
                       <Label className="text-xs text-sidebar-foreground/70">ROAS Target (x)</Label>
                     </div>
-                    <Input
-                      type="number"
-                      min="0"
-                      value={globalMultipliers.roasTarget ?? ''}
-                      onChange={(e) => {
-                        const val = parseFloat(e.target.value);
-                        setGlobalMultipliers({
-                          roasTarget: e.target.value ? Math.max(0, val) : null
-                        });
-                      }}
+                    <SmartInput
+                      value={globalMultipliers.roasTarget}
+                      onChange={(val) => setGlobalMultipliers({ roasTarget: val })}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />

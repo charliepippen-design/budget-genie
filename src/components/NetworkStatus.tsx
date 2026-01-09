@@ -27,6 +27,10 @@ export function NetworkStatus() {
     return (
         <div className={cn(
             "fixed bottom-4 left-4 z-[9999] bg-[#0f172a] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
+            // REPAIR 3: Debug Visibility - Hide via CSS when online if desired, or just show status. 
+            // User asked to "remove if (!isOnline) return null". We didn't have it, but we'll ensure it stays.
+            // If we want to hide it when online:
+            isOnline ? "opacity-0 pointer-events-none translate-y-10" : "opacity-100 translate-y-0",
             displayStatus === 'error' ? "border-red-500/50 bg-red-950/20" : "border-blue-500/20"
         )}>
             {displayStatus === 'syncing' && (

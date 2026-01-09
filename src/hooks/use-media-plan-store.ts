@@ -518,11 +518,14 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         if (poor.length === 0 || good.length === 0) return;
 
         // Shift 10% from poor to good channels
+        // REPAIR 4: Respect locked channels
         const shiftAmount = 10 / poor.length;
         const addAmount = (shiftAmount * poor.length) / good.length;
 
         set({
           channels: state.channels.map((ch) => {
+            if (ch.locked) return ch; // Explicitly skip locked channels
+
             if (poor.includes(ch.id)) {
               return {
                 ...ch,
@@ -575,8 +578,10 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
+        // REPAIR 2: Atomic Reset
+        localStorage.removeItem('mediaplan-store-v2'); // Match persist name
         set({
-          totalBudget: 0,
+          totalBudget: 50000,
           channels: createInitialChannels(),
           globalMultipliers: { ...DEFAULT_MULTIPLIERS },
         });
