@@ -33,24 +33,40 @@ export const BudgetGenieAI: React.FC = () => {
     const [preset, setPreset] = useState<any>('custom');
 
     return (
-        // MAIN CONTAINER: Strict Flex Row.
-        <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100">
+        <div style={{
+            display: 'grid',
+            gridTemplateColumns: isSidebarOpen ? '320px 1fr' : '0px 1fr',
+            height: '100vh',
+            width: '100vw',
+            overflow: 'hidden',
+            backgroundColor: '#020617', // slate-950
+            transition: 'grid-template-columns 0.3s ease'
+        }}>
 
-            {/* LEFT COLUMN: SIDEBAR */}
-            {/* relative positioning ensures it takes up physical space. flex-shrink-0 prevents squishing. */}
-            {/* Inner wrapper div ensures content width is stable during transition */}
-            <div
-                className={`${isSidebarOpen ? 'w-80' : 'w-0'} flex-shrink-0 transition-all duration-300 border-r border-slate-800 bg-slate-900 overflow-y-auto relative z-20`}
-            >
-                <div className="w-80 min-h-full">
+            {/* CELL 1: SIDEBAR */}
+            <div style={{
+                gridColumn: '1 / 2',
+                overflowY: 'auto',
+                borderRight: '1px solid #1e293b', // slate-800
+                backgroundColor: '#0f172a', // slate-900
+                position: 'relative', // NON-NEGOTIABLE
+                zIndex: 20
+            }}>
+                {/* Force width to prevent collapse during transition */}
+                <div style={{ width: '320px', height: '100%' }}>
                     <SettingsConsole />
                 </div>
             </div>
 
-            {/* RIGHT COLUMN: MAIN CONTENT */}
-            {/* flex-1 forces it to fill ONLY the remaining space. */}
-            <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-10">
-
+            {/* CELL 2: MAIN CONTENT */}
+            <div style={{
+                gridColumn: '2 / 3',
+                overflowY: 'auto',
+                position: 'relative',
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column'
+            }}>
                 <DashboardHeader
                     budgetPreset={preset}
                     onPresetChange={setPreset}
@@ -61,7 +77,7 @@ export const BudgetGenieAI: React.FC = () => {
                     isOpen={isSidebarOpen}
                 />
 
-                <main className="flex-1 overflow-y-auto bg-slate-950 p-0">
+                <main className="flex-1 p-0">
                     <div className="flex flex-col min-h-full">
                         <Tabs defaultValue="quick" className="flex-1 flex flex-col">
                             <div className="border-b border-border bg-card/50 sticky top-0 z-40 backdrop-blur-sm">
