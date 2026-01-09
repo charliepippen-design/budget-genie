@@ -23,6 +23,8 @@ interface DashboardHeaderProps {
   onExport: (format: 'pdf' | 'csv' | 'png') => void;
   onImport: () => void;
   onReset: () => void;
+  isOpen?: boolean;
+  toggleSidebar?: () => void;
 }
 
 export function DashboardHeader({
@@ -31,6 +33,8 @@ export function DashboardHeader({
   onExport,
   onImport,
   onReset,
+  isOpen,
+  toggleSidebar
 }: DashboardHeaderProps) {
   return (
     <header className="glass border-b border-border/50 sticky top-0 z-50">
@@ -38,6 +42,11 @@ export function DashboardHeader({
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
+            {toggleSidebar && (
+              <Button variant="ghost" size="icon" onClick={toggleSidebar} className="mr-2">
+                <Settings className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+              </Button>
+            )}
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary">
               <DollarSign className="h-5 w-5 text-primary-foreground" />
             </div>
