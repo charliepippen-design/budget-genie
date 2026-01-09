@@ -532,10 +532,59 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
+        const DEFAULT_CHANNELS_DATA = [
+          {
+            id: '1', name: 'Paid Search', category: 'Paid Search',
+            buyingModel: 'CPC', price: 2.50, allocation: 20,
+            baselineMetrics: { conversionRate: 3.5, ctr: 2.0 }, isLocked: false
+          },
+          {
+            id: '2', name: 'Facebook Ads', category: 'Paid Social',
+            buyingModel: 'CPM', price: 12.00, allocation: 30,
+            baselineMetrics: { ctr: 1.2, conversionRate: 1.5 }, isLocked: false
+          },
+          {
+            id: '3', name: 'Affiliates', category: 'Affiliate',
+            buyingModel: 'CPA', price: 45.00, allocation: 15,
+            baselineMetrics: { conversionRate: 5.0 }, isLocked: false
+          },
+          {
+            id: '4', name: 'Display / Programmatic', category: 'Display/Programmatic',
+            buyingModel: 'CPM', price: 4.50, allocation: 15,
+            baselineMetrics: { ctr: 0.8, conversionRate: 0.5 }, isLocked: false
+          },
+          {
+            id: '5', name: 'SEO Content', category: 'SEO/Content',
+            buyingModel: 'FLAT_FEE', price: 2000, allocation: 20,
+            baselineMetrics: { trafficPerUnit: 5000, conversionRate: 1.8 }, isLocked: false
+          }
+        ];
+
+        // Map to Schema
+        const newChannels: ChannelData[] = DEFAULT_CHANNELS_DATA.map(d => {
+          const family = inferChannelFamily(d.name);
+          return {
+            id: d.id,
+            name: d.name,
+            category: d.category as ChannelCategory,
+            allocationPct: d.allocation,
+            family,
+            buyingModel: d.buyingModel as BuyingModel,
+            typeConfig: {
+              family,
+              buyingModel: d.buyingModel as BuyingModel,
+              price: d.price,
+              baselineMetrics: d.baselineMetrics,
+              secondaryPrice: 0
+            },
+            locked: d.isLocked
+          };
+        });
+
         localStorage.removeItem('mediaplan-store-v2');
         set({
           totalBudget: 50000,
-          channels: createInitialChannels(),
+          channels: newChannels,
           globalMultipliers: { ...DEFAULT_MULTIPLIERS },
         });
       },

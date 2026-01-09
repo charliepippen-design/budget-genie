@@ -10,7 +10,7 @@ import { SummaryCards } from '@/components/dashboard/SummaryCards';
 import { ChannelTable } from '@/components/dashboard/ChannelTable';
 import { ChartSection } from '@/components/dashboard/ChartSection';
 import { SettingsConsole } from '@/components/dashboard/SettingsConsole';
-import { BudgetGenieAI } from '@/components/dashboard/BudgetGenieAI'; // <--- We added this
+import { BudgetGenieAI } from '@/components/dashboard/BudgetGenieAI';
 
 // Multi-Month Components
 import { MonthConfigPanel } from '@/components/multi-month/MonthConfigPanel';
@@ -106,11 +106,9 @@ const Index = () => {
 
   const handleReset = useCallback(() => {
     if (confirm('BRUTAL RESET: This will wipe all data and reset the budget to $0. Are you sure?')) {
-      // REPAIR 2: "Atomic" Action sequence
       useMediaPlanStore.getState().resetAll();
       useMultiMonthStore.getState().resetPlan();
 
-      // Explicitly clear local storage keys for safety
       localStorage.removeItem('mediaplan-store-v2');
       localStorage.removeItem('multi-month-plan-store');
 
@@ -128,86 +126,94 @@ const Index = () => {
         <meta name="description" content="Professional media plan budget calibrator for iGaming and digital marketing. Scale budgets, analyze ROI, and optimize channel allocation in real-time." />
       </Helmet>
 
-      <div className="min-h-screen bg-background flex flex-col dashboard-container">
-        <DashboardHeader
-          budgetPreset={currentPreset}
-          onPresetChange={handlePresetChange}
-          onExport={handleExport}
-          onImport={() => setImportOpen(true)}
-          onReset={handleReset}
-        />
+      {/* REPAIR 1: Layout Fix */}
+      <div className="flex h-screen w-screen overflow-hidden bg-slate-950 dashboard-container">
 
-        <Tabs defaultValue="quick" className="flex-1 flex flex-col">
-          <div className="border-b border-border bg-card/50">
-            <div className="container mx-auto px-4">
-              <TabsList className="h-12 bg-transparent gap-4">
-                <TabsTrigger value="quick" className="gap-2 data-[state=active]:bg-primary/10">
-                  <LayoutGrid className="h-4 w-4" />
-                  Quick View
-                </TabsTrigger>
-                <TabsTrigger value="multi-month" className="gap-2 data-[state=active]:bg-primary/10">
-                  <Calendar className="h-4 w-4" />
-                  Multi-Month Plan
-                </TabsTrigger>
-              </TabsList>
+        {/* Sidebar Container - FIXED WIDTH & NO OVERLAP */}
+        <div className="w-80 flex-shrink-0 border-r border-slate-800 bg-slate-900 overflow-y-auto relative z-10">
+          <SettingsConsole />
+        </div>
+
+        {/* Main Content - FLEX-1 & INDEPENDENT SCROLL */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative z-0">
+          <DashboardHeader
+            budgetPreset={currentPreset}
+            onPresetChange={handlePresetChange}
+            onExport={handleExport}
+            onImport={() => setImportOpen(true)}
+            onReset={handleReset}
+          />
+
+          <Tabs defaultValue="quick" className="flex-1 flex flex-col mt-4">
+            <div className="border-b border-border bg-card/50">
+              <div className="flex items-center px-4">
+                <TabsList className="h-10 bg-transparent gap-4">
+                  <TabsTrigger value="quick" className="gap-2 data-[state=active]:bg-primary/10">
+                    <LayoutGrid className="h-4 w-4" />
+                    Quick View
+                  </TabsTrigger>
+                  <TabsTrigger value="multi-month" className="gap-2 data-[state=active]:bg-primary/10">
+                    <Calendar className="h-4 w-4" />
+                    Multi-Month Plan
+                  </TabsTrigger>
+                </TabsList>
+              </div>
             </div>
-          </div>
 
-          {/* Quick View Tab */}
-          <TabsContent value="quick" className="flex-1 flex overflow-hidden m-0">
-            <SettingsConsole />
-            <main className="flex-1 overflow-auto">
-              <div className="container mx-auto px-4 py-6 space-y-6">
-                <BudgetSlider value={totalBudget} onChange={setTotalBudget} />
-                <SummaryCards
-                  totalBudget={blendedMetrics.totalSpend}
-                  blendedCpa={blendedMetrics.blendedCpa}
-                  totalConversions={blendedMetrics.totalConversions}
-                  projectedRevenue={blendedMetrics.projectedRevenue}
-                  blendedRoas={blendedMetrics.blendedRoas}
-                />
-                <ChartSection channels={channelsWithMetrics} categoryTotals={categoryTotals} />
-                <ChannelTable />
+            {/* Quick View Tab */}
+            <TabsContent value="quick" className="flex-1 flex overflow-hidden m-0">
+              <main className="flex-1 overflow-auto p-6 scroll-smooth">
+                <div className="max-w-6xl mx-auto space-y-6 pb-20">
+                  <BudgetSlider value={totalBudget} onChange={setTotalBudget} />
+                  <SummaryCards
+                    totalBudget={blendedMetrics.totalSpend}
+                    blendedCpa={blendedMetrics.blendedCpa}
+                    totalConversions={blendedMetrics.totalConversions}
+                    projectedRevenue={blendedMetrics.projectedRevenue}
+                    blendedRoas={blendedMetrics.blendedRoas}
+                  />
+                  <ChartSection channels={channelsWithMetrics} categoryTotals={categoryTotals} />
+                  <ChannelTable />
+                </div>
+              </main>
+            </TabsContent>
+
+            {/* Multi-Month Tab */}
+            <TabsContent value="multi-month" className="flex-1 flex overflow-hidden m-0">
+              <div className="w-64 border-r border-border overflow-y-auto">
+                <MultiMonthGlobalSettings />
               </div>
-            </main>
-          </TabsContent>
+              <main className="flex-1 overflow-auto p-6 scroll-smooth">
+                <div className="max-w-6xl mx-auto space-y-6 pb-20">
+                  <MonthConfigPanel />
+                  <Tabs defaultValue="overview" className="w-full">
+                    <TabsList className="mb-4">
+                      <TabsTrigger value="overview">Plan Overview</TabsTrigger>
+                      <TabsTrigger value="comparison">Scenario Comparison</TabsTrigger>
+                      <TabsTrigger value="optimizer">Auto-Optimizer</TabsTrigger>
+                    </TabsList>
 
-          {/* Multi-Month Tab */}
-          <TabsContent value="multi-month" className="flex-1 flex overflow-hidden m-0">
-            <MultiMonthGlobalSettings />
-            <main className="flex-1 overflow-auto">
-              <div className="container mx-auto px-4 py-6 space-y-6">
-                <MonthConfigPanel />
+                    <TabsContent value="overview" className="space-y-6">
+                      <PLTable />
+                      <MultiMonthCharts />
+                    </TabsContent>
 
-                <Tabs defaultValue="overview" className="w-full">
-                  <TabsList className="mb-4">
-                    <TabsTrigger value="overview">Plan Overview</TabsTrigger>
-                    <TabsTrigger value="comparison">Scenario Comparison</TabsTrigger>
-                    <TabsTrigger value="optimizer">Auto-Optimizer</TabsTrigger>
-                  </TabsList>
+                    <TabsContent value="comparison">
+                      <ScenarioComparison />
+                    </TabsContent>
 
-                  <TabsContent value="overview" className="space-y-6">
-                    <PLTable />
-                    <MultiMonthCharts />
-                  </TabsContent>
-
-                  <TabsContent value="comparison">
-                    <ScenarioComparison />
-                  </TabsContent>
-
-                  <TabsContent value="optimizer">
-                    <AutoOptimizer />
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </main>
-          </TabsContent>
-        </Tabs>
+                    <TabsContent value="optimizer">
+                      <AutoOptimizer />
+                    </TabsContent>
+                  </Tabs>
+                </div>
+              </main>
+            </TabsContent>
+          </Tabs>
+        </div>
       </div>
 
-      {/* The AI Button is right here! */}
       <BudgetGenieAI />
-
       <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
