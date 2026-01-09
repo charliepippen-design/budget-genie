@@ -46,6 +46,8 @@
     "@types/papaparse": "^5.5.2",
     "@types/react-helmet": "^6.1.11",
     "ai": "^6.0.18",
+    "baseline-browser-mapping": "^2.9.13",
+    "caniuse-lite": "^1.0.30001763",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

@@ -240,7 +240,7 @@ export function SettingsConsole() {
 
   if (isCollapsed) {
     return (
-      <div className="w-14 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-4 shrink-0">
+      <div className="h-full w-14 bg-sidebar border-r border-sidebar-border flex flex-col items-center py-4 gap-4 shrink-0">
         <Button
           variant="ghost"
           size="icon"
@@ -258,7 +258,13 @@ export function SettingsConsole() {
   }
 
   return (
-    <div className="w-80 bg-sidebar border-r border-sidebar-border flex flex-col shrink-0">
+    <div style={{
+      position: 'relative',
+      width: '100%',
+      height: '100%',
+      overflowY: 'auto',
+      background: '#0f172a' /* matches slate-900 */
+    }} className="border-r border-sidebar-border flex flex-col shrink-0">
       {/* Header */}
       <div className="p-4 border-b border-sidebar-border flex items-center justify-between">
         <div className="flex items-center gap-2">
