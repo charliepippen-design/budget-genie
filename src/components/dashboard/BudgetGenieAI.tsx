@@ -2,12 +2,10 @@ import React, { useState } from 'react';
 import { DashboardHeader } from './DashboardHeader';
 import { ChannelTable } from './ChannelTable';
 import { ChartSection } from './ChartSection';
-import { ProjectManager } from './ProjectManager';
-// import { ScenarioSidebar } from './ScenarioSidebar'; // Not found in recent file list, omitting to avoid build error
-import { SettingsConsole } from './SettingsConsole'; // REPLACED ChannelEditor with correct Sidebar Component
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store'; // FIXED import
+import { SettingsConsole } from './SettingsConsole'; // Correct sidebar component
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 
-// Additional imports needed for the full dashboard experience that were in Index.tsx
+// Additional imports needed for the full dashboard experience
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { LayoutGrid, Calendar } from 'lucide-react';
 import { BudgetSlider } from '@/components/dashboard/BudgetSlider';
@@ -29,10 +27,13 @@ export const BudgetGenieAI: React.FC = () => {
     const blendedMetrics = useBlendedMetrics();
     const categoryTotals = useCategoryTotals();
 
-    // Handlers from Index.tsx (simplified for this context)
+    // Handlers
     const [preset, setPreset] = useState<any>('custom');
 
     return (
+        // PARENT: CSS GRID (2 Columns)
+        // Column 1: 320px (Sidebar)
+        // Column 2: 1fr (Remaining Space)
         <div style={{
             display: 'grid',
             gridTemplateColumns: isSidebarOpen ? '320px 1fr' : '0px 1fr',
@@ -46,13 +47,13 @@ export const BudgetGenieAI: React.FC = () => {
             {/* CELL 1: SIDEBAR */}
             <div style={{
                 gridColumn: '1 / 2',
+                backgroundColor: '#0f172a', // slate-900 
+                borderRight: '1px solid #1e293b',
                 overflowY: 'auto',
-                borderRight: '1px solid #1e293b', // slate-800
-                backgroundColor: '#0f172a', // slate-900
-                position: 'relative', // NON-NEGOTIABLE
-                zIndex: 20
+                position: 'relative', // Forces it to stay in the track
+                zIndex: 50 // HIGH Z-INDEX as requested
             }}>
-                {/* Force width to prevent collapse during transition */}
+                {/* Force width to prevent content squashing during transition */}
                 <div style={{ width: '320px', height: '100%' }}>
                     <SettingsConsole />
                 </div>
