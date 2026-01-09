@@ -177,6 +177,26 @@ export const BUDGET_PRESETS = {
       influencer: 0.8,
     },
   },
+  growth_mode: {
+    name: 'Growth Mode',
+    description: 'Maximum scale on paid channels',
+    multipliers: {
+      seo: 0.5,
+      paid: 2.0,
+      affiliate: 1.2,
+      influencer: 1.2,
+    },
+  },
+  affiliate_dominant: {
+    name: 'Affiliate Dominant',
+    description: 'Scale via partner networks',
+    multipliers: {
+      seo: 0.8,
+      paid: 0.5,
+      affiliate: 2.5,
+      influencer: 1.0,
+    },
+  },
   balanced: {
     name: 'Balanced',
     description: 'Equal distribution across all channels',

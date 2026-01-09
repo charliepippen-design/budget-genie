@@ -13,19 +13,24 @@ import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
 import { NetworkStatus } from "./components/NetworkStatus";
 import { useStoreSync } from "./hooks/use-store-sync";
+import UnderConstruction from "./pages/UnderConstruction";
 
 const queryClient = new QueryClient();
 
 const App = () => {
-  // Check for maintenance mode
-  const isMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
-  const isBypass = new URLSearchParams(window.location.search).get('dev') === 'bypass';
+  // MAINTENANCE LOGIC: Domain Check
+  const currentDomain = window.location.hostname;
+  const isLocal = currentDomain === 'localhost' || currentDomain === '127.0.0.1';
+
+  // Also keep env check as a fallback or explicit override if needed, but primary request is domain check.
+  // User asked: "IF we are NOT local... STOP and show Maintenance Page."
+
+  if (!isLocal) {
+    return <UnderConstruction />;
+  }
 
   useStoreSync();
-
-  if (isMaintenance && !isBypass) {
-    return <MaintenanceMode />;
-  }
+  // ... rest of app
 
   return (
     <QueryClientProvider client={queryClient}>

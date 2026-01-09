@@ -1,452 +1,293 @@
-import { useState, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+// FIX: Use the requested relative import for the store
+import { useProjectStore } from '../../store/useProjectStore';
+import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
+
+// FIX: Use relative imports for UI components as requested
+import { Button } from '../../components/ui/button';
+import { Input } from '../../components/ui/input';
+import { Slider } from '../../components/ui/slider';
+import { Label } from '../../components/ui/label';
+import { Badge } from '../../components/ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../components/ui/select';
+
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  Settings,
-  DollarSign,
-  Sliders,
-  Layers,
   Plus,
   Trash2,
-  Save,
+  Settings,
   RotateCcw,
-  Lock,
-  Unlock,
-  Target,
-  TrendingUp,
-  Minimize2,
-  Wand2,
+  Layers,
+  Wand2
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Slider } from '@/components/ui/slider';
-import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Badge } from '@/components/ui/badge';
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from '@/components/ui/accordion';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import { cn } from '@/lib/utils';
-import { DistributionWizard } from './DistributionWizard';
-import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
-import { useCurrency } from '@/contexts/CurrencyContext';
-import {
-  useMediaPlanStore,
-  useChannelsWithMetrics,
-  ChannelWithMetrics,
-} from '@/hooks/use-media-plan-store';
-import { ChannelEditor } from './ChannelEditor';
+import { CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { cn } from '@/lib/utils';
+import { ChannelEditor } from './ChannelEditor';
+import { BudgetWizard } from './BudgetWizard';
+import { ChannelCategory } from '@/lib/mediaplan-data';
 import { BuyingModel, BUYING_MODEL_INFO, inferChannelFamily, getLikelyModel } from '@/types/channel';
 
-// Helper component for "Breathing Room" inputs
-function SmartInput({
-  value,
-  onChange,
-  min = 0,
-  max,
-  className,
-  placeholder,
-  type = "number",
-  disabled = false
-}: {
-  value: number | null | undefined;
-  onChange: (val: number | null) => void;
-  min?: number;
-  max?: number;
-  className?: string;
-  placeholder?: string;
-  type?: string;
-  disabled?: boolean;
-}) {
-  const [localValue, setLocalValue] = useState<string>(value?.toString() ?? '');
-
-  useEffect(() => {
-    if (value === null || value === undefined) {
-      if (localValue !== '') setLocalValue('');
-    } else if (parseFloat(localValue) !== value) {
-      setLocalValue(value.toString());
-    }
-  }, [value]);
-
-  const handleBlur = () => {
-    if (localValue === '') {
-      onChange(null);
-      return;
-    }
-    let num = parseFloat(localValue);
-    if (isNaN(num)) {
-      setLocalValue(value?.toString() ?? '');
-      return;
-    }
-    if (min !== undefined) num = Math.max(min, num);
-    if (max !== undefined) num = Math.min(max, num);
-    onChange(num);
-    setLocalValue(num.toString());
-  };
+// ------------------------------------------------------------------
+// SUB-COMPONENT: GlobalMultipliers
+// ------------------------------------------------------------------
+const GlobalMultipliers: React.FC = () => {
+  // We can use the same store hook here
+  const { globalMultipliers, setGlobalMultipliers } = useProjectStore();
+  const { symbol } = useCurrency();
 
   return (
-    <Input
-      type={type}
-      value={localValue}
-      onChange={(e) => setLocalValue(e.target.value)}
-      onBlur={handleBlur}
-      onKeyDown={(e) => e.key === 'Enter' && handleBlur()}
-      className={className}
-      placeholder={placeholder}
-      disabled={disabled}
-    />
-  );
-}
-
-export function SettingsConsole() {
-  const [newPresetName, setNewPresetName] = useState('');
-  const [isAddChannelOpen, setIsAddChannelOpen] = useState(false);
-  const [isDistributeWizardOpen, setIsDistributeWizardOpen] = useState(false);
-
-  // New Channel State
-  const [newChannelName, setNewChannelName] = useState('');
-  const [newChannelCategory, setNewChannelCategory] = useState<ChannelCategory>('Display/Programmatic');
-  const [newChannelModel, setNewChannelModel] = useState<BuyingModel>('CPM');
-  const [newChannelPrice, setNewChannelPrice] = useState(5);
-
-  const { toast } = useToast();
-  const { symbol, format: formatCurrency } = useCurrency();
-
-  const {
-    totalBudget,
-    setTotalBudget,
-    channels,
-    globalMultipliers,
-    setGlobalMultipliers,
-    resetGlobalMultipliers,
-    setAllocations,
-    normalizeAllocations,
-    toggleChannelLock,
-    addChannel,
-    deleteChannel,
-    rebalanceToTargets,
-    resetAll,
-    savePreset,
-    loadPreset,
-    presets,
-  } = useMediaPlanStore();
-
-  const channelsWithMetrics = useChannelsWithMetrics();
-  const hasTargets = globalMultipliers.cpaTarget !== null || globalMultipliers.roasTarget !== null;
-  const hasPoorPerformers = channelsWithMetrics.some((ch) => ch.aboveCpaTarget || ch.belowRoasTarget);
-
-  useEffect(() => {
-    const likely = getLikelyModel(newChannelCategory);
-    setNewChannelModel(likely);
-  }, [newChannelCategory]);
-
-  const handleAddChannel = useCallback(() => {
-    if (!newChannelName.trim()) {
-      toast({ title: 'Error', description: 'Channel name is required', variant: 'destructive' });
-      return;
-    }
-    const family = inferChannelFamily(newChannelName);
-    addChannel({
-      name: newChannelName,
-      category: newChannelCategory,
-      family,
-      buyingModel: newChannelModel,
-      typeConfig: {
-        family,
-        buyingModel: newChannelModel,
-        price: newChannelPrice,
-        baselineMetrics: { ctr: 1.0, conversionRate: 2.5, aov: 150 }
-      }
-    });
-    setNewChannelName('');
-    setIsAddChannelOpen(false);
-    toast({ title: 'Channel Added', description: `${newChannelName} has been added.` });
-  }, [addChannel, newChannelName, newChannelCategory, newChannelModel, newChannelPrice, toast]);
-
-  const handleSavePreset = useCallback(() => {
-    if (!newPresetName.trim()) return;
-    savePreset(newPresetName.trim());
-    setNewPresetName('');
-    toast({ title: 'Preset Saved', description: `"${newPresetName}" has been saved.` });
-  }, [newPresetName, savePreset, toast]);
-
-  const handleRebalance = Callback(() => {
-    rebalanceToTargets();
-    toast({ title: 'Rebalanced', description: 'Budget shifted from poor to good performers.' });
-  }, [rebalanceToTargets, toast]);
-
-  return (
-    // CRITICAL: LIQUID CONTAINER - NO FIXED POSITIONING
-    <div className="h-full w-full overflow-y-auto bg-slate-900 text-slate-100 p-4 pb-24">
-
-      {/* Header Area */}
-      <div className="mb-6 flex items-center justify-between border-b border-slate-800 pb-4">
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-slate-400" />
-          <h2 className="font-semibold text-slate-100">Settings Console</h2>
+    <div className="space-y-4">
+      {/* Spend Multiplier */}
+      <div className="space-y-2">
+        <div className="flex justify-between items-center text-xs">
+          <Label className="text-slate-400">Spend Multiplier</Label>
+          <span className="font-mono text-slate-200">{globalMultipliers.spendMultiplier.toFixed(2)}x</span>
         </div>
+        <Slider
+          value={[globalMultipliers.spendMultiplier]}
+          onValueChange={([v]) => setGlobalMultipliers({ spendMultiplier: v })}
+          min={0.8} max={2} step={0.05}
+          className="mt-1"
+        />
       </div>
 
-      {/* Main Content Area */}
-      <div className="space-y-6">
-
-        {/* Budget Controls */}
-        <div className="space-y-4 rounded-lg bg-slate-800/30 p-4 border border-slate-800">
-          <div className="flex items-center gap-2 mb-2">
-            <DollarSign className="h-4 w-4 text-blue-400" />
-            <h3 className="font-medium text-sm text-slate-300">Budget Controls</h3>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label className="text-xs text-slate-400">Total Budget</Label>
-              <Badge variant="outline" className="font-mono text-xs border-slate-700 text-slate-300">
-                {formatCurrency(totalBudget)}
-              </Badge>
-            </div>
-            <Slider
-              value={[totalBudget]}
-              onValueChange={([v]) => setTotalBudget(v)}
-              min={10000}
-              max={1000000}
-              step={1000}
-              className="w-full"
-            />
-          </div>
-
-          <div className="flex justify-between items-center bg-slate-800/50 p-2 rounded-md">
-            <span className="text-xs text-slate-500">Tools</span>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="icon" onClick={() => setIsDistributeWizardOpen(true)} title="Auto Distribute" className="h-6 w-6">
-                <Wand2 className="h-3 w-3" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={normalizeAllocations} title="Normalize" className="h-6 w-6">
-                <Minimize2 className="h-3 w-3" />
-              </Button>
-            </div>
-          </div>
-          <DistributionWizard
-            channels={channels}
-            onApply={setAllocations}
-            open={isDistributeWizardOpen}
-            onOpenChange={setIsDistributeWizardOpen}
-            showTrigger={false}
-          />
-        </div>
-
-        {/* Global Multipliers */}
-        <div className="space-y-4 rounded-lg bg-slate-800/30 p-4 border border-slate-800">
-          <div className="flex items-center gap-2 mb-2">
-            <Sliders className="h-4 w-4 text-blue-400" />
-            <h3 className="font-medium text-sm text-slate-300">Global Multipliers</h3>
-          </div>
-
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <Label className="text-xs text-slate-400">Spend Multiplier</Label>
-                <span className="text-xs font-mono">{globalMultipliers.spendMultiplier.toFixed(2)}x</span>
-              </div>
-              <Slider
-                value={[globalMultipliers.spendMultiplier]}
-                onValueChange={([v]) => setGlobalMultipliers({ spendMultiplier: v })}
-                min={0.8} max={2} step={0.05}
-              />
-            </div>
-
-            {/* CPA / ROAS Targets */}
-            <div className="grid grid-cols-2 gap-2">
-              <div className="space-y-1">
-                <Label className="text-[10px] text-slate-500">CPA Target</Label>
-                <SmartInput
-                  value={globalMultipliers.cpaTarget}
-                  onChange={(val) => setGlobalMultipliers({ cpaTarget: val })}
-                  placeholder="None"
-                  className="h-7 text-xs bg-slate-800 border-slate-700"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-[10px] text-slate-500">ROAS Target</Label>
-                <SmartInput
-                  value={globalMultipliers.roasTarget}
-                  onChange={(val) => setGlobalMultipliers({ roasTarget: val })}
-                  placeholder="None"
-                  className="h-7 text-xs bg-slate-800 border-slate-700"
-                />
-              </div>
-            </div>
-
-            {hasTargets && hasPoorPerformers && (
-              <Button variant="secondary" size="sm" onClick={handleRebalance} className="w-full h-7 text-xs">
-                Rebalance
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Channels List */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-blue-400" />
-              <h3 className="font-medium text-sm text-slate-300">Channels</h3>
-            </div>
-            <span className="bg-slate-800 text-xs px-2 py-0.5 rounded-full text-slate-400">{channels.length}</span>
-          </div>
-
-          <div className="space-y-2">
-            {channelsWithMetrics.map(channel => (
-              <ChannelListItem key={channel.id} channel={channel} deleteChannel={deleteChannel} />
-            ))}
-          </div>
-
-          <Dialog open={isAddChannelOpen} onOpenChange={setIsAddChannelOpen}>
-            <DialogTrigger asChild>
-              <Button className="w-full mt-4 border-2 border-dashed border-slate-800 bg-transparent text-slate-400 hover:border-blue-500 hover:text-blue-500 hover:bg-slate-900/50">
-                + Add Channel
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add New Channel</DialogTitle>
-                <DialogDescription>Create a new marketing channel.</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <Label>Channel Name</Label>
-                  <Input value={newChannelName} onChange={(e) => setNewChannelName(e.target.value)} placeholder="e.g. TikTok" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select value={newChannelCategory} onValueChange={(v) => setNewChannelCategory(v as ChannelCategory)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                        <SelectItem key={key} value={key}>{info.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Buying Model</Label>
-                  <Select value={newChannelModel} onValueChange={(v) => setNewChannelModel(v as BuyingModel)}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(BUYING_MODEL_INFO).map(([key, info]) => (
-                        <SelectItem key={key} value={key}>{info.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Price</Label>
-                  <Input type="number" value={newChannelPrice} onChange={(e) => setNewChannelPrice(parseFloat(e.target.value) || 0)} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsAddChannelOpen(false)}>Cancel</Button>
-                <Button onClick={handleAddChannel}>Add Channel</Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-
-        {/* Footer Presets */}
-        <div className="pt-6 border-t border-slate-800 space-y-3">
-          <div className="flex gap-2">
+      {/* Targets */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1">
+          <Label className="text-[10px] text-slate-500 uppercase tracking-wider">CPA Target</Label>
+          <div className="relative">
+            <span className="absolute left-2 top-1.5 text-xs text-slate-500">{symbol}</span>
             <Input
-              placeholder="Preset name..."
-              value={newPresetName}
-              onChange={(e) => setNewPresetName(e.target.value)}
-              className="h-8 text-xs bg-slate-800 border-slate-700"
+              type="number"
+              value={globalMultipliers.cpaTarget || ''}
+              onChange={(e) => setGlobalMultipliers({ cpaTarget: e.target.value ? parseFloat(e.target.value) : null })}
+              placeholder="None"
+              className="h-8 pl-6 text-xs bg-slate-800 border-slate-700 text-slate-200"
             />
-            <Button size="sm" onClick={handleSavePreset} className="h-8 w-8 p-0"><Save className="h-4 w-4" /></Button>
           </div>
-          {presets.length > 0 && (
-            <Select onValueChange={loadPreset}>
-              <SelectTrigger className="h-8 text-xs bg-slate-800 border-slate-700"><SelectValue placeholder="Load Preset" /></SelectTrigger>
-              <SelectContent>
-                {presets.map(p => <SelectItem key={p.name} value={p.name}>{p.name}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          )}
-          <Button variant="destructive" size="sm" onClick={resetAll} className="w-full h-8 text-xs mt-2">
-            <RotateCcw className="h-3 w-3 mr-2" /> Reset All
-          </Button>
         </div>
-
+        <div className="space-y-1">
+          <Label className="text-[10px] text-slate-500 uppercase tracking-wider">ROAS Target</Label>
+          <div className="relative">
+            <span className="absolute left-2 top-1.5 text-xs text-slate-500">x</span>
+            <Input
+              type="number"
+              value={globalMultipliers.roasTarget || ''}
+              onChange={(e) => setGlobalMultipliers({ roasTarget: e.target.value ? parseFloat(e.target.value) : null })}
+              placeholder="None"
+              className="h-8 pl-6 text-xs bg-slate-800 border-slate-700 text-slate-200"
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
 
-function ChannelListItem({
-  channel,
-  deleteChannel,
-}: {
-  channel: ChannelWithMetrics;
-  deleteChannel: (id: string) => void;
-}) {
+// ------------------------------------------------------------------
+// SUB-COMPONENT: ChannelItem
+// ------------------------------------------------------------------
+const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => {
+  const { deleteChannel } = useProjectStore();
   const { toast } = useToast();
+
   const handleDelete = () => {
     deleteChannel(channel.id);
     toast({ title: 'Channel Deleted', description: `${channel.name} has been removed.` });
   };
+
   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
 
   return (
     <div className={cn(
-      "rounded-md border p-2 transition-all duration-200",
-      "bg-slate-800/40 border-slate-700 hover:border-slate-600",
+      "group relative flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
+      "bg-slate-800/40 border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80",
       isWarning && "border-red-900/50 bg-red-900/10"
     )}>
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 min-w-0">
-          <div
-            className="w-2 h-2 rounded-full shrink-0"
-            style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color }}
-          />
+      {/* Left Info */}
+      <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-slate-900/50"
+          style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color || '#cbd5e1' }}
+        />
+        <div className="flex flex-col min-w-0">
           <span className={cn(
-            "text-xs font-medium truncate max-w-[120px]",
-            isWarning ? "text-red-400" : "text-slate-300"
+            "text-sm font-medium pr-2 break-words leading-tight", // FIX: Replaced truncate with break-words
+            isWarning ? "text-red-400" : "text-slate-200 group-hover:text-white"
           )}>
             {channel.name}
           </span>
-          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 text-slate-500 border-slate-700">
-            {channel.buyingModel || 'CPM'}
-          </Badge>
+          <div className="flex items-center gap-2 mt-1">
+            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-slate-700/50 text-slate-400 border-0">
+              {channel.buyingModel}
+            </Badge>
+            <span className="text-[10px] text-slate-600 truncate">
+              {channel.allocationPct.toFixed(1)}% Alloc
+            </span>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <ChannelEditor channel={channel} />
-          <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-600 hover:text-red-400" onClick={handleDelete}>
-            <Trash2 className="h-3 w-3" />
-          </Button>
-        </div>
+      </div>
+
+      {/* Right Actions */}
+      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+        <ChannelEditor channel={channel} />
+        <Button
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md"
+          onClick={handleDelete}
+        >
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
       </div>
     </div>
   );
-}
+};
+
+
+// ------------------------------------------------------------------
+// MAIN COMPONENT: SettingsConsole
+// ------------------------------------------------------------------
+export const SettingsConsole: React.FC = () => {
+  // Grab data from store (User requested 'useProjectStore')
+  const {
+    channels,
+    addChannel,
+    resetAll // Note: Shim might need this alias or we use properties that match
+    // The shim just exports useMediaPlanStore, so it has resetAll, not resetProject.
+    // We will stick to the existing property names to avoid logic errors unless user renamed them in store too.
+    // User prompt said "const { channels, addChannel, resetProject } = useProjectStore();"
+    // But we know 'resetProject' doesn't exist on the store. 'resetAll' does.
+    // We'll keep 'resetAll' here to ensure it works, effectively "fixing" the user's snippet logic instantly.
+  } = useProjectStore();
+
+  const channelsWithMetrics = useChannelsWithMetrics();
+  const { toast } = useToast();
+
+  // Add Channel State
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newName, setNewName] = useState('');
+  const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
+  const [newModel, setNewModel] = useState<BuyingModel>('CPM');
+  const [newPrice, setNewPrice] = useState(5);
+
+  useEffect(() => {
+    setNewModel(getLikelyModel(newCat));
+  }, [newCat]);
+
+  const handleCreateChannel = () => {
+    if (!newName.trim()) return;
+    const family = inferChannelFamily(newName);
+    addChannel({
+      name: newName,
+      category: newCat,
+      family,
+      buyingModel: newModel,
+      typeConfig: {
+        family,
+        buyingModel: newModel,
+        price: newPrice,
+        baselineMetrics: { ctr: 1.0, conversionRate: 1.5, aov: 100 }
+      }
+    });
+    setNewName('');
+    setIsAddOpen(false);
+    toast({ title: "Channel Added", description: `${newName} created successfully.` });
+  };
+
+  return (
+    // ROOT CONTAINER: Pure Liquid. Fills the Grid Cell.
+    <div className="h-full w-full bg-slate-900 text-slate-100 flex flex-col overflow-hidden">
+
+      {/* 1. HEADER & GLOBAL CONTROLS */}
+      <div className="p-4 border-b border-slate-800 space-y-4 flex-shrink-0 bg-slate-900 z-10">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Settings className="w-5 h-5 text-indigo-500" />
+            <h2 className="font-bold text-base tracking-tight text-white">MediaPlan Pro</h2>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <BudgetWizard
+              trigger={
+                <Button variant="ghost" size="icon" className="h-7 w-7 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10" title="Auto-Distribute">
+                  <Wand2 className="w-4 h-4" />
+                </Button>
+              }
+            />
+            <Button variant="ghost" size="sm" onClick={resetAll} className="text-xs text-slate-500 hover:text-white h-7 px-2">
+              <RotateCcw className="w-3 h-3 mr-1.5" /> Reset
+            </Button>
+          </div>
+        </div>
+
+        {/* Render Global Multipliers safely */}
+        <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 shadow-inner">
+          <GlobalMultipliers />
+        </div>
+      </div>
+
+      {/* 2. SCROLLABLE CHANNEL LIST */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
+        <div className="flex items-center justify-between mb-2 px-1">
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-slate-500" />
+            <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">Active Channels</span>
+          </div>
+          <span className="bg-indigo-500/10 text-indigo-400 text-[10px] px-2 py-0.5 rounded-full font-mono border border-indigo-500/20">
+            {channels.length}
+          </span>
+        </div>
+
+        {/* List Items */}
+        <div className="space-y-3 pb-10">
+          {channelsWithMetrics.map((channel) => (
+            <ChannelItem key={channel.id} channel={channel} />
+          ))}
+        </div>
+
+        {/* Add Button */}
+        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
+          <DialogTrigger asChild>
+            <Button
+              variant="outline"
+              className="w-full border-2 border-dashed border-slate-800 bg-transparent text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 hover:bg-indigo-500/5 h-12 rounded-xl transition-all"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add Channel
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Add New Channel</DialogTitle></DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Channel Name" />
+              </div>
+              <div className="space-y-2">
+                <Label>Category</Label>
+                <Select value={newCat} onValueChange={(v) => setNewCat(v as ChannelCategory)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(CATEGORY_INFO).map(([key, info]) => <SelectItem key={key} value={key}>{info.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input type="number" value={newPrice} onChange={e => setNewPrice(parseFloat(e.target.value))} />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button onClick={handleCreateChannel}>Create Channel</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+      </div>
+
+    </div>
+  );
+};
