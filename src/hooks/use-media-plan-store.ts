@@ -8,7 +8,8 @@ import {
   FAMILY_INFO,
   calculateUnifiedMetrics,
   inferChannelFamily,
-  inferBuyingModel
+  inferBuyingModel,
+  getLikelyModel
 } from '@/types/channel';
 
 // ========== DATA MODEL ==========
@@ -21,31 +22,14 @@ export interface ChannelData {
   category: ChannelCategory;
   allocationPct: number;
 
-  // NEW: Channel type configuration for polymorphic calculations
+  // Polymorphic configuration
   family: ChannelFamily;
   buyingModel: BuyingModel;
   typeConfig: ChannelTypeConfig;
 
-  // Base KPI inputs (from CSV/defaults) - kept for backwards compatibility
-  baseCpm: number;
-  baseCtr: number;
-  baseCr: number; // Conversion rate (%)
-  baseCpa: number | null;
-  baseRoas: number;
-
-  // Editable overrides (null = use base)
-  overrideCpm: number | null;
-  overrideCtr: number | null;
-  overrideCr: number | null;
-  overrideCpa: number | null;
-  overrideRoas: number | null;
-
-  // Impression mode
-  impressionMode: ImpressionMode;
-  fixedImpressions: number;
-
-  // Locked allocation (for normalization)
+  // UI State / Meta
   locked: boolean;
+  warnings?: string[];
 }
 
 export interface GlobalMultipliers {
@@ -59,26 +43,22 @@ export interface GlobalMultipliers {
 
 export interface CalculatedChannelMetrics {
   spend: number;
-  effectiveCpm: number;
-  effectiveCtr: number;
-  effectiveCr: number;
   impressions: number;
   clicks: number;
   conversions: number;
   cpa: number | null;
   revenue: number;
   roas: number;
+  // Effective rates for display
+  effectivePrice: number;
+  effectiveCtr: number;
+  effectiveCr: number;
 }
 
 export interface ChannelWithMetrics extends ChannelData {
   metrics: CalculatedChannelMetrics;
   aboveCpaTarget: boolean;
   belowRoasTarget: boolean;
-  // Legacy compat
-  currentPercentage: number;
-  effectiveCpm: number;
-  effectiveCtr: number;
-  warnings: string[];
 }
 
 export interface BlendedMetrics {
@@ -132,17 +112,30 @@ function createTypeConfigFromLegacy(ch: typeof BASE_CHANNELS_DATA[0]): ChannelTy
   const family = inferChannelFamily(ch.name);
   const buyingModel = inferBuyingModel(ch.name, family);
 
+  let price = 0;
+  let secondaryPrice = 0;
+
+  // Map legacy values to new Price field
+  switch (buyingModel) {
+    case 'CPM': price = ch.cpm; break;
+    case 'CPC': price = ch.cpm / 10; break; // Rough est
+    case 'CPA': price = 50; break; // Default CPA
+    case 'FLAT_FEE': price = ch.baseSpend; break;
+    case 'RETAINER': price = ch.baseSpend; break;
+    default: price = ch.cpm;
+  }
+
   return {
     family,
     buyingModel,
-    cpm: ch.cpm,
-    ctr: ch.ctr,
-    cr: 2.5,
-    // Set defaults based on model
-    ...(buyingModel === 'flat_fee' && { fixedCost: ch.baseSpend, estFtds: 5 }),
-    ...(buyingModel === 'retainer' && { fixedCost: ch.baseSpend, estTraffic: 5000, cr: 2.5 }),
-    ...(buyingModel === 'cpa' && { targetCpa: 50, targetFtds: 10 }),
-    ...(buyingModel === 'unit_based' && { unitCount: 4, costPerUnit: 500, estReachPerUnit: 50000, ctr: ch.ctr, cr: 2.5 }),
+    price,
+    secondaryPrice,
+    baselineMetrics: {
+      ctr: ch.ctr,
+      conversionRate: 2.5,
+      aov: 150,
+      trafficPerUnit: 1000
+    }
   };
 }
 
@@ -160,25 +153,9 @@ function createInitialChannels(): ChannelData[] {
       category: ch.category,
       allocationPct: (ch.baseSpend / totalBaseSpend) * 100,
 
-      // NEW: Channel type fields
       family,
       buyingModel,
       typeConfig,
-
-      baseCpm: ch.cpm,
-      baseCtr: ch.ctr,
-      baseCr: 2.5, // Default conversion rate
-      baseCpa: null,
-      baseRoas: ch.roas,
-
-      overrideCpm: null,
-      overrideCtr: null,
-      overrideCr: null,
-      overrideCpa: null,
-      overrideRoas: null,
-
-      impressionMode: (ch.category === 'Paid Social' || ch.id === 'affiliate-listing') ? 'FIXED' as ImpressionMode : 'CPM' as ImpressionMode,
-      fixedImpressions: ch.category === 'Paid Social' ? 200000 : 100000,
 
       locked: false,
     };
@@ -195,52 +172,42 @@ function calculateChannelMetrics(
   // Spend = allocation × budget × spend multiplier
   const spend = (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
 
-  // Effective values with overrides
-  let effectiveCpm = channel.overrideCpm
-    ?? (multipliers.defaultCpmOverride && channel.overrideCpm === null ? multipliers.defaultCpmOverride : null)
-    ?? channel.baseCpm;
+  // Apply Multipliers to Config
+  // 1. CTR Bump
+  const effectiveCtr = Math.max(0.01, (channel.typeConfig.baselineMetrics.ctr || 1) + multipliers.ctrBump);
 
-  // CTR with bump, clamped to minimum 0.01%
-  const effectiveCtr = Math.max(
-    0.01,
-    (channel.overrideCtr ?? channel.baseCtr) + multipliers.ctrBump
-  );
-
-  const effectiveCr = channel.overrideCr ?? channel.baseCr;
-
-  // Impressions based on mode
-  let impressions: number;
-  if (channel.impressionMode === 'FIXED') {
-    impressions = channel.fixedImpressions;
-    // Derive CPM from fixed impressions
-    effectiveCpm = impressions > 0 ? (spend / impressions) * 1000 : 0;
-  } else {
-    impressions = effectiveCpm > 0 ? (spend / effectiveCpm) * 1000 : 0;
+  // 2. Global CPM Override (Only if model is CPM? Or apply broadly?)
+  // If global CPM override is set, and we are in CPM mode, use it.
+  // But 'price' is polymorphic. 
+  // Let's only apply if model is CPM.
+  let effectivePrice = channel.typeConfig.price;
+  if (channel.buyingModel === 'CPM' && multipliers.defaultCpmOverride) {
+    effectivePrice = multipliers.defaultCpmOverride;
   }
 
-  // Clicks and conversions
-  const clicks = impressions * (effectiveCtr / 100);
-  const conversions = clicks * (effectiveCr / 100);
+  // Construct effective config
+  const effectiveConfig: ChannelTypeConfig = {
+    ...channel.typeConfig,
+    price: effectivePrice,
+    baselineMetrics: {
+      ...channel.typeConfig.baselineMetrics,
+      ctr: effectiveCtr
+    }
+  };
 
-  // CPA (override or calculated)
-  const cpa = channel.overrideCpa
-    ?? (conversions > 0 ? spend / conversions : null);
-
-  // ROAS and Revenue
-  const effectiveRoas = channel.overrideRoas ?? channel.baseRoas;
-  const revenue = spend * effectiveRoas;
+  const unified = calculateUnifiedMetrics(effectiveConfig, spend, multipliers.playerValue);
 
   return {
-    spend,
-    effectiveCpm,
+    spend: unified.spend,
+    impressions: unified.impressions,
+    clicks: unified.clicks,
+    conversions: unified.ftds,
+    cpa: unified.cpa,
+    revenue: unified.revenue,
+    roas: unified.roas,
+    effectivePrice,
     effectiveCtr,
-    effectiveCr,
-    impressions,
-    clicks,
-    conversions,
-    cpa,
-    revenue,
-    roas: effectiveRoas,
+    effectiveCr: channel.typeConfig.baselineMetrics.conversionRate || 0,
   };
 }
 
@@ -261,9 +228,7 @@ interface MediaPlanState {
   setAllocations: (allocations: Record<string, number>) => void;
   normalizeAllocations: () => void;
   toggleChannelLock: (channelId: string) => void;
-  updateChannelOverride: (channelId: string, updates: Partial<ChannelData>) => void;
-  setImpressionMode: (channelId: string, mode: ImpressionMode) => void;
-  setFixedImpressions: (channelId: string, impressions: number) => void;
+
   addChannel: (channel: Partial<ChannelData> & { name: string; category: ChannelCategory }) => void;
   deleteChannel: (id: string) => void;
   setChannels: (channels: ChannelData[]) => void;
@@ -271,6 +236,9 @@ interface MediaPlanState {
   // Actions - Channel Types (NEW)
   setChannelType: (channelId: string, family: ChannelFamily, buyingModel: BuyingModel) => void;
   updateChannelTypeConfig: (channelId: string, config: Partial<ChannelTypeConfig>) => void;
+
+  // New Action for polymorphic updates
+  updateChannelConfigField: (channelId: string, field: keyof ChannelTypeConfig | 'baselineMetrics', value: any) => void;
 
   // Actions - Multipliers
   setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
@@ -353,27 +321,37 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         }));
       },
 
-      updateChannelOverride: (channelId, updates) => {
+      // Replaced updateChannelOverride with specific config updates
+      updateChannelTypeConfig: (channelId, config) => {
         set((state) => ({
           channels: state.channels.map((ch) =>
-            ch.id === channelId ? { ...ch, ...updates } : ch
+            ch.id === channelId
+              ? { ...ch, typeConfig: { ...ch.typeConfig, ...config } }
+              : ch
           ),
         }));
       },
 
-      setImpressionMode: (channelId, mode) => {
+      updateChannelConfigField: (channelId, field, value) => {
         set((state) => ({
-          channels: state.channels.map((ch) =>
-            ch.id === channelId ? { ...ch, impressionMode: mode } : ch
-          ),
-        }));
-      },
+          channels: state.channels.map((ch) => {
+            if (ch.id !== channelId) return ch;
 
-      setFixedImpressions: (channelId, impressions) => {
-        set((state) => ({
-          channels: state.channels.map((ch) =>
-            ch.id === channelId ? { ...ch, fixedImpressions: Math.max(0, impressions) } : ch
-          ),
+            if (field === 'baselineMetrics') {
+              return {
+                ...ch,
+                typeConfig: {
+                  ...ch.typeConfig,
+                  baselineMetrics: { ...ch.typeConfig.baselineMetrics, ...value }
+                }
+              };
+            }
+
+            return {
+              ...ch,
+              typeConfig: { ...ch.typeConfig, [field]: value }
+            };
+          }),
         }));
       },
 
@@ -381,37 +359,23 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         set((state) => {
           const id = `channel-${Date.now()}`;
           const family = channelData.family ?? inferChannelFamily(channelData.name);
-          const buyingModel = channelData.buyingModel ?? inferBuyingModel(channelData.name, family);
+          // Auto-sensing defaults
+          const likelyModel = getLikelyModel(channelData.category);
+          const buyingModel = channelData.buyingModel ?? likelyModel;
 
           const newChannel: ChannelData = {
             id,
             name: channelData.name,
             category: channelData.category,
             allocationPct: 5,
-
-            // NEW: Channel type fields
             family,
             buyingModel,
             typeConfig: channelData.typeConfig ?? {
               family,
               buyingModel,
-              cpm: channelData.baseCpm ?? 5,
-              ctr: channelData.baseCtr ?? 1,
-              cr: channelData.baseCr ?? 2.5,
+              price: 5,
+              baselineMetrics: { ctr: 1, conversionRate: 2.5 }
             },
-
-            baseCpm: channelData.baseCpm ?? 5,
-            baseCtr: channelData.baseCtr ?? 1,
-            baseCr: channelData.baseCr ?? 2.5,
-            baseCpa: channelData.baseCpa ?? null,
-            baseRoas: channelData.baseRoas ?? 2,
-            overrideCpm: channelData.overrideCpm ?? null,
-            overrideCtr: channelData.overrideCtr ?? null,
-            overrideCr: channelData.overrideCr ?? null,
-            overrideCpa: channelData.overrideCpa ?? null,
-            overrideRoas: channelData.overrideRoas ?? null,
-            impressionMode: channelData.impressionMode ?? 'CPM',
-            fixedImpressions: channelData.fixedImpressions ?? 100000,
             locked: false,
           };
 
@@ -467,16 +431,6 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         }));
       },
 
-      updateChannelTypeConfig: (channelId, config) => {
-        set((state) => ({
-          channels: state.channels.map((ch) =>
-            ch.id === channelId
-              ? { ...ch, typeConfig: { ...ch.typeConfig, ...config } }
-              : ch
-          ),
-        }));
-      },
-
       // Multipliers
       setGlobalMultipliers: (updates) => {
         set((state) => ({
@@ -505,7 +459,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         const good: string[] = [];
 
         channelsWithMetrics.forEach((ch) => {
-          if (ch.locked) return; // REPAIR 4: Explicitly skip locked channels from being sources/destinations
+          if (ch.locked) return;
 
           const aboveCpa = cpaTarget && ch.metrics.cpa && ch.metrics.cpa > cpaTarget;
           const belowRoas = roasTarget && ch.metrics.roas < roasTarget;
@@ -519,14 +473,12 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
         if (poor.length === 0 || good.length === 0) return;
 
-        // Shift 10% from poor to good channels
-        // REPAIR 4: Respect locked channels
         const shiftAmount = 10 / poor.length;
         const addAmount = (shiftAmount * poor.length) / good.length;
 
         set({
           channels: state.channels.map((ch) => {
-            if (ch.locked) return ch; // Explicitly skip locked channels
+            if (ch.locked) return ch;
 
             if (poor.includes(ch.id)) {
               return {
@@ -580,8 +532,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
-        // REPAIR 2: Atomic Reset
-        localStorage.removeItem('mediaplan-store-v2'); // Match persist name
+        localStorage.removeItem('mediaplan-store-v2');
         set({
           totalBudget: 50000,
           channels: createInitialChannels(),
@@ -591,21 +542,18 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       applyCategoryMultipliers: (multipliers) => {
         set((state) => {
-          // 1. Calculate weighted allocations based on BASE data and multipliers
           const baseTotalSpend = BASE_CHANNELS_DATA.reduce((sum, ch) => sum + ch.baseSpend, 0);
 
           const newAllocations = state.channels.map(ch => {
-            // Find base data for this channel
             const base = BASE_CHANNELS_DATA.find(b => b.id === ch.id);
-            if (!base) return { id: ch.id, raw: ch.allocationPct }; // Keep as is if custom/unknown
+            if (!base) return { id: ch.id, raw: ch.allocationPct };
 
             const mult = multipliers[base.category] ?? 1.0;
-            // Base share * multiplier
             const baseShare = (base.baseSpend / baseTotalSpend) * 100;
             return { id: ch.id, raw: baseShare * mult };
           });
 
-          // 2. Normalize
+          // Normalize
           const totalRaw = newAllocations.reduce((sum, item) => sum + item.raw, 0);
           const factor = totalRaw > 0 ? 100 / totalRaw : 1;
 
@@ -629,24 +577,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
       }),
-      version: 1,
+      version: 2, // Increment version to force migration/reset
       migrate: (persistedState: any, version) => {
-        if (version === 0) {
-          // Migration from version 0 to 1
-          // Update legacy categories
-          const mapping: Record<string, ChannelCategory> = {
-            'seo': 'SEO/Content',
-            'paid': 'Display/Programmatic',
-            'affiliate': 'Affiliate',
-            'influencer': 'Paid Social',
-          };
-
-          const newChannels = persistedState.channels.map((ch: any) => ({
-            ...ch,
-            category: mapping[ch.category] || ch.category
-          }));
-
-          return { ...persistedState, channels: newChannels };
+        if (version < 2) {
+          // Hard reset for version 2 (Types totally changed)
+          return {
+            totalBudget: 50000,
+            channels: createInitialChannels(),
+            globalMultipliers: { ...DEFAULT_MULTIPLIERS },
+            presets: []
+          } as MediaPlanState;
         }
         return persistedState as MediaPlanState;
       },
@@ -666,25 +606,11 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
     const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
     const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);
 
-    // Warnings for legacy compat - use generic symbol (will be formatted by UI)
-    const warnings: string[] = [];
-    if (aboveCpaTarget) {
-      warnings.push(`CPA ${metrics.cpa?.toFixed(0)} exceeds target ${cpaTarget}`);
-    }
-    if (belowRoasTarget) {
-      warnings.push(`ROAS ${metrics.roas.toFixed(1)}x below target ${roasTarget}x`);
-    }
-
     return {
       ...channel,
       metrics,
       aboveCpaTarget,
       belowRoasTarget,
-      // Legacy compat
-      currentPercentage: channel.allocationPct,
-      effectiveCpm: metrics.effectiveCpm,
-      effectiveCtr: metrics.effectiveCtr,
-      warnings,
     };
   });
 }
@@ -734,5 +660,4 @@ export function useCategoryTotals(): Record<string, { spend: number; percentage:
   return totals;
 }
 
-// Legacy Channel type export for compatibility
 export type Channel = ChannelData;

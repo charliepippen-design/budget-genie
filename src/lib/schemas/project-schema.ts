@@ -7,7 +7,28 @@ const ChannelCategorySchema = z.enum([
     'SEO/Content', 'Offline/TV', 'Email/SMS', 'Other'
 ]);
 
-const ImpressionModeSchema = z.enum(['CPM', 'FIXED']);
+const BuyingModelSchema = z.enum([
+    'CPM', 'CPC', 'CPA', 'REV_SHARE', 'HYBRID', 'FLAT_FEE', 'RETAINER'
+]);
+
+const ChannelFamilySchema = z.enum([
+    'paid_media', 'affiliate', 'influencer', 'seo_content', 'pr_brand', 'email_crm'
+]);
+
+const BaselineMetricsSchema = z.object({
+    ctr: z.number().optional(),
+    conversionRate: z.number().optional(),
+    aov: z.number().optional(),
+    trafficPerUnit: z.number().optional(),
+});
+
+const ChannelTypeConfigSchema = z.object({
+    family: ChannelFamilySchema,
+    buyingModel: BuyingModelSchema,
+    price: z.number(),
+    secondaryPrice: z.number().optional(),
+    baselineMetrics: BaselineMetricsSchema,
+});
 
 // Media Plan Store Schemas
 export const ChannelDataSchema = z.object({
@@ -15,28 +36,15 @@ export const ChannelDataSchema = z.object({
     name: z.string(),
     category: ChannelCategorySchema,
     allocationPct: z.number(),
-    // Polymorphic fields (simplified for validation, can be refined)
-    family: z.string().optional(),
-    buyingModel: z.string().optional(),
-    typeConfig: z.any().optional(),
 
-    // Base KPI inputs
-    baseCpm: z.number(),
-    baseCtr: z.number(),
-    baseCr: z.number(),
-    baseCpa: z.number().nullable(),
-    baseRoas: z.number(),
+    // New Polymorphic fields
+    family: ChannelFamilySchema,
+    buyingModel: BuyingModelSchema,
+    typeConfig: ChannelTypeConfigSchema,
 
-    // Overrides
-    overrideCpm: z.number().nullable(),
-    overrideCtr: z.number().nullable(),
-    overrideCr: z.number().nullable(),
-    overrideCpa: z.number().nullable(),
-    overrideRoas: z.number().nullable(),
-
-    impressionMode: ImpressionModeSchema,
-    fixedImpressions: z.number(),
+    // UI State
     locked: z.boolean(),
+    warnings: z.array(z.string()).optional(),
 });
 
 export const GlobalMultipliersSchema = z.object({

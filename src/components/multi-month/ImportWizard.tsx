@@ -20,7 +20,7 @@ import {
   ValidationReport,
 } from '@/lib/import-service';
 import { ChannelData } from '@/hooks/use-media-plan-store';
-import { inferChannelFamily, inferBuyingModel, ChannelTypeConfig } from '@/types/channel';
+import { inferChannelFamily, inferBuyingModel, ChannelTypeConfig, getLikelyModel } from '@/types/channel';
 import { ReconciliationTable } from './ReconciliationTable';
 import { GranularitySelector, ImportGranularity, DistributionStrategy } from './GranularitySelector';
 import { CurrencyConflictDialog, CurrencyConflictResolution } from './CurrencyConflictDialog';
@@ -224,6 +224,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
           const family = inferChannelFamily(data.name);
           const buyingModel = inferBuyingModel(data.name, family);
 
+          // Construct legacy-free channel object
           return {
             id,
             name: data.name,
@@ -235,25 +236,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
             typeConfig: {
               family,
               buyingModel,
-              cpm: data.cpm,
-              ctr: data.ctr,
-              cr: 2.5,
+              price: data.cpm || 5, // Fallback price (assuming CPM import)
+              baselineMetrics: {
+                ctr: data.ctr,
+                conversionRate: 2.5,
+                aov: 150
+              },
+              secondaryPrice: 0 // Optional
             },
 
-            baseCpm: data.cpm,
-            baseCtr: data.ctr,
-            baseCr: 2.5,
-            baseCpa: null,
-            baseRoas: data.roas,
-
-            overrideCpm: null,
-            overrideCtr: null,
-            overrideCr: null,
-            overrideCpa: null,
-            overrideRoas: null,
-
-            impressionMode: 'CPM',
-            fixedImpressions: 100000,
             locked: false,
           };
         });

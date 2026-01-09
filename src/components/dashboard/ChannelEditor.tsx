@@ -1,16 +1,16 @@
 import { useState, useMemo } from 'react';
-import { 
-  Sheet, 
-  SheetContent, 
-  SheetDescription, 
-  SheetHeader, 
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
   SheetTitle,
-  SheetTrigger 
+  SheetTrigger
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,29 +18,27 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { 
-  Settings2, 
-  DollarSign, 
-  Users, 
-  TrendingUp, 
+import {
+  Settings2,
+  DollarSign,
+  Users,
+  TrendingUp,
   Percent,
   Zap,
-  FileText,
   Target
 } from 'lucide-react';
-import { 
-  ChannelFamily, 
-  BuyingModel, 
-  FAMILY_INFO, 
+import {
+  ChannelFamily,
+  BuyingModel,
+  FAMILY_INFO,
   BUYING_MODEL_INFO,
   calculateUnifiedMetrics,
-  ChannelTypeConfig,
+  ChannelTypeConfig
 } from '@/types/channel';
-import { 
+import {
   useMediaPlanStore,
-  ChannelData,
+  ChannelData
 } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
@@ -51,354 +49,204 @@ interface ChannelEditorProps {
 }
 
 export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
-  const { setChannelType, updateChannelTypeConfig, globalMultipliers } = useMediaPlanStore();
+  const {
+    setChannelType,
+    updateChannelTypeConfig,
+    updateChannelConfigField,
+    globalMultipliers
+  } = useMediaPlanStore();
+
   const { format: formatCurrency } = useCurrency();
   const [isOpen, setIsOpen] = useState(false);
-  
-  // Derive defaults for channels that may not have polymorphic fields yet
-  const defaultFamily: ChannelFamily = channel.family || 'paid_media';
-  const defaultBuyingModel: BuyingModel = channel.buyingModel || FAMILY_INFO[defaultFamily].defaultModel;
-  const defaultConfig: ChannelTypeConfig = channel.typeConfig || {
-    family: defaultFamily,
-    buyingModel: defaultBuyingModel,
-    cpm: channel.baseCpm || 5,
-    ctr: channel.baseCtr || 1,
-    cr: channel.baseCr || 2.5,
-  };
-  
-  // Local state for form
-  const [family, setFamily] = useState<ChannelFamily>(defaultFamily);
-  const [buyingModel, setBuyingModel] = useState<BuyingModel>(defaultBuyingModel);
-  const [config, setConfig] = useState<ChannelTypeConfig>(defaultConfig);
 
-  // Get allowed models for selected family (with fallback)
+  // Local state derived from store (syncing happens on change)
+  const family = channel.family;
+  const buyingModel = channel.buyingModel;
+
+  // Config comes directly from store channel object
+  const config = channel.typeConfig;
+
+  // Get allowed models for selected family
   const allowedModels = useMemo(() => {
     const familyInfo = FAMILY_INFO[family];
-    return familyInfo?.allowedModels || ['cpm', 'cpc'];
+    return familyInfo?.allowedModels || ['CPM', 'CPC'];
   }, [family]);
 
-  // Calculate preview metrics
+  // Calculate preview metrics using dummy spend
   const previewMetrics = useMemo(() => {
     const playerValue = globalMultipliers.playerValue || 150;
-    // Use a sample spend for preview
     const sampleSpend = 10000;
-    return calculateUnifiedMetrics({ ...config, family, buyingModel }, sampleSpend, playerValue);
-  }, [config, family, buyingModel, globalMultipliers.playerValue]);
+    // We pass the config as is
+    return calculateUnifiedMetrics(config, sampleSpend, playerValue);
+  }, [config, globalMultipliers.playerValue]);
 
   const handleFamilyChange = (newFamily: ChannelFamily) => {
-    setFamily(newFamily);
     const defaultModel = FAMILY_INFO[newFamily].defaultModel;
-    setBuyingModel(defaultModel);
-    setConfig(prev => ({ ...prev, family: newFamily, buyingModel: defaultModel }));
     setChannelType(channel.id, newFamily, defaultModel);
   };
 
   const handleModelChange = (newModel: BuyingModel) => {
-    setBuyingModel(newModel);
-    setConfig(prev => ({ ...prev, buyingModel: newModel }));
     setChannelType(channel.id, family, newModel);
   };
 
-  const handleConfigChange = (field: keyof ChannelTypeConfig, value: number) => {
-    const newConfig = { ...config, [field]: value };
-    setConfig(newConfig);
-    updateChannelTypeConfig(channel.id, { [field]: value });
+  const updatePrice = (val: number) => {
+    updateChannelConfigField(channel.id, 'price', val);
   };
 
-  // Render fields based on buying model
+  const updateSecondaryPrice = (val: number) => {
+    updateChannelConfigField(channel.id, 'secondaryPrice', val);
+  };
+
+  const updateBaselineMetric = (field: keyof typeof config.baselineMetrics, val: number) => {
+    updateChannelConfigField(channel.id, 'baselineMetrics', { [field]: val });
+  };
+
+  // Render fields based on buying model (The Chameleon)
   const renderModelFields = () => {
     switch (buyingModel) {
-      case 'cpm':
+      case 'CPM':
         return (
           <>
-            <FormField 
-              label="CPM" 
-              value={config.cpm || 5} 
-              onChange={(v) => handleConfigChange('cpm', v)}
+            <FormField
+              label="CPM Price"
+              value={config.price || 5}
+              onChange={updatePrice}
               icon={<DollarSign className="h-4 w-4" />}
               suffix="per 1K"
             />
-            <FormField 
-              label="CTR %" 
-              value={config.ctr || 1} 
-              onChange={(v) => handleConfigChange('ctr', v)}
+            <FormField
+              label="CTR %"
+              value={config.baselineMetrics.ctr || 1}
+              onChange={(v) => updateBaselineMetric('ctr', v)}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
             />
-            <FormField 
-              label="Conv. Rate %" 
-              value={config.cr || 2.5} 
-              onChange={(v) => handleConfigChange('cr', v)}
+            <FormField
+              label="Conv. Rate %"
+              value={config.baselineMetrics.conversionRate || 2.5}
+              onChange={(v) => updateBaselineMetric('conversionRate', v)}
               icon={<TrendingUp className="h-4 w-4" />}
               suffix="%"
             />
           </>
         );
 
-      case 'cpc':
+      case 'CPC':
         return (
           <>
-            <FormField 
-              label="CPC" 
-              value={config.cpc || 0.5} 
-              onChange={(v) => handleConfigChange('cpc', v)}
+            <FormField
+              label="CPC Price"
+              value={config.price || 0.5}
+              onChange={updatePrice}
               icon={<DollarSign className="h-4 w-4" />}
               suffix="per click"
             />
-            <FormField 
-              label="Conv. Rate %" 
-              value={config.cr || 2.5} 
-              onChange={(v) => handleConfigChange('cr', v)}
+            <FormField
+              label="Conv. Rate %"
+              value={config.baselineMetrics.conversionRate || 2.5}
+              onChange={(v) => updateBaselineMetric('conversionRate', v)}
               icon={<TrendingUp className="h-4 w-4" />}
               suffix="%"
             />
           </>
         );
 
-      case 'cpa':
+      case 'CPA':
         return (
           <>
-            <FormField 
-              label="CPA Amount" 
-              value={config.targetCpa || 50} 
-              onChange={(v) => handleConfigChange('targetCpa', v)}
+            <FormField
+              label="Target CPA"
+              value={config.price || 50}
+              onChange={updatePrice}
               icon={<Target className="h-4 w-4" />}
               suffix="per FTD"
             />
-            <FormField 
-              label="Target FTDs" 
-              value={config.targetFtds || 10} 
-              onChange={(v) => handleConfigChange('targetFtds', v)}
-              icon={<Users className="h-4 w-4" />}
-              suffix="players"
-            />
+            {/* Hide CTR, maybe show CR to estimate traffic? */}
+            <div className="text-xs text-muted-foreground mt-2">
+              Based on the budget allocation, we calculate total FTDs using this Target CPA.
+            </div>
           </>
         );
 
-      case 'rev_share':
+      case 'REV_SHARE':
         return (
           <>
-            <FormField 
-              label="RevShare %" 
-              value={config.revSharePercentage || 30} 
-              onChange={(v) => handleConfigChange('revSharePercentage', v)}
+            <FormField
+              label="RevShare %"
+              value={config.secondaryPrice || 30}
+              onChange={updateSecondaryPrice}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
             />
-            <FormField 
-              label="NGR per FTD" 
-              value={config.ngrPerFtd || 150} 
-              onChange={(v) => handleConfigChange('ngrPerFtd', v)}
+            <FormField
+              label="Avg Order Value"
+              value={config.baselineMetrics.aov || 150}
+              onChange={(v) => updateBaselineMetric('aov', v)}
               icon={<DollarSign className="h-4 w-4" />}
-              suffix="revenue"
-            />
-            <FormField 
-              label="Target FTDs" 
-              value={config.targetFtds || 10} 
-              onChange={(v) => handleConfigChange('targetFtds', v)}
-              icon={<Users className="h-4 w-4" />}
-              suffix="players"
+              suffix="per FTD"
             />
           </>
         );
 
-      case 'hybrid':
+      case 'HYBRID':
         return (
           <>
-            <FormField 
-              label="CPA Amount" 
-              value={config.targetCpa || 50} 
-              onChange={(v) => handleConfigChange('targetCpa', v)}
+            <FormField
+              label="Base CPA"
+              value={config.price || 20}
+              onChange={updatePrice}
               icon={<Target className="h-4 w-4" />}
               suffix="per FTD"
             />
-            <FormField 
-              label="RevShare %" 
-              value={config.revSharePercentage || 20} 
-              onChange={(v) => handleConfigChange('revSharePercentage', v)}
+            <FormField
+              label="RevShare %"
+              value={config.secondaryPrice || 20}
+              onChange={updateSecondaryPrice}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
             />
-            <FormField 
-              label="NGR per FTD" 
-              value={config.ngrPerFtd || 150} 
-              onChange={(v) => handleConfigChange('ngrPerFtd', v)}
+            <FormField
+              label="Avg Order Value"
+              value={config.baselineMetrics.aov || 150}
+              onChange={(v) => updateBaselineMetric('aov', v)}
               icon={<DollarSign className="h-4 w-4" />}
-              suffix="revenue"
-            />
-            <FormField 
-              label="Target FTDs" 
-              value={config.targetFtds || 10} 
-              onChange={(v) => handleConfigChange('targetFtds', v)}
-              icon={<Users className="h-4 w-4" />}
-              suffix="players"
+              suffix="per FTD"
             />
           </>
         );
 
-      case 'flat_fee':
+      case 'FLAT_FEE':
+      case 'RETAINER':
         return (
           <>
-            <FormField 
-              label="Fixed Cost" 
-              value={config.fixedCost || 1000} 
-              onChange={(v) => handleConfigChange('fixedCost', v)}
-              icon={<DollarSign className="h-4 w-4" />}
-              suffix="monthly"
-            />
-            <FormField 
-              label="Est. FTDs" 
-              value={config.estFtds || 5} 
-              onChange={(v) => handleConfigChange('estFtds', v)}
-              icon={<Users className="h-4 w-4" />}
-              suffix="players"
-            />
-          </>
-        );
-
-      case 'retainer':
-        return (
-          <>
-            <FormField 
-              label="Monthly Retainer" 
-              value={config.fixedCost || 2000} 
-              onChange={(v) => handleConfigChange('fixedCost', v)}
-              icon={<DollarSign className="h-4 w-4" />}
-              suffix="monthly"
-            />
-            <FormField 
-              label="Est. Traffic" 
-              value={config.estTraffic || 5000} 
-              onChange={(v) => handleConfigChange('estTraffic', v)}
-              icon={<Zap className="h-4 w-4" />}
-              suffix="visits"
-            />
-            <FormField 
-              label="Conv. Rate %" 
-              value={config.cr || 2} 
-              onChange={(v) => handleConfigChange('cr', v)}
-              icon={<TrendingUp className="h-4 w-4" />}
-              suffix="%"
-            />
-          </>
-        );
-
-      case 'unit_based':
-        return (
-          <>
-            <FormField 
-              label="Number of Units" 
-              value={config.unitCount || 4} 
-              onChange={(v) => handleConfigChange('unitCount', v)}
-              icon={<FileText className="h-4 w-4" />}
-              suffix="posts"
-            />
-            <FormField 
-              label="Cost per Unit" 
-              value={config.costPerUnit || 500} 
-              onChange={(v) => handleConfigChange('costPerUnit', v)}
-              icon={<DollarSign className="h-4 w-4" />}
-              suffix="each"
-            />
-            <FormField 
-              label="Est. Reach/Unit" 
-              value={config.estReachPerUnit || 50000} 
-              onChange={(v) => handleConfigChange('estReachPerUnit', v)}
-              icon={<Zap className="h-4 w-4" />}
-              suffix="views"
-            />
-            <FormField 
-              label="CTR %" 
-              value={config.ctr || 2} 
-              onChange={(v) => handleConfigChange('ctr', v)}
-              icon={<Percent className="h-4 w-4" />}
-              suffix="%"
-            />
-            <FormField 
-              label="Conv. Rate %" 
-              value={config.cr || 1} 
-              onChange={(v) => handleConfigChange('cr', v)}
-              icon={<TrendingUp className="h-4 w-4" />}
-              suffix="%"
-            />
-          </>
-        );
-
-      case 'cpl':
-        return (
-          <>
-            <FormField 
-              label="CPL" 
-              value={config.cpl || 5} 
-              onChange={(v) => handleConfigChange('cpl', v)}
-              icon={<DollarSign className="h-4 w-4" />}
-              suffix="per lead"
-            />
-            <FormField 
-              label="Lead → FTD %" 
-              value={config.leadToFtdRate || 10} 
-              onChange={(v) => handleConfigChange('leadToFtdRate', v)}
-              icon={<TrendingUp className="h-4 w-4" />}
-              suffix="%"
-            />
-          </>
-        );
-
-      case 'input_based':
-      default:
-        return (
-          <>
-            <FormField 
-              label="Manual Spend" 
-              value={config.fixedCost || 1000} 
-              onChange={(v) => handleConfigChange('fixedCost', v)}
+            <FormField
+              label="Monthly Cost"
+              value={config.price || 1000}
+              onChange={updatePrice}
               icon={<DollarSign className="h-4 w-4" />}
               suffix="total"
             />
-            <FormField 
-              label="Est. FTDs" 
-              value={config.estFtds || 5} 
-              onChange={(v) => handleConfigChange('estFtds', v)}
-              icon={<Users className="h-4 w-4" />}
-              suffix="players"
+            <FormField
+              label="Est. Traffic"
+              value={config.baselineMetrics.trafficPerUnit || 1000}
+              onChange={(v) => updateBaselineMetric('trafficPerUnit', v)}
+              icon={<Zap className="h-4 w-4" />}
+              suffix="visits"
+            />
+            <FormField
+              label="Conv. Rate %"
+              value={config.baselineMetrics.conversionRate || 2.5}
+              onChange={(v) => updateBaselineMetric('conversionRate', v)}
+              icon={<TrendingUp className="h-4 w-4" />}
+              suffix="%"
             />
           </>
         );
+
+      default:
+        return null;
     }
   };
-
-  // Calculate deal summary for affiliates
-  const dealSummary = useMemo(() => {
-    if (family !== 'affiliate') return null;
-    
-    const ftds = config.targetFtds || 10;
-    let totalPerPlayer = 0;
-    let breakdown = '';
-    
-    switch (buyingModel) {
-      case 'cpa':
-        totalPerPlayer = config.targetCpa || 50;
-        breakdown = `${formatCurrency(totalPerPlayer)} CPA`;
-        break;
-      case 'rev_share':
-        const rsAmount = (config.ngrPerFtd || 150) * ((config.revSharePercentage || 30) / 100);
-        totalPerPlayer = rsAmount;
-        breakdown = `${config.revSharePercentage || 30}% of ${formatCurrency(config.ngrPerFtd || 150)} NGR`;
-        break;
-      case 'hybrid':
-        const cpaPart = config.targetCpa || 50;
-        const rsPart = (config.ngrPerFtd || 150) * ((config.revSharePercentage || 20) / 100);
-        totalPerPlayer = cpaPart + rsPart;
-        breakdown = `${formatCurrency(cpaPart)} CPA + ${formatCurrency(rsPart)} RS`;
-        break;
-      case 'flat_fee':
-        totalPerPlayer = (config.fixedCost || 1000) / (config.estFtds || 5);
-        breakdown = `${formatCurrency(config.fixedCost || 1000)} ÷ ${config.estFtds || 5} FTDs`;
-        break;
-    }
-    
-    return { totalPerPlayer, breakdown };
-  }, [family, buyingModel, config, formatCurrency]);
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
@@ -471,50 +319,22 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
             </div>
           </div>
 
-          {/* Deal Summary Card (Affiliates Only) */}
-          {dealSummary && (
-            <>
-              <Separator />
-              <Card className="bg-primary/5 border-primary/20">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <Target className="h-4 w-4 text-primary" />
-                    Deal Summary
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm text-muted-foreground">Payout per Player:</span>
-                      <span className="font-mono font-bold text-primary">
-                        {formatCurrency(dealSummary.totalPerPlayer)}
-                      </span>
-                    </div>
-                    <div className="text-xs text-muted-foreground">
-                      {dealSummary.breakdown}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </>
-          )}
-
           {/* Live Preview */}
           <Separator />
           <Card className="bg-muted/30">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium">Projected Metrics (Sample)</CardTitle>
+              <CardTitle className="text-sm font-medium">Projected Metrics (Sample $10k Budget)</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <MetricRow label="Spend" value={formatCurrency(previewMetrics.spend)} />
                 <MetricRow label="FTDs" value={previewMetrics.ftds.toFixed(0)} />
-                <MetricRow 
-                  label="CPA" 
-                  value={previewMetrics.cpa ? formatCurrency(previewMetrics.cpa) : 'N/A'} 
+                <MetricRow
+                  label="CPA"
+                  value={previewMetrics.cpa ? formatCurrency(previewMetrics.cpa) : 'N/A'}
                 />
-                <MetricRow 
-                  label="ROAS" 
+                <MetricRow
+                  label="ROAS"
                   value={`${previewMetrics.roas.toFixed(1)}x`}
                   highlight={previewMetrics.roas >= 2}
                 />
@@ -528,15 +348,15 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
 }
 
 // Helper Components
-function FormField({ 
-  label, 
-  value, 
-  onChange, 
+function FormField({
+  label,
+  value,
+  onChange,
   icon,
-  suffix 
-}: { 
-  label: string; 
-  value: number; 
+  suffix
+}: {
+  label: string;
+  value: number;
   onChange: (v: number) => void;
   icon?: React.ReactNode;
   suffix?: string;
@@ -569,13 +389,13 @@ function FormField({
   );
 }
 
-function MetricRow({ 
-  label, 
-  value, 
-  highlight 
-}: { 
-  label: string; 
-  value: string; 
+function MetricRow({
+  label,
+  value,
+  highlight
+}: {
+  label: string;
+  value: string;
   highlight?: boolean;
 }) {
   return (

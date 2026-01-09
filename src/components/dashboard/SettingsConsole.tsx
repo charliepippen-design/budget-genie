@@ -23,6 +23,7 @@ import {
   MoreHorizontal,
   Minimize2,
   Wand2,
+  Settings2
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -70,9 +71,11 @@ import {
   useMediaPlanStore,
   useChannelsWithMetrics,
   ChannelWithMetrics,
-  ImpressionMode,
+  ChannelData,
 } from '@/hooks/use-media-plan-store';
+import { ChannelEditor } from './ChannelEditor';
 import { useToast } from '@/hooks/use-toast';
+import { BuyingModel, BUYING_MODEL_INFO, FAMILY_INFO, inferChannelFamily, inferBuyingModel, getLikelyModel } from '@/types/channel';
 
 // Helper component for "Breathing Room" inputs
 function SmartInput({
@@ -98,15 +101,13 @@ function SmartInput({
 
   // Sync local value when external value changes (unless we are editing)
   useEffect(() => {
-    // Only update if the parsed local value is different from new value
-    // to avoid cursor jumping or overwrite if they are equivalent
     const parsed = parseFloat(localValue);
     if (value === null || value === undefined) {
       if (localValue !== '') setLocalValue('');
     } else if (parsed !== value) {
       setLocalValue(value.toString());
     }
-  }, [value]); // relying only on value change
+  }, [value]);
 
   const handleBlur = () => {
     if (localValue === '') {
@@ -115,18 +116,14 @@ function SmartInput({
     }
     let num = parseFloat(localValue);
     if (isNaN(num)) {
-      // Revert to original
       setLocalValue(value?.toString() ?? '');
       return;
     }
 
-    // Clamp
     if (min !== undefined) num = Math.max(min, num);
     if (max !== undefined) num = Math.min(max, num);
 
-    // Update parent
     onChange(num);
-    // Update local to match clamped
     setLocalValue(num.toString());
   };
 
@@ -149,16 +146,12 @@ export function SettingsConsole() {
   const [newPresetName, setNewPresetName] = useState('');
   const [isAddChannelOpen, setIsAddChannelOpen] = useState(false);
   const [isDistributeWizardOpen, setIsDistributeWizardOpen] = useState(false);
-  const [newChannel, setNewChannel] = useState({
-    name: '',
-    category: 'Display/Programmatic' as ChannelCategory,
-    baseCpm: 5,
-    baseCtr: 1,
-    baseCr: 2.5,
-    baseRoas: 2,
-    impressionMode: 'CPM' as ImpressionMode,
-    fixedImpressions: 100000,
-  });
+
+  // New Channel State
+  const [newChannelName, setNewChannelName] = useState('');
+  const [newChannelCategory, setNewChannelCategory] = useState<ChannelCategory>('Display/Programmatic');
+  const [newChannelModel, setNewChannelModel] = useState<BuyingModel>('CPM');
+  const [newChannelPrice, setNewChannelPrice] = useState(5);
 
   const { toast } = useToast();
   const { symbol, format: formatCurrency } = useCurrency();
@@ -174,9 +167,8 @@ export function SettingsConsole() {
     setAllocations,
     normalizeAllocations,
     toggleChannelLock,
-    updateChannelOverride,
-    setImpressionMode,
-    setFixedImpressions,
+    updateChannelTypeConfig,
+    updateChannelConfigField,
     addChannel,
     deleteChannel,
     rebalanceToTargets,
@@ -193,26 +185,43 @@ export function SettingsConsole() {
   const hasTargets = globalMultipliers.cpaTarget !== null || globalMultipliers.roasTarget !== null;
   const hasPoorPerformers = channelsWithMetrics.some((ch) => ch.aboveCpaTarget || ch.belowRoasTarget);
 
+  // Auto-set model when category changes
+  useEffect(() => {
+    const likely = getLikelyModel(newChannelCategory);
+    setNewChannelModel(likely);
+  }, [newChannelCategory]);
+
   const handleAddChannel = useCallback(() => {
-    if (!newChannel.name.trim()) {
+    if (!newChannelName.trim()) {
       toast({ title: 'Error', description: 'Channel name is required', variant: 'destructive' });
       return;
     }
 
-    addChannel(newChannel);
-    setNewChannel({
-      name: '',
-      category: 'Display/Programmatic',
-      baseCpm: 5,
-      baseCtr: 1,
-      baseCr: 2.5,
-      baseRoas: 2,
-      impressionMode: 'CPM',
-      fixedImpressions: 100000,
+    // Construct new channel data
+    const family = inferChannelFamily(newChannelName);
+
+    addChannel({
+      name: newChannelName,
+      category: newChannelCategory,
+      family,
+      buyingModel: newChannelModel,
+      typeConfig: {
+        family,
+        buyingModel: newChannelModel,
+        price: newChannelPrice,
+        baselineMetrics: {
+          ctr: 1.0,
+          conversionRate: 2.5,
+          aov: 150
+        }
+      }
     });
+
+    setNewChannelName('');
+    setNewChannelPrice(5);
     setIsAddChannelOpen(false);
-    toast({ title: 'Channel Added', description: `${newChannel.name} has been added.` });
-  }, [addChannel, newChannel, toast]);
+    toast({ title: 'Channel Added', description: `${newChannelName} has been added.` });
+  }, [addChannel, newChannelName, newChannelCategory, newChannelModel, newChannelPrice, toast]);
 
   const handleSavePreset = useCallback(() => {
     if (!newPresetName.trim()) {
@@ -243,15 +252,6 @@ export function SettingsConsole() {
         <Separator className="bg-sidebar-border w-8" />
         <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Settings Console">
           <Settings className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Budget">
-          <DollarSign className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Multipliers">
-          <Sliders className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent" title="Channels">
-          <Layers className="h-4 w-4" />
         </Button>
       </div>
     );
@@ -310,97 +310,48 @@ export function SettingsConsole() {
                   </div>
                 </div>
 
-                {/* Channel Allocations */}
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="flex items-center gap-2">
-                      <Label className="text-xs text-sidebar-foreground/70">Channel Allocations</Label>
-                      <Badge
-                        variant={Math.abs(allocationTotal - 100) < 0.1 ? "default" : "destructive"}
-                        className="font-mono text-xs"
-                      >
-                        {allocationTotal.toFixed(1)}%
-                      </Badge>
-                    </div>
-
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={normalizeAllocations}>
-                          <Minimize2 className="mr-2 h-4 w-4" />
-                          <span>Normalize</span>
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsDistributeWizardOpen(true)}>
-                          <Wand2 className="mr-2 h-4 w-4" />
-                          <span>Auto-Distribute</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <DistributionWizard
-                      channels={channels}
-                      onApply={setAllocations}
-                      open={isDistributeWizardOpen}
-                      onOpenChange={setIsDistributeWizardOpen}
-                      showTrigger={false}
-                    />
-                  </div>
-
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {channelsWithMetrics.map((channel) => (
-                      <div key={channel.id} className="space-y-1">
-                        <div className="flex justify-between items-center gap-1">
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-5 w-5 shrink-0"
-                                onClick={() => toggleChannelLock(channel.id)}
-                              >
-                                {channel.locked ? (
-                                  <Lock className="h-3 w-3 text-warning" />
-                                ) : (
-                                  <Unlock className="h-3 w-3 text-sidebar-foreground/40" />
-                                )}
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Click to lock this channel's budget %</TooltipContent>
-                          </Tooltip>
-                          <span
-                            className={cn(
-                              "text-xs truncate flex-1",
-                              channel.aboveCpaTarget || channel.belowRoasTarget
-                                ? "text-destructive"
-                                : "text-sidebar-foreground/70"
-                            )}
-                            title={channel.name}
-                          >
-                            {channel.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
-                          </span>
-                          <span className="text-xs font-mono text-sidebar-foreground w-12 text-right">
-                            {channel.allocationPct.toFixed(1)}%
-                          </span>
-                        </div>
-                        <Slider
-                          value={[channel.allocationPct]}
-                          onValueChange={([v]) => setChannelAllocation(channel.id, v)}
-                          min={0}
-                          max={100}
-                          step={0.5}
-                          className="w-full"
-                          disabled={channel.locked}
-                        />
-                      </div>
-                    ))}
+                {/* Automation Tools */}
+                <div className="flex justify-between items-center bg-sidebar-accent/50 p-2 rounded-md">
+                  <span className="text-xs text-muted-foreground">Tools</span>
+                  <div className="flex gap-2">
+                    <Button variant="ghost" size="icon" onClick={() => setIsDistributeWizardOpen(true)} title="Auto Distribute">
+                      <Wand2 className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={normalizeAllocations} title="Normalize to 100%">
+                      <Minimize2 className="h-4 w-4" />
+                    </Button>
                   </div>
                 </div>
+                <DistributionWizard
+                  channels={channels}
+                  onApply={setAllocations}
+                  open={isDistributeWizardOpen}
+                  onOpenChange={setIsDistributeWizardOpen}
+                  showTrigger={false}
+                />
+
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+                  {channelsWithMetrics.map((channel) => (
+                    <div key={channel.id} className="flex items-center gap-2 text-xs">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-4 w-4 shrink-0"
+                        onClick={() => toggleChannelLock(channel.id)}
+                      >
+                        {channel.locked ? <Lock className="h-3 w-3 text-warning" /> : <Unlock className="h-3 w-3 text-muted-foreground" />}
+                      </Button>
+                      <span className="truncate flex-1">{channel.name}</span>
+                      <span className={cn(
+                        "font-mono w-10 text-right",
+                        (channel.aboveCpaTarget || channel.belowRoasTarget) ? "text-destructive" : "text-muted-foreground"
+                      )}>
+                        {channel.allocationPct.toFixed(1)}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
               </AccordionContent>
             </AccordionItem>
 
@@ -446,7 +397,7 @@ export function SettingsConsole() {
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
                   </div>
-                  <p className="text-xs text-sidebar-foreground/50">Only applies to channels without CPM override</p>
+                  <p className="text-xs text-sidebar-foreground/50">Overrules CPM channels</p>
                 </div>
 
                 {/* CTR Bump */}
@@ -465,10 +416,6 @@ export function SettingsConsole() {
                     step={0.1}
                     className="w-full"
                   />
-                  <div className="flex justify-between text-xs text-sidebar-foreground/50">
-                    <span>-2%</span>
-                    <span>+2%</span>
-                  </div>
                 </div>
 
                 <Separator className="bg-sidebar-border" />
@@ -530,12 +477,12 @@ export function SettingsConsole() {
               </AccordionContent>
             </AccordionItem>
 
-            {/* Channel Editor */}
+            {/* Channel List / Editor */}
             <AccordionItem value="channels" className="border border-sidebar-border rounded-lg overflow-hidden bg-sidebar-accent/30">
               <AccordionTrigger className="px-4 py-3 hover:bg-sidebar-accent/50 hover:no-underline">
                 <div className="flex items-center gap-2">
                   <Layers className="h-4 w-4 text-sidebar-primary" />
-                  <span className="text-sm font-medium text-sidebar-foreground">Channel Editor</span>
+                  <span className="text-sm font-medium text-sidebar-foreground">Channels</span>
                   <Badge variant="secondary" className="text-xs">{channels.length}</Badge>
                 </div>
               </AccordionTrigger>
@@ -543,12 +490,9 @@ export function SettingsConsole() {
                 {/* Channel List */}
                 <div className="space-y-2 max-h-80 overflow-y-auto">
                   {channelsWithMetrics.map((channel) => (
-                    <ChannelEditorItem
+                    <ChannelListItem
                       key={channel.id}
                       channel={channel}
-                      updateChannelOverride={updateChannelOverride}
-                      setImpressionMode={setImpressionMode}
-                      setFixedImpressions={setFixedImpressions}
                       deleteChannel={deleteChannel}
                     />
                   ))}
@@ -570,23 +514,23 @@ export function SettingsConsole() {
                     <DialogHeader>
                       <DialogTitle>Add New Channel</DialogTitle>
                       <DialogDescription>
-                        Create a new marketing channel with custom KPIs.
+                        Create a new marketing channel. You can configure precise KPIs after adding.
                       </DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
                       <div className="space-y-2">
                         <Label>Channel Name</Label>
                         <Input
-                          value={newChannel.name}
-                          onChange={(e) => setNewChannel(prev => ({ ...prev, name: e.target.value }))}
+                          value={newChannelName}
+                          onChange={(e) => setNewChannelName(e.target.value)}
                           placeholder="e.g., TikTok Ads"
                         />
                       </div>
                       <div className="space-y-2">
                         <Label>Category</Label>
                         <Select
-                          value={newChannel.category}
-                          onValueChange={(v) => setNewChannel(prev => ({ ...prev, category: v as ChannelCategory }))}
+                          value={newChannelCategory}
+                          onValueChange={(v) => setNewChannelCategory(v as ChannelCategory)}
                         >
                           <SelectTrigger>
                             <SelectValue />
@@ -598,74 +542,34 @@ export function SettingsConsole() {
                           </SelectContent>
                         </Select>
                       </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label>CPM ({symbol})</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={newChannel.baseCpm}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCpm: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>CTR (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={newChannel.baseCtr}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCtr: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Conv. Rate (%)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={newChannel.baseCr}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseCr: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>ROAS (x)</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            step="0.1"
-                            value={newChannel.baseRoas}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, baseRoas: Math.max(0, parseFloat(e.target.value) || 0) }))}
-                          />
-                        </div>
-                      </div>
+
                       <div className="space-y-2">
-                        <Label>Impression Mode</Label>
+                        <Label>Buying Model</Label>
                         <Select
-                          value={newChannel.impressionMode}
-                          onValueChange={(v) => setNewChannel(prev => ({ ...prev, impressionMode: v as ImpressionMode }))}
+                          value={newChannelModel}
+                          onValueChange={(v) => setNewChannelModel(v as BuyingModel)}
                         >
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="CPM">CPM-based (dynamic)</SelectItem>
-                            <SelectItem value="FIXED">Fixed Impressions</SelectItem>
+                            {Object.entries(BUYING_MODEL_INFO).map(([key, info]) => (
+                              <SelectItem key={key} value={key}>{info.name}</SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </div>
-                      {newChannel.impressionMode === 'FIXED' && (
-                        <div className="space-y-2">
-                          <Label>Fixed Impressions</Label>
-                          <Input
-                            type="number"
-                            min="0"
-                            value={newChannel.fixedImpressions}
-                            onChange={(e) => setNewChannel(prev => ({ ...prev, fixedImpressions: Math.max(0, parseInt(e.target.value) || 0) }))}
-                          />
-                        </div>
-                      )}
+
+                      <div className="space-y-2">
+                        <Label>Price / Base Cost</Label>
+                        <Input
+                          type="number"
+                          value={newChannelPrice}
+                          onChange={(e) => setNewChannelPrice(parseFloat(e.target.value) || 0)}
+                        />
+                        <p className="text-xs text-muted-foreground">Acts as CPM, CPC, CPA, or Monthly Fee depending on model.</p>
+                      </div>
+
                     </div>
                     <DialogFooter>
                       <Button variant="outline" onClick={() => setIsAddChannelOpen(false)}>
@@ -733,23 +637,14 @@ export function SettingsConsole() {
   );
 }
 
-// Channel Editor Item Component
-function ChannelEditorItem({
+function ChannelListItem({
   channel,
-  updateChannelOverride,
-  setImpressionMode,
-  setFixedImpressions,
   deleteChannel,
 }: {
   channel: ChannelWithMetrics;
-  updateChannelOverride: (id: string, updates: any) => void;
-  setImpressionMode: (id: string, mode: ImpressionMode) => void;
-  setFixedImpressions: (id: string, impressions: number) => void;
   deleteChannel: (id: string) => void;
 }) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const { toast } = useToast();
-  const { symbol } = useCurrency();
 
   const handleDelete = () => {
     deleteChannel(channel.id);
@@ -757,195 +652,45 @@ function ChannelEditorItem({
   };
 
   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
-  const [isMounting, setIsMounting] = useState(true);
-
-  useEffect(() => {
-    // Remove mounting class after animation
-    const t = setTimeout(() => setIsMounting(false), 500);
-    return () => clearTimeout(t);
-  }, []);
 
   return (
     <div
       className={cn(
-        "rounded-lg border transition-all duration-500",
+        "rounded-lg border transition-all duration-300",
         "bg-sidebar-accent/50 border-sidebar-border",
-        isWarning && "border-destructive/50 bg-destructive/10",
-        isExpanded && "bg-sidebar-accent",
-        isMounting && "animate-pulse scale-[1.02] bg-blue-500/20 border-blue-500/50"
+        isWarning && "border-destructive/50 bg-destructive/10"
       )}
     >
-      <div
-        className="flex items-center justify-between p-2 cursor-pointer"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
+      <div className="flex items-center justify-between p-2">
         <div className="flex items-center gap-2 min-w-0">
           <div
             className="w-2 h-2 rounded-full shrink-0"
             style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color }}
           />
           <span className={cn(
-            "text-xs truncate",
+            "text-xs truncate max-w-[120px]",
             isWarning ? "text-destructive" : "text-sidebar-foreground"
           )}>
-            {channel.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
+            {channel.name}
           </span>
-          {isWarning && (
-            <AlertTriangle className="h-3 w-3 text-destructive shrink-0" />
-          )}
+          <Badge variant="outline" className="text-[10px] px-1 py-0 h-4 scale-90 origin-left">
+            {channel.buyingModel || 'CPM'}
+          </Badge>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/20"
-          onClick={(e) => {
-            e.stopPropagation();
-            handleDelete();
-          }}
-        >
-          <Trash2 className="h-3 w-3" />
-        </Button>
+
+        <div className="flex items-center gap-1">
+          <ChannelEditor channel={channel} />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 text-sidebar-foreground/50 hover:text-destructive hover:bg-destructive/20"
+            onClick={handleDelete}
+          >
+            <Trash2 className="h-3 w-3" />
+          </Button>
+        </div>
       </div>
-
-      {isExpanded && (
-        <div className="px-2 pb-2 space-y-3 border-t border-sidebar-border/50 pt-2">
-          {/* Name */}
-          <div className="space-y-1">
-            <Label className="text-xs text-sidebar-foreground/60">Name</Label>
-            <Input
-              value={channel.name}
-              onChange={(e) => updateChannelOverride(channel.id, { name: e.target.value })}
-              className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-            />
-          </div>
-
-          {/* Category */}
-          <div className="space-y-1">
-            <Label className="text-xs text-sidebar-foreground/60">Category</Label>
-            <Select
-              value={channel.category}
-              onValueChange={(v) => updateChannelOverride(channel.id, { category: v as ChannelCategory })}
-            >
-              <SelectTrigger className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(CATEGORY_INFO).map(([key, info]) => (
-                  <SelectItem key={key} value={key}>{info.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* Impression Mode */}
-          <div className="space-y-1">
-            <Label className="text-xs text-sidebar-foreground/60">Impression Mode</Label>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={channel.impressionMode === 'FIXED'}
-                onCheckedChange={(checked) => setImpressionMode(channel.id, checked ? 'FIXED' : 'CPM')}
-              />
-              <span className="text-xs text-sidebar-foreground">
-                {channel.impressionMode === 'FIXED' ? 'Fixed Impressions' : 'CPM-based'}
-              </span>
-            </div>
-          </div>
-
-          {channel.impressionMode === 'FIXED' && (
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">Fixed Impressions</Label>
-              <Input
-                type="number"
-                min="0"
-                value={channel.fixedImpressions}
-                onChange={(e) => setFixedImpressions(channel.id, Math.max(0, parseInt(e.target.value) || 0))}
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-          )}
-
-          {/* KPI Overrides Grid */}
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">CPM ({symbol})</Label>
-              <Input
-                type="number"
-                min="0"
-                step="0.1"
-                value={channel.overrideCpm ?? channel.baseCpm}
-                onChange={(e) => {
-                  const val = parseFloat(e.target.value);
-                  updateChannelOverride(channel.id, {
-                    overrideCpm: isNaN(val) ? null : Math.max(0, val)
-                  });
-                }}
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">CTR (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={channel.overrideCtr ?? channel.baseCtr}
-                onChange={(e) => updateChannelOverride(channel.id, {
-                  overrideCtr: e.target.value ? parseFloat(e.target.value) : null
-                })}
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">Conv. Rate (%)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={channel.overrideCr ?? channel.baseCr}
-                onChange={(e) => updateChannelOverride(channel.id, {
-                  overrideCr: e.target.value ? parseFloat(e.target.value) : null
-                })}
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs text-sidebar-foreground/60">ROAS (x)</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={channel.overrideRoas ?? channel.baseRoas}
-                onChange={(e) => updateChannelOverride(channel.id, {
-                  overrideRoas: e.target.value ? parseFloat(e.target.value) : null
-                })}
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-            <div className="space-y-1 col-span-2">
-              <Label className="text-xs text-sidebar-foreground/60">CPA Override ({symbol})</Label>
-              <Input
-                type="number"
-                step="0.1"
-                value={channel.overrideCpa ?? ''}
-                onChange={(e) => updateChannelOverride(channel.id, {
-                  overrideCpa: e.target.value ? parseFloat(e.target.value) : null
-                })}
-                placeholder="Auto-calculated"
-                className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
-              />
-            </div>
-          </div>
-
-          {/* Warnings */}
-          {channel.warnings.length > 0 && (
-            <div className="space-y-1 pt-1">
-              {channel.warnings.map((warning, i) => (
-                <div key={i} className="flex items-center gap-1 text-xs text-destructive">
-                  <AlertTriangle className="h-3 w-3" />
-                  <span>{warning}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
     </div>
   );
 }

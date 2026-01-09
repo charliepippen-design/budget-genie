@@ -1,7 +1,7 @@
 // ========== CHANNEL TYPE DEFINITIONS ==========
 // Polymorphic channel model for multi-model media planning
 
-export type ChannelFamily = 
+export type ChannelFamily =
   | 'paid_media'    // PPC, Display, Social
   | 'affiliate'     // Networks, Partners
   | 'influencer'    // Creators, Streamers
@@ -9,66 +9,63 @@ export type ChannelFamily =
   | 'pr_brand'      // Offline, Press, Sponsorships
   | 'email_crm';    // Database marketing
 
-export type BuyingModel = 
-  | 'cpm'           // Cost per Mille (Display)
-  | 'cpc'           // Cost per Click (Search)
-  | 'cpa'           // Cost per Acquisition (Affiliate Standard)
-  | 'cpl'           // Cost per Lead (CRM/sweeps)
-  | 'rev_share'     // % of NGR (Affiliate RS)
-  | 'hybrid'        // CPA + RevShare (Affiliate Hybrid)
-  | 'flat_fee'      // Fixed listing/tenancy (Affiliate/Sponsorship)
-  | 'retainer'      // Monthly Agency Fee (SEO/PR)
-  | 'unit_based'    // Per Post/Article (Influencer/Content)
-  | 'input_based';  // Manual Spend + Manual Traffic input (General)
+export type BuyingModel =
+  | 'CPM'
+  | 'CPC'
+  | 'CPA'
+  | 'REV_SHARE'
+  | 'HYBRID'
+  | 'FLAT_FEE'
+  | 'RETAINER';
 
 // ========== FAMILY METADATA ==========
 
-export const FAMILY_INFO: Record<ChannelFamily, { 
-  name: string; 
-  defaultModel: BuyingModel; 
+export const FAMILY_INFO: Record<ChannelFamily, {
+  name: string;
+  defaultModel: BuyingModel;
   allowedModels: BuyingModel[];
   icon: string;
   color: string;
 }> = {
-  paid_media: { 
-    name: 'Paid Media', 
-    defaultModel: 'cpm', 
-    allowedModels: ['cpm', 'cpc', 'cpa'],
+  paid_media: {
+    name: 'Paid Media',
+    defaultModel: 'CPM',
+    allowedModels: ['CPM', 'CPC', 'CPA'],
     icon: 'Megaphone',
     color: 'hsl(var(--chart-2))'
   },
-  affiliate: { 
-    name: 'Affiliates', 
-    defaultModel: 'cpa', 
-    allowedModels: ['cpa', 'rev_share', 'hybrid', 'flat_fee'],
+  affiliate: {
+    name: 'Affiliates',
+    defaultModel: 'CPA',
+    allowedModels: ['CPA', 'REV_SHARE', 'HYBRID', 'FLAT_FEE'],
     icon: 'Users',
     color: 'hsl(var(--chart-3))'
   },
-  influencer: { 
-    name: 'Influencers', 
-    defaultModel: 'unit_based', 
-    allowedModels: ['unit_based', 'flat_fee', 'rev_share', 'hybrid'],
+  influencer: {
+    name: 'Influencers',
+    defaultModel: 'FLAT_FEE',
+    allowedModels: ['FLAT_FEE', 'REV_SHARE', 'HYBRID', 'CPM'],
     icon: 'Star',
     color: 'hsl(var(--chart-4))'
   },
-  seo_content: { 
-    name: 'SEO & Content', 
-    defaultModel: 'retainer', 
-    allowedModels: ['retainer', 'unit_based', 'input_based'],
+  seo_content: {
+    name: 'SEO & Content',
+    defaultModel: 'RETAINER',
+    allowedModels: ['RETAINER', 'FLAT_FEE'],
     icon: 'Search',
     color: 'hsl(var(--chart-1))'
   },
-  pr_brand: { 
-    name: 'PR & Brand', 
-    defaultModel: 'flat_fee', 
-    allowedModels: ['flat_fee', 'retainer', 'unit_based'],
+  pr_brand: {
+    name: 'PR & Brand',
+    defaultModel: 'FLAT_FEE',
+    allowedModels: ['FLAT_FEE', 'RETAINER'],
     icon: 'Award',
     color: 'hsl(var(--chart-5))'
   },
-  email_crm: { 
-    name: 'Email & CRM', 
-    defaultModel: 'cpl', 
-    allowedModels: ['cpl', 'cpm', 'input_based'],
+  email_crm: {
+    name: 'Email & CRM',
+    defaultModel: 'CPM',
+    allowedModels: ['CPM', 'FLAT_FEE'],
     icon: 'Mail',
     color: 'hsl(var(--chart-6))'
   },
@@ -77,92 +74,53 @@ export const FAMILY_INFO: Record<ChannelFamily, {
 export const BUYING_MODEL_INFO: Record<BuyingModel, {
   name: string;
   description: string;
-  requiredFields: string[];
 }> = {
-  cpm: {
+  CPM: {
     name: 'CPM',
     description: 'Cost per 1,000 impressions',
-    requiredFields: ['cpm', 'ctr', 'cr'],
   },
-  cpc: {
+  CPC: {
     name: 'CPC',
     description: 'Cost per click',
-    requiredFields: ['cpc', 'cr'],
   },
-  cpa: {
+  CPA: {
     name: 'CPA',
-    description: 'Cost per acquisition/FTD',
-    requiredFields: ['targetCpa', 'targetFtds'],
+    description: 'Cost per acquisition',
   },
-  cpl: {
-    name: 'CPL',
-    description: 'Cost per lead',
-    requiredFields: ['cpl', 'leadToFtdRate'],
-  },
-  rev_share: {
+  REV_SHARE: {
     name: 'Revenue Share',
-    description: 'Percentage of player revenue',
-    requiredFields: ['revSharePercentage', 'ngrPerFtd', 'targetFtds'],
+    description: 'Percentage of revenue',
   },
-  hybrid: {
+  HYBRID: {
     name: 'Hybrid',
-    description: 'CPA + Revenue Share combined',
-    requiredFields: ['targetCpa', 'revSharePercentage', 'ngrPerFtd', 'targetFtds'],
+    description: 'CPA + RevShare combined',
   },
-  flat_fee: {
+  FLAT_FEE: {
     name: 'Flat Fee',
-    description: 'Fixed cost listing/tenancy',
-    requiredFields: ['fixedCost', 'estFtds'],
+    description: 'Fixed cost',
   },
-  retainer: {
+  RETAINER: {
     name: 'Retainer',
-    description: 'Monthly fixed agency fee',
-    requiredFields: ['fixedCost', 'estTraffic', 'cr'],
-  },
-  unit_based: {
-    name: 'Unit Based',
-    description: 'Cost per post/article/video',
-    requiredFields: ['unitCount', 'costPerUnit', 'estReachPerUnit', 'ctr', 'cr'],
-  },
-  input_based: {
-    name: 'Manual Input',
-    description: 'Manual spend and traffic entry',
-    requiredFields: ['fixedCost', 'estFtds'],
+    description: 'Monthly fixed fee',
   },
 };
 
 // ========== EXTENDED CHANNEL INTERFACE ==========
 
 export interface ChannelTypeConfig {
-  // Core type info
   family: ChannelFamily;
   buyingModel: BuyingModel;
-  
-  // Performance Model Fields (CPM/CPC)
-  cpm?: number;           // CPM rate
-  cpc?: number;           // CPC rate
-  ctr?: number;           // Click-through rate %
-  cr?: number;            // Conversion/FTD rate %
-  
-  // Affiliate Fields
-  targetCpa?: number;     // CPA amount for CPA deals
-  revSharePercentage?: number;  // 0-100 for rev share
-  ngrPerFtd?: number;     // Net Gaming Revenue per player
-  targetFtds?: number;    // Expected FTDs (reverse calc)
-  
-  // Production Fields (Influencer/Content)
-  unitCount?: number;     // Number of posts/articles
-  costPerUnit?: number;   // Fee per unit
-  estReachPerUnit?: number;   // Est. impressions per unit
-  
-  // Retainer/Fixed Fields
-  fixedCost?: number;     // Monthly fee or listing cost
-  estTraffic?: number;    // Estimated traffic/visits
-  estFtds?: number;       // Est. FTDs for fixed cost models
-  
-  // Lead Fields
-  cpl?: number;           // Cost per lead
-  leadToFtdRate?: number; // Lead to FTD conversion %
+
+  // The DNA: Unifying all cost models into one flexible structure
+  price: number;              // Acts as CPM, CPC, CPA, Monthly Fee, or Base CPA
+  secondaryPrice?: number;    // Used as RevShare % for HYBRID/REV_SHARE (0-100)
+
+  baselineMetrics: {
+    ctr?: number;             // % Click Through Rate
+    conversionRate?: number;  // % Conversion Rate (or Lead -> FTD)
+    aov?: number;             // Average Order Value / LTV / NGR per FTD
+    trafficPerUnit?: number;  // Est. Traffic for Flat Fee / Retainer
+  };
 }
 
 // ========== UNIFIED OUTPUT SCHEMA ==========
@@ -181,129 +139,116 @@ export interface UnifiedMetrics {
 
 export function calculateUnifiedMetrics(
   config: ChannelTypeConfig,
-  spend: number,
+  spend: number, // Total annual/input spend
   playerValue: number = 150 // Default LTV per player
 ): UnifiedMetrics {
-  const { buyingModel } = config;
-  
+  const { buyingModel, price, secondaryPrice, baselineMetrics } = config;
+
+  // Defaults
+  const ctr = baselineMetrics.ctr || 1;
+  const cr = baselineMetrics.conversionRate || 2.5;
+  const aov = baselineMetrics.aov || playerValue;
+
   let ftds = 0;
   let impressions = 0;
   let clicks = 0;
-  let finalSpend = spend;
-  
+  let finalSpend = spend; // Default to input spend for budget-based models
+
   switch (buyingModel) {
-    // ========== PERFORMANCE MODELS ==========
-    case 'cpm': {
-      const cpm = config.cpm || 5;
-      const ctr = config.ctr || 1;
-      const cr = config.cr || 2.5;
-      
-      impressions = (spend / cpm) * 1000;
+    case 'CPM': // price = CPM
+      // Math: Budget -> Impr -> Clicks -> Conv
+      // Impressions = (Spend / CPM) * 1000
+      impressions = price > 0 ? (spend / price) * 1000 : 0;
       clicks = impressions * (ctr / 100);
       ftds = clicks * (cr / 100);
       break;
-    }
-    
-    case 'cpc': {
-      const cpc = config.cpc || 0.5;
-      const cr = config.cr || 2.5;
-      
-      clicks = spend / cpc;
+
+    case 'CPC': // price = CPC
+      // Math: Budget -> Clicks -> Conv
+      clicks = price > 0 ? spend / price : 0;
       ftds = clicks * (cr / 100);
-      impressions = clicks * 100; // Assume 1% CTR for impression estimate
+      impressions = clicks * 100; // Estimate
       break;
-    }
-    
-    // ========== AFFILIATE MODELS (REVERSE CALCULATION) ==========
-    case 'cpa': {
-      const targetCpa = config.targetCpa || 50;
-      const targetFtds = config.targetFtds || 10;
-      
-      ftds = targetFtds;
-      finalSpend = ftds * targetCpa;
+
+    case 'CPA': // price = Target CPA
+      // Math: Budget / CPA = Conv
+      ftds = price > 0 ? spend / price : 0;
+      // Reverse calculate impressions for reference
+      clicks = cr > 0 ? (ftds / (cr / 100)) : 0;
+      impressions = ctr > 0 ? (clicks / (ctr / 100)) : 0;
       break;
-    }
-    
-    case 'rev_share': {
-      const revShare = (config.revSharePercentage || 30) / 100;
-      const ngr = config.ngrPerFtd || 150;
-      const targetFtds = config.targetFtds || 10;
-      
-      ftds = targetFtds;
-      finalSpend = ftds * ngr * revShare;
+
+    case 'REV_SHARE': // price = % (Wait, secondaryPrice is %) - Let's use price as dummy or 0? 
+      // The user spec said "secondaryPrice: number (Used ONLY for Hybrid RevShare %)".
+      // But for Pure RevShare, we need a percentage. 
+      // Let's assume price is the percentage if model is REV_SHARE? 
+      // Or maybe secondaryPrice is widely used for percentage.
+      // User Spec: "Add secondaryPrice: number (Used ONLY for Hybrid RevShare %)."
+      // Re-reading user Step 1: "Add price: number (Acts as the CPA, CPM, CPC, or Monthly Fee...)"
+      // For RevShare, usually there is no fixed price, just %. 
+      // Maybe price = 0? And secondaryPrice = %. 
+      // OR price = %. Let's use secondaryPrice for % as per spec for Hybrid.
+      // PROPOSAL: For pure RevShare, stick to secondaryPrice for consistency or use price as the %.
+      // Let's us price as % for purity if secondaryPrice is ONLY for hybrid.
+      // Actually, let's use secondaryPrice for consistency of "Revenue Share %".
+      // But wait, "price" is required.
+      // Let's set price = 0 for Rev Share? 
+      // And use secondaryPrice for the %.
+      // Calculation: Est Revenue -> Cost.
+      // For RevShare, Spend depends on performance. It's usually output driven.
+      // But here we likely input Budget = Estimated Spend.
+      // ftds = (Spend / (AOV * RevShare%)) ? 
+      // Spend = FTDs * AOV * RevShare%
+      // ftds = Spend / (AOV * (secondaryPrice/100))
+      {
+        const rs = (secondaryPrice || 0) / 100;
+        const revenuePerFtd = aov;
+        const costPerFtd = revenuePerFtd * rs;
+        ftds = costPerFtd > 0 ? spend / costPerFtd : 0;
+      }
       break;
-    }
-    
-    case 'hybrid': {
-      const targetCpa = config.targetCpa || 50;
-      const revShare = (config.revSharePercentage || 20) / 100;
-      const ngr = config.ngrPerFtd || 150;
-      const targetFtds = config.targetFtds || 10;
-      
-      ftds = targetFtds;
-      const cpaCost = ftds * targetCpa;
-      const revShareCost = ftds * ngr * revShare;
-      finalSpend = cpaCost + revShareCost;
+
+    case 'HYBRID': // price = Base CPA, secondaryPrice = RevShare %
+      {
+        const baseCpa = price;
+        const rs = (secondaryPrice || 0) / 100;
+        const revenuePerFtd = aov;
+        const totalCostPerFtd = baseCpa + (revenuePerFtd * rs);
+
+        ftds = totalCostPerFtd > 0 ? spend / totalCostPerFtd : 0;
+      }
       break;
-    }
-    
-    case 'flat_fee': {
-      const fixedCost = config.fixedCost || spend;
-      const estFtds = config.estFtds || 5;
-      
-      finalSpend = fixedCost;
-      ftds = estFtds;
+
+    case 'FLAT_FEE': // price = Monthly Cost. 
+      // Budget is FIXED to this amount. 
+      // logic: spend = price.
+      // But here we take 'spend' as arg. 
+      // Usually the store will force spend = price. 
+      // So here we assume spend IS price.
+      finalSpend = price;
+      // Traffic ? baselineMetris.trafficPerUnit?
+      {
+        const traffic = baselineMetrics.trafficPerUnit || 1000;
+        clicks = traffic; // Visits
+        ftds = clicks * (cr / 100);
+      }
       break;
-    }
-    
-    // ========== PRODUCTION MODELS ==========
-    case 'unit_based': {
-      const units = config.unitCount || 1;
-      const costPerUnit = config.costPerUnit || 500;
-      const reachPerUnit = config.estReachPerUnit || 50000;
-      const ctr = config.ctr || 2;
-      const cr = config.cr || 1;
-      
-      finalSpend = units * costPerUnit;
-      impressions = units * reachPerUnit;
-      clicks = impressions * (ctr / 100);
-      ftds = clicks * (cr / 100);
+
+    case 'RETAINER':
+      // Same as Flat Fee
+      finalSpend = price;
+      {
+        const traffic = baselineMetrics.trafficPerUnit || 1000;
+        clicks = traffic;
+        ftds = clicks * (cr / 100);
+      }
       break;
-    }
-    
-    case 'retainer': {
-      const fixedCost = config.fixedCost || spend;
-      const estTraffic = config.estTraffic || 5000;
-      const cr = config.cr || 2;
-      
-      finalSpend = fixedCost;
-      clicks = estTraffic; // Traffic = "clicks" for organic
-      ftds = estTraffic * (cr / 100);
-      break;
-    }
-    
-    // ========== INPUT-BASED ==========
-    case 'input_based': {
-      finalSpend = config.fixedCost || spend;
-      ftds = config.estFtds || 0;
-      break;
-    }
-    
-    // ========== LEAD MODELS ==========
-    case 'cpl': {
-      const cpl = config.cpl || 5;
-      const leadToFtd = config.leadToFtdRate || 10;
-      
-      const leads = spend / cpl;
-      ftds = leads * (leadToFtd / 100);
-      break;
-    }
   }
-  
+
   const revenue = ftds * playerValue;
   const cpa = ftds > 0 ? finalSpend / ftds : null;
   const roas = finalSpend > 0 ? revenue / finalSpend : 0;
-  
+
   return {
     spend: finalSpend,
     ftds,
@@ -319,59 +264,60 @@ export function calculateUnifiedMetrics(
 
 export function inferChannelFamily(name: string): ChannelFamily {
   const lower = name.toLowerCase();
-  
-  // SEO / Content
-  if (lower.includes('seo') || lower.includes('content') || lower.includes('blog') || lower.includes('organic')) {
-    return 'seo_content';
-  }
-  
-  // Affiliates
-  if (lower.includes('affiliate') || lower.includes('partner') || lower.includes('listing') || lower.includes('cpa commission')) {
-    return 'affiliate';
-  }
-  
-  // Influencers
-  if (lower.includes('influencer') || lower.includes('twitch') || lower.includes('tiktok') || 
-      lower.includes('youtube') || lower.includes('ambassador') || lower.includes('streamer')) {
-    return 'influencer';
-  }
-  
-  // PR / Brand
-  if (lower.includes('pr') || lower.includes('press') || lower.includes('sponsor') || 
-      lower.includes('brand') || lower.includes('offline')) {
-    return 'pr_brand';
-  }
-  
-  // Email / CRM
-  if (lower.includes('email') || lower.includes('crm') || lower.includes('newsletter') || 
-      lower.includes('database') || lower.includes('retention')) {
-    return 'email_crm';
-  }
-  
-  // Default to paid media
+
+  if (lower.includes('seo') || lower.includes('content') || lower.includes('blog')) return 'seo_content';
+  if (lower.includes('affiliate') || lower.includes('partner') || lower.includes('cpa')) return 'affiliate';
+  if (lower.includes('influencer') || lower.includes('twitch') || lower.includes('tiktok')) return 'influencer';
+  if (lower.includes('pr') || lower.includes('brand')) return 'pr_brand';
+  if (lower.includes('email') || lower.includes('crm')) return 'email_crm';
+
   return 'paid_media';
 }
 
 export function inferBuyingModel(name: string, family: ChannelFamily): BuyingModel {
   const lower = name.toLowerCase();
-  
-  // Specific patterns
-  if (lower.includes('revshare') || lower.includes('rev share') || lower.includes('rs')) {
-    return 'rev_share';
-  }
-  if (lower.includes('hybrid')) {
-    return 'hybrid';
-  }
-  if (lower.includes('listing') || lower.includes('tenancy') || lower.includes('fixed fee')) {
-    return 'flat_fee';
-  }
-  if (lower.includes('retainer')) {
-    return 'retainer';
-  }
-  if (lower.includes('post') || lower.includes('article') || lower.includes('video')) {
-    return 'unit_based';
-  }
-  
-  // Fall back to family default
+
+  if (lower.includes('revshare') || lower.includes('rs')) return 'REV_SHARE';
+  if (lower.includes('hybrid')) return 'HYBRID';
+  if (lower.includes('fixed') || lower.includes('listing')) return 'FLAT_FEE';
+  if (lower.includes('retainer')) return 'RETAINER';
+  if (lower.includes('cpa')) return 'CPA';
+  if (lower.includes('cpc')) return 'CPC';
+  if (lower.includes('cpm')) return 'CPM';
+
   return FAMILY_INFO[family].defaultModel;
+}
+
+// ========== DEFAULTS HELPER ==========
+
+export function getLikelyModel(category: string): BuyingModel {
+  const lower = category.toLowerCase();
+
+  // Paid Search / Native / Listings: Default to CPC
+  if (lower.includes('paid') || lower.includes('search') || lower.includes('native') || lower.includes('programmatic')) {
+    // Broad check for PPC style
+    return 'CPC'; // Or CPM depending on specific sub-channel, but generic default requested
+  }
+
+  // Social / Display / Pop: Default to CPM
+  if (lower.includes('social') || lower.includes('display')) {
+    return 'CPM';
+  }
+
+  // Affiliates: Default to CPA
+  if (lower.includes('affiliate')) {
+    return 'CPA';
+  }
+
+  // SEO / PR: Default to RETAINER
+  if (lower.includes('seo') || lower.includes('pr') || lower.includes('brand')) {
+    return 'RETAINER';
+  }
+
+  // Influencers: Default to FLAT_FEE
+  if (lower.includes('influencer')) {
+    return 'FLAT_FEE';
+  }
+
+  return 'CPM'; // Fallback
 }

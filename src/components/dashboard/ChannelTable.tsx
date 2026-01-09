@@ -124,7 +124,7 @@ function EditableCell({
 }
 
 export function ChannelTable() {
-  const { setChannelAllocation, updateChannelOverride } = useMediaPlanStore();
+  const { setChannelAllocation, updateChannelConfigField } = useMediaPlanStore();
   const channels = useChannelsWithMetrics();
   const categoryTotals = useCategoryTotals();
   const { symbol, format: formatCurrency } = useCurrency();
@@ -191,7 +191,7 @@ export function ChannelTable() {
               <TableHead className="w-[250px]">Channel</TableHead>
               <TableHead className="w-[180px]">Allocation %</TableHead>
               <TableHead className="text-right">Spend</TableHead>
-              <TableHead className="text-right">CPM</TableHead>
+              <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-right">Impressions</TableHead>
               <TableHead className="text-right">CTR %</TableHead>
               <TableHead className="text-right">Conversions</TableHead>
@@ -281,8 +281,8 @@ export function ChannelTable() {
                         </TableCell>
                         <TableCell className="text-right">
                           <EditableCell
-                            value={channel.metrics.effectiveCpm}
-                            onSave={(v) => updateChannelOverride(channel.id, { overrideCpm: v })}
+                            value={channel.metrics.effectivePrice}
+                            onSave={(v) => updateChannelConfigField(channel.id, 'price', v)}
                             prefix={symbol}
                             className="justify-end text-muted-foreground"
                           />
@@ -293,7 +293,7 @@ export function ChannelTable() {
                         <TableCell className="text-right">
                           <EditableCell
                             value={channel.metrics.effectiveCtr}
-                            onSave={(v) => updateChannelOverride(channel.id, { overrideCtr: v })}
+                            onSave={(v) => updateChannelConfigField(channel.id, 'baselineMetrics', { ctr: v })}
                             suffix="%"
                             className="justify-end text-muted-foreground"
                           />
