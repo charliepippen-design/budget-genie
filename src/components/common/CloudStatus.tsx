@@ -24,9 +24,10 @@ export function CloudStatus() {
     // If browser is offline, force error state in UI even if useAutoSave hasn't errored yet
     const displayStatus = !isOnline ? 'error' : status;
 
+    // Mission 3: High Visibility
     return (
         <div className={cn(
-            "fixed bottom-4 left-4 z-40 bg-[#0f172a] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
+            "fixed bottom-4 left-4 z-[9999] bg-[#0f172a] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
             displayStatus === 'error' ? "border-red-500/50 bg-red-950/20" : "border-blue-500/20"
         )}>
             {displayStatus === 'syncing' && (

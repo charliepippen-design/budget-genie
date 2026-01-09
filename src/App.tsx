@@ -11,6 +11,7 @@ import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
+import { useStoreSync } from "./hooks/use-store-sync";
 
 const queryClient = new QueryClient();
 
@@ -18,6 +19,8 @@ const App = () => {
   // Check for maintenance mode
   const isMaintenance = import.meta.env.VITE_MAINTENANCE_MODE === 'true';
   const isBypass = new URLSearchParams(window.location.search).get('dev') === 'bypass';
+
+  useStoreSync();
 
   if (isMaintenance && !isBypass) {
     return <MaintenanceMode />;

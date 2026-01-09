@@ -301,7 +301,7 @@ export function SettingsConsole() {
                                 )}
                               </Button>
                             </TooltipTrigger>
-                            <TooltipContent>Locks allocation % during budget scaling.</TooltipContent>
+                            <TooltipContent>Click to lock this channel's budget %</TooltipContent>
                           </Tooltip>
                           <span
                             className={cn(
@@ -371,10 +371,14 @@ export function SettingsConsole() {
                     <Label className="text-xs text-sidebar-foreground/70">Default CPM ({symbol})</Label>
                     <Input
                       type="number"
+                      min="0"
                       value={globalMultipliers.defaultCpmOverride ?? ''}
-                      onChange={(e) => setGlobalMultipliers({
-                        defaultCpmOverride: e.target.value ? parseFloat(e.target.value) : null
-                      })}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setGlobalMultipliers({
+                          defaultCpmOverride: e.target.value ? Math.max(0, val) : null
+                        });
+                      }}
                       placeholder="Per-channel"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
@@ -415,10 +419,14 @@ export function SettingsConsole() {
                     </div>
                     <Input
                       type="number"
+                      min="0"
                       value={globalMultipliers.cpaTarget ?? ''}
-                      onChange={(e) => setGlobalMultipliers({
-                        cpaTarget: e.target.value ? parseFloat(e.target.value) : null
-                      })}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setGlobalMultipliers({
+                          cpaTarget: e.target.value ? Math.max(0, val) : null
+                        });
+                      }}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
@@ -434,10 +442,14 @@ export function SettingsConsole() {
                     </div>
                     <Input
                       type="number"
+                      min="0"
                       value={globalMultipliers.roasTarget ?? ''}
-                      onChange={(e) => setGlobalMultipliers({
-                        roasTarget: e.target.value ? parseFloat(e.target.value) : null
-                      })}
+                      onChange={(e) => {
+                        const val = parseFloat(e.target.value);
+                        setGlobalMultipliers({
+                          roasTarget: e.target.value ? Math.max(0, val) : null
+                        });
+                      }}
                       placeholder="No target"
                       className="w-24 h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
                     />
@@ -803,11 +815,15 @@ function ChannelEditorItem({
               <Label className="text-xs text-sidebar-foreground/60">CPM ({symbol})</Label>
               <Input
                 type="number"
+                min="0"
                 step="0.1"
                 value={channel.overrideCpm ?? channel.baseCpm}
-                onChange={(e) => updateChannelOverride(channel.id, {
-                  overrideCpm: e.target.value ? parseFloat(e.target.value) : null
-                })}
+                onChange={(e) => {
+                  const val = parseFloat(e.target.value);
+                  updateChannelOverride(channel.id, {
+                    overrideCpm: isNaN(val) ? null : Math.max(0, val)
+                  });
+                }}
                 className="h-7 text-xs bg-sidebar-accent border-sidebar-border text-sidebar-foreground"
               />
             </div>
