@@ -12,7 +12,23 @@ import {
   calculateLowCpaAllocation
 } from '@/lib/distribution-logic';
 
-export const ScenarioSidebar: React.FC = () => {
+import { RotateCcw, SlidersHorizontal } from 'lucide-react';
+
+interface ScenarioSidebarProps {
+  totalBudget: number;
+  channelAllocations: Record<string, number>;
+  onLoadScenario: (scenario: { totalBudget: number }) => void;
+  onReset: () => void;
+  onNormalize: () => void;
+}
+
+export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
+  totalBudget,
+  channelAllocations,
+  onLoadScenario,
+  onReset,
+  onNormalize
+}) => {
   // Use the modern store hooks
   const { setAllocations, globalMultipliers, setGlobalMultipliers, rebalanceToTargets } = useMediaPlanStore();
   const channelsWithMetrics = useChannelsWithMetrics();
@@ -196,6 +212,34 @@ export const ScenarioSidebar: React.FC = () => {
 
         </div>
       </div>
-    </div>
+
+
+      {/* SCENARIO ACTIONS (NEW) */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <h3 className="font-semibold text-slate-100 mb-4 flex items-center gap-2">
+          <SlidersHorizontal className="w-4 h-4 text-indigo-400" /> Actions
+        </h3>
+
+        <div className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start text-left bg-slate-950/50 border-slate-700 hover:bg-slate-800 hover:text-white"
+            onClick={onNormalize}
+          >
+            Make 100% (Normalize)
+          </Button>
+
+          <Button
+            variant="destructive"
+            className="w-full justify-start text-left bg-red-950/20 border-red-900/50 text-red-400 hover:bg-red-900/40 hover:text-red-300"
+            onClick={onReset}
+          >
+            <RotateCcw className="w-4 h-4 mr-2" />
+            Reset All
+          </Button>
+        </div>
+      </div>
+
+    </div >
   );
 };

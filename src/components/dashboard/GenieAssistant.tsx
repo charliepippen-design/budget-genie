@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { X, Send, Sparkles, Bot, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Send, Sparkles, Bot, Loader2, AlertTriangle, Scissors, TrendingUp, BarChart } from 'lucide-react';
 import { useProjectStore } from '../../store/useProjectStore';
 import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { cn } from '@/lib/utils';
@@ -170,19 +170,75 @@ export const GenieAssistant: React.FC = () => {
             {/* CHAT WINDOW */}
             {isOpen && (
                 <Card className={cn(
-                    "w-[340px] h-[450px] flex flex-col shadow-2xl border-slate-700 bg-slate-900 overflow-hidden transition-all duration-300 animate-in slide-in-from-bottom-10 fade-in",
+                    "w-[380px] h-[600px] flex flex-col shadow-2xl border-slate-700 bg-slate-950 overflow-hidden transition-all duration-300 animate-in slide-in-from-bottom-10 fade-in",
                 )}>
                     {/* Header */}
-                    <div className="p-3 border-b border-slate-800 bg-indigo-600/10 flex items-center justify-between">
-                        <div className="flex items-center gap-2 text-indigo-100">
-                            <div className="p-1.5 bg-indigo-600 rounded-lg">
-                                <Bot className="w-4 h-4 text-white" />
+                    <div className="p-4 border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
+                        <div className="flex items-center justify-between mb-1">
+                            <div className="flex items-center gap-2 text-indigo-100">
+                                <div className="p-1.5 bg-indigo-600 rounded-lg shadow-lg shadow-indigo-500/20">
+                                    <Bot className="w-4 h-4 text-white" />
+                                </div>
+                                <span className="font-semibold text-sm tracking-wide">AI Performance Analyst</span>
                             </div>
-                            <span className="font-semibold text-sm">Budget Genie</span>
+                            <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsOpen(false)}>
+                                <X className="w-4 h-4" />
+                            </Button>
                         </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 text-slate-400 hover:text-white" onClick={() => setIsOpen(false)}>
-                            <X className="w-4 h-4" />
-                        </Button>
+                        <p className="text-[10px] text-slate-400 ml-9">
+                            Analyzing <span className="text-slate-200 font-mono">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(totalBudget)}</span> across <span className="text-slate-200 font-mono">{channels.length} channels</span>.
+                        </p>
+
+                        {/* Quick Actions */}
+                        <div className="grid grid-cols-1 gap-2 mt-4">
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="justify-start gap-2 h-9 text-xs border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white"
+                                onClick={() => {
+                                    setInput("Identify wasted spend and inefficient channels.");
+                                    handleSubmit();
+                                }}
+                            >
+                                <div className="p-1 bg-red-500/20 rounded">
+                                    <Scissors className="w-3 h-3 text-red-400" />
+                                </div>
+                                Cut Waste
+                                <span className="ml-auto text-[10px] text-slate-500">Find inefficiencies</span>
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="justify-start gap-2 h-9 text-xs border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white"
+                                onClick={() => {
+                                    setInput("Identify high ROAS channels to scale.");
+                                    handleSubmit();
+                                }}
+                            >
+                                <div className="p-1 bg-green-500/20 rounded">
+                                    <TrendingUp className="w-3 h-3 text-green-400" />
+                                </div>
+                                Scale Winners
+                                <span className="ml-auto text-[10px] text-slate-500">High ROAS potential</span>
+                            </Button>
+
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="justify-start gap-2 h-9 text-xs border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-300 hover:text-white"
+                                onClick={() => {
+                                    setInput("Give me an executive summary of the current plan.");
+                                    handleSubmit();
+                                }}
+                            >
+                                <div className="p-1 bg-blue-500/20 rounded">
+                                    <BarChart className="w-3 h-3 text-blue-400" />
+                                </div>
+                                Plan Summary
+                                <span className="ml-auto text-[10px] text-slate-500">Executive overview</span>
+                            </Button>
+                        </div>
                     </div>
 
                     {/* Messages */}

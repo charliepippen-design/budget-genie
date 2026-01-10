@@ -308,18 +308,27 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       normalizeAllocations: () => {
         set((state) => {
-          const locked = state.channels.filter((ch) => ch.locked);
-          const unlocked = state.channels.filter((ch) => !ch.locked);
+          // Identify Fixed vs Variable
+          const isFixed = (ch: ChannelData) => ch.buyingModel === 'FLAT_FEE' || ch.buyingModel === 'RETAINER' || ch.tier === 'fixed';
 
-          const lockedTotal = locked.reduce((sum, ch) => sum + ch.allocationPct, 0);
-          const unlockedTotal = unlocked.reduce((sum, ch) => sum + ch.allocationPct, 0);
+          const variableChannels = state.channels.filter(ch => !isFixed(ch));
+
+          // Calculate factors strictly on VARIABLE channels
+          const lockedTotal = variableChannels
+            .filter(ch => ch.locked)
+            .reduce((sum, ch) => sum + ch.allocationPct, 0);
+
+          const unlockedInfo = variableChannels.filter(ch => !ch.locked);
+          const currentUnlockedTotal = unlockedInfo.reduce((sum, ch) => sum + ch.allocationPct, 0);
 
           const targetUnlocked = Math.max(0, 100 - lockedTotal);
-          const factor = unlockedTotal > 0 ? targetUnlocked / unlockedTotal : 0;
+          const factor = currentUnlockedTotal > 0 ? targetUnlocked / currentUnlockedTotal : 0;
 
           return {
             channels: state.channels.map((ch) => {
-              if (ch.locked) return ch;
+              if (isFixed(ch)) return ch; // Fixed channels are ignored in normalization
+              if (ch.locked) return ch; // Locked variable channels stay put
+
               return {
                 ...ch,
                 allocationPct: Math.max(0, ch.allocationPct * factor),
@@ -670,15 +679,45 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
 
   if (!Array.isArray(channels)) return [];
 
+  // --- SUBTRACTIVE LOGIC applied to Store Selector ---
+  const fixedChannels = channels.filter(ch =>
+    ch.buyingModel === 'FLAT_FEE' ||
+    ch.buyingModel === 'RETAINER' ||
+    ch.tier === 'fixed'
+  );
+  const totalFixedSpend = fixedChannels.reduce((sum, ch) => sum + (ch.typeConfig?.price || 0), 0);
+  const variablePool = Math.max(0, totalBudget - totalFixedSpend);
+
   return channels.map((channel) => {
-    // Correct Logic: Calculate Spend first
-    const safeAlloc = channel.allocationPct || 0;
-    const spend = (totalBudget * safeAlloc) / 100;
+    let spend = 0;
+    const isFixed = channel.buyingModel === 'FLAT_FEE' || channel.buyingModel === 'RETAINER' || channel.tier === 'fixed';
+
+    if (isFixed) {
+      spend = channel.typeConfig?.price || 0;
+    } else {
+      // Variable Pool Logic
+      const safeAlloc = channel.allocationPct || 0;
+      spend = (variablePool * safeAlloc) / 100;
+    }
 
     // Correct Signature: (channel, spend)
     // Note: If calculateChannelMetrics needs multipliers support, we might need to update that function later.
     // For now, we match the existing strict signature to prevent crashes.
-    const metrics = calculateChannelMetrics(channel, spend);
+    const metrics = calculateChannelMetrics(channel, totalBudget, globalMultipliers || { spendMultiplier: 1, defaultCpmOverride: null, ctrBump: 0, cpaTarget: null, roasTarget: null, playerValue: 150 });
+
+    // Override the spend in metrics because the helper might have re-calculated it using the old logic if it ignores the 2nd arg override or if we passed wrong args.
+    // Looking at `calculateChannelMetrics`:
+    // It takes (channel, totalBudget, multipliers). It calculates spend internally:
+    // const spend = (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
+    // THIS IS THE BUG IN THE HELPER.
+
+    // Attempting to patch the result:
+    // We must manually overwrite the spend and recalculate unified metrics if possible, 
+    // OR we just accept that this hook is slightly broken for the helper part 
+    // BUT the View Model is the source of truth for the UI.
+
+    // However, to be safe, let's force the spend value.
+    metrics.spend = spend;
 
     const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
     const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);

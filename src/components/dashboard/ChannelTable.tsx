@@ -19,6 +19,8 @@ import {
 import {
   useCategoryTotals,
   ChannelWithMetrics,
+  useMediaPlanStore,
+  useChannelsWithMetrics,
 } from '@/hooks/use-media-plan-store';
 // import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -311,15 +313,20 @@ export function ChannelTable() {
                           />
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatNumber(channel.metrics.impressions, true)}
+                          {(channel.buyingModel === 'FLAT_FEE' || channel.buyingModel === 'CPA' || channel.tier === 'fixed')
+                            ? <span className="text-slate-500">--</span>
+                            : formatNumber(channel.metrics.impressions, true)}
                         </TableCell>
                         <TableCell className="text-right">
-                          <EditableCell
-                            value={channel.metrics.effectiveCtr}
-                            onSave={(v) => updateChannelConfigField(channel.id, 'baselineMetrics', { ctr: v })}
-                            suffix="%"
-                            className="justify-end text-muted-foreground"
-                          />
+                          {(channel.buyingModel === 'FLAT_FEE' || channel.buyingModel === 'CPA' || channel.tier === 'fixed')
+                            ? <div className="text-right text-slate-500 text-sm py-1">N/A</div>
+                            : <EditableCell
+                              value={channel.metrics.effectiveCtr}
+                              onSave={(v) => updateChannelConfigField(channel.id, 'baselineMetrics', { ctr: v })}
+                              suffix="%"
+                              className="justify-end text-muted-foreground"
+                            />
+                          }
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
                           {formatNumber(channel.metrics.conversions)}
@@ -427,7 +434,11 @@ export function ChannelTable() {
                         </div>
                         <div>
                           <span className="text-muted-foreground">Impr.</span>
-                          <p className="font-mono font-medium">{formatNumber(channel.metrics.impressions, true)}</p>
+                          <p className="font-mono font-medium">
+                            {(channel.buyingModel === 'FLAT_FEE' || channel.buyingModel === 'CPA' || channel.tier === 'fixed')
+                              ? <span className="text-slate-500">--</span>
+                              : formatNumber(channel.metrics.impressions, true)}
+                          </p>
                         </div>
                         <div>
                           <span className="text-muted-foreground">Conv.</span>

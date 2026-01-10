@@ -34,7 +34,7 @@ import { BuyingModel, BUYING_MODEL_INFO, inferChannelFamily, getLikelyModel } fr
 // ------------------------------------------------------------------
 const GlobalMultipliers: React.FC = () => {
   // We can use the same store hook here
-  const { globalMultipliers, setGlobalMultipliers } = useProjectStore();
+  const { globalMultipliers = { spendMultiplier: 1, cpaTarget: null, roasTarget: null }, setGlobalMultipliers } = useProjectStore();
   const { symbol } = useCurrency();
 
   return (
