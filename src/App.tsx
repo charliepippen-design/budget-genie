@@ -11,7 +11,6 @@ import Auth from "./pages/Auth";
 import Settings from "./pages/Settings";
 import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
-import { NetworkStatus } from "./components/NetworkStatus";
 import { useStoreSync } from "./hooks/use-store-sync";
 import UnderConstruction from "./pages/UnderConstruction";
 
@@ -48,7 +47,7 @@ const App = () => {
           </CurrencyProvider>
         </BrowserRouter>
         {/* REPAIR 3: Force-Mount outside of everything else */}
-        <NetworkStatus />
+        {/* NetworkStatus moved to dashboard layout */}
       </TooltipProvider>
     </QueryClientProvider>
   );

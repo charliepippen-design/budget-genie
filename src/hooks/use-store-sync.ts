@@ -31,7 +31,14 @@ export function useStoreSync() {
 
         // Subscribe to changes to broadcast them
         const unsubscribe = useMediaPlanStore.subscribe((state) => {
-            channel.postMessage({ type: 'STATE_UPDATE', payload: state });
+            // FILTER: Only broadcast DATA, not ACTIONS (functions cannot be cloned)
+            const serializableState = {
+                totalBudget: state.totalBudget,
+                channels: state.channels,
+                globalMultipliers: state.globalMultipliers,
+                presets: state.presets
+            };
+            channel.postMessage({ type: 'STATE_UPDATE', payload: serializableState });
         });
 
         return () => {

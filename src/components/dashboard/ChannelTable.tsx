@@ -17,11 +17,10 @@ import {
   ChannelCategory,
 } from '@/lib/mediaplan-data';
 import {
-  useMediaPlanStore,
-  useChannelsWithMetrics,
   useCategoryTotals,
   ChannelWithMetrics,
 } from '@/hooks/use-media-plan-store';
+// import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 import { Search, Megaphone, Users, Star, Edit2, Settings2, Lock, Unlock } from 'lucide-react';
@@ -125,6 +124,7 @@ function EditableCell({
 
 export function ChannelTable() {
   const { setChannelAllocation, updateChannelConfigField } = useMediaPlanStore();
+  // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
   const categoryTotals = useCategoryTotals();
   const { symbol, format: formatCurrency } = useCurrency();
@@ -237,6 +237,7 @@ export function ChannelTable() {
                           "group transition-colors hover:bg-muted/20",
                           isWarning && "bg-destructive/5 hover:bg-destructive/10"
                         )}
+                        title={isWarning ? "Constraint Violation: Channel metrics exceed Target CPA/ROAS" : undefined}
                       >
                         <TableCell className="font-medium">
                           <div className="flex items-center gap-2">
@@ -249,6 +250,11 @@ export function ChannelTable() {
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                               {(channel.buyingModel && BUYING_MODEL_INFO[channel.buyingModel]?.name) || 'CPM'}
                             </Badge>
+                            {channel.tier === 'fixed' && (
+                              <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-slate-800 text-slate-400 border-slate-700">
+                                FIXED
+                              </Badge>
+                            )}
                             <ChannelEditor channel={channel} />
                           </div>
                         </TableCell>
@@ -258,9 +264,20 @@ export function ChannelTable() {
                               variant="ghost"
                               size="icon"
                               className="h-6 w-6 shrink-0"
-                              onClick={() => useMediaPlanStore.getState().toggleChannelLock(channel.id)}
+                              onClick={() => {
+                                // Fixed Tier channels cannot be unlocked manually in this context unless tier changes
+                                if (channel.tier === 'fixed') return;
+                                useMediaPlanStore.getState().toggleChannelLock(channel.id);
+                              }}
+                              disabled={channel.tier === 'fixed'}
                             >
-                              {channel.locked ? <Lock className="h-3 w-3 text-red-500" /> : <Unlock className="h-3 w-3 text-gray-400" />}
+                              {channel.tier === 'fixed' ? (
+                                <Lock className="h-3 w-3 text-slate-500 opacity-50" />
+                              ) : channel.locked ? (
+                                <Lock className="h-3 w-3 text-red-500" />
+                              ) : (
+                                <Unlock className="h-3 w-3 text-gray-400" />
+                              )}
                             </Button>
                             <Slider
                               value={[channel.allocationPct]}
@@ -268,10 +285,16 @@ export function ChannelTable() {
                               min={0}
                               max={100}
                               step={0.5}
-                              className="w-20 [&_[role=slider]]:h-4 [&_[role=slider]]:w-4"
-                              disabled={channel.locked}
+                              className={cn(
+                                "w-20 [&_[role=slider]]:h-4 [&_[role=slider]]:w-4",
+                                (channel.locked || channel.tier === 'fixed') && "opacity-50 pointer-events-none grayscale"
+                              )}
+                              disabled={channel.locked || channel.tier === 'fixed'}
                             />
-                            <span className="font-mono text-sm w-12 text-right">
+                            <span className={cn(
+                              "font-mono text-sm w-12 text-right",
+                              channel.tier === 'fixed' && "text-slate-500 italic"
+                            )}>
                               {formatPercentage(channel.allocationPct)}
                             </span>
                           </div>

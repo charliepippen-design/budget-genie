@@ -4,7 +4,12 @@ import { Cloud, CloudOff, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAutoSave } from '@/hooks/use-auto-save';
 
-export function NetworkStatus() {
+interface NetworkStatusProps {
+    className?: string;
+    style?: React.CSSProperties;
+}
+
+export function NetworkStatus({ className, style }: NetworkStatusProps) {
     const { status, lastSaved } = useAutoSave();
     const [isOnline, setIsOnline] = useState(navigator.onLine);
 
@@ -25,7 +30,13 @@ export function NetworkStatus() {
     const displayStatus = !isOnline ? 'error' : status;
 
     return (
-        <div className="fixed bottom-4 right-4 z-[9999] bg-blue-600 text-white px-4 py-2 rounded shadow-xl font-mono text-xs font-bold">
+        <div
+            className={cn(
+                "fixed bottom-4 left-4 z-[9999] bg-blue-600 text-white px-4 py-2 rounded shadow-xl font-mono text-xs font-bold transition-all duration-300",
+                className
+            )}
+            style={style}
+        >
             Network: {isOnline ? 'ONLINE' : 'OFFLINE'}
         </div>
     );

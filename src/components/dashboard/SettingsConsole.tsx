@@ -64,7 +64,7 @@ const GlobalMultipliers: React.FC = () => {
               value={globalMultipliers.cpaTarget || ''}
               onChange={(e) => setGlobalMultipliers({ cpaTarget: e.target.value ? parseFloat(e.target.value) : null })}
               placeholder="None"
-              className="h-8 pl-6 text-xs bg-slate-800 border-slate-700 text-slate-200"
+              className="h-8 pl-6 text-xs bg-[#020617] border-slate-700 text-slate-200" // Updated to Deep Blue Input
             />
           </div>
         </div>
@@ -77,7 +77,7 @@ const GlobalMultipliers: React.FC = () => {
               value={globalMultipliers.roasTarget || ''}
               onChange={(e) => setGlobalMultipliers({ roasTarget: e.target.value ? parseFloat(e.target.value) : null })}
               placeholder="None"
-              className="h-8 pl-6 text-xs bg-slate-800 border-slate-700 text-slate-200"
+              className="h-8 pl-6 text-xs bg-[#020617] border-slate-700 text-slate-200" // Updated to Deep Blue Input
             />
           </div>
         </div>
@@ -103,7 +103,7 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
   return (
     <div className={cn(
       "group relative flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
-      "bg-slate-800/40 border-slate-700/50 hover:border-slate-600 hover:bg-slate-800/80",
+      "bg-slate-800/20 border-slate-700/30 hover:bg-slate-800/50 hover:border-slate-600", // UPDATED: More subtle base, stronger hover
       isWarning && "border-red-900/50 bg-red-900/10"
     )}>
       {/* Left Info */}
@@ -114,8 +114,8 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
         />
         <div className="flex flex-col min-w-0">
           <span className={cn(
-            "text-sm font-medium pr-2 break-words leading-tight", // FIX: Replaced truncate with break-words
-            isWarning ? "text-red-400" : "text-slate-200 group-hover:text-white"
+            "text-sm font-medium pr-2 break-words leading-tight transition-colors",
+            isWarning ? "text-red-400" : "text-slate-300 group-hover:text-white" // UPDATED: text-slate-300 base
           )}>
             {channel.name}
           </span>
@@ -151,22 +151,10 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
 // MAIN COMPONENT: SettingsConsole
 // ------------------------------------------------------------------
 export const SettingsConsole: React.FC = () => {
-  // Grab data from store (User requested 'useProjectStore')
-  const {
-    channels,
-    addChannel,
-    resetAll // Note: Shim might need this alias or we use properties that match
-    // The shim just exports useMediaPlanStore, so it has resetAll, not resetProject.
-    // We will stick to the existing property names to avoid logic errors unless user renamed them in store too.
-    // User prompt said "const { channels, addChannel, resetProject } = useProjectStore();"
-    // But we know 'resetProject' doesn't exist on the store. 'resetAll' does.
-    // We'll keep 'resetAll' here to ensure it works, effectively "fixing" the user's snippet logic instantly.
-  } = useProjectStore();
-
+  const { channels, addChannel, resetAll } = useProjectStore();
   const channelsWithMetrics = useChannelsWithMetrics();
   const { toast } = useToast();
 
-  // Add Channel State
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
@@ -178,6 +166,7 @@ export const SettingsConsole: React.FC = () => {
   }, [newCat]);
 
   const handleCreateChannel = () => {
+    // (Keep existing logic)
     if (!newName.trim()) return;
     const family = inferChannelFamily(newName);
     addChannel({
@@ -198,11 +187,10 @@ export const SettingsConsole: React.FC = () => {
   };
 
   return (
-    // ROOT CONTAINER: Pure Liquid. Fills the Grid Cell.
-    <div className="h-full w-full bg-slate-900 text-slate-100 flex flex-col overflow-hidden">
-
-      {/* 1. HEADER & GLOBAL CONTROLS */}
-      <div className="p-4 border-b border-slate-800 space-y-4 flex-shrink-0 bg-slate-900 z-10">
+    // ROOT CONTAINER: Deep Blue Background
+    <div className="h-full w-full bg-[#020617] text-slate-100 flex flex-col overflow-hidden">
+      {/* <div className="text-yellow-500 font-mono">DEBUG MODE: Settings Console</div> */}
+      <div className="p-4 border-b border-slate-800 space-y-4 flex-shrink-0 bg-[#020617] z-10">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Settings className="w-5 h-5 text-indigo-500" />
@@ -223,13 +211,12 @@ export const SettingsConsole: React.FC = () => {
           </div>
         </div>
 
-        {/* Render Global Multipliers safely */}
-        <div className="bg-slate-950/40 p-3 rounded-xl border border-slate-800/60 shadow-inner">
+        {/* Render Global Multipliers safely in a Card */}
+        <div className="bg-[#0f172a] p-4 rounded-xl border border-slate-800 shadow-sm mb-2">
           <GlobalMultipliers />
         </div>
       </div>
 
-      {/* 2. SCROLLABLE CHANNEL LIST */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
@@ -241,14 +228,13 @@ export const SettingsConsole: React.FC = () => {
           </span>
         </div>
 
-        {/* List Items */}
         <div className="space-y-3 pb-10">
+          {/* <div className="text-slate-500 text-xs">Debugging List...</div> */}
           {channelsWithMetrics.map((channel) => (
             <ChannelItem key={channel.id} channel={channel} />
           ))}
         </div>
 
-        {/* Add Button */}
         <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
           <DialogTrigger asChild>
             <Button
@@ -264,12 +250,12 @@ export const SettingsConsole: React.FC = () => {
             <div className="space-y-4 py-4">
               <div className="space-y-2">
                 <Label>Name</Label>
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Channel Name" />
+                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Channel Name" className="bg-[#020617] border-slate-700" />
               </div>
               <div className="space-y-2">
                 <Label>Category</Label>
                 <Select value={newCat} onValueChange={(v) => setNewCat(v as ChannelCategory)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="bg-[#020617] border-slate-700"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {Object.entries(CATEGORY_INFO).map(([key, info]) => <SelectItem key={key} value={key}>{info.name}</SelectItem>)}
                   </SelectContent>
@@ -277,7 +263,7 @@ export const SettingsConsole: React.FC = () => {
               </div>
               <div className="space-y-2">
                 <Label>Price</Label>
-                <Input type="number" value={newPrice} onChange={e => setNewPrice(parseFloat(e.target.value))} />
+                <Input type="number" value={newPrice} onChange={e => setNewPrice(parseFloat(e.target.value))} className="bg-[#020617] border-slate-700" />
               </div>
             </div>
             <DialogFooter>
@@ -287,7 +273,6 @@ export const SettingsConsole: React.FC = () => {
         </Dialog>
 
       </div>
-
     </div>
   );
 };

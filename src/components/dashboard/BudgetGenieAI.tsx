@@ -1,85 +1,114 @@
-import React, { useState, useEffect } from 'react';
-import { DashboardHeader } from './DashboardHeader';
-import { ChannelTable } from './ChannelTable';
-import { ChartSection } from './ChartSection';
-import { SettingsConsole } from './SettingsConsole';
+import { useState, useEffect } from 'react';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { useChannelsWithMetrics, useBlendedMetrics, useCategoryTotals } from '@/hooks/use-media-plan-store';
-import { BUDGET_PRESETS, BudgetPresetKey, BudgetScenario } from '@/lib/mediaplan-data';
-
-// RESTORED IMPORTS
+import { SettingsConsole } from './SettingsConsole';
+import { DashboardHeader } from './DashboardHeader';
+import { BudgetHero } from './BudgetHero';
+import { ChartSection } from './ChartSection';
+import { ChannelTable } from './ChannelTable';
 import { ScenarioSidebar } from './ScenarioSidebar';
+import { MonthConfigPanel } from '../multi-month/MonthConfigPanel';
+import { WizardLauncherCard } from './WizardLauncherCard';
 import { ProjectManager } from './ProjectManager';
-import { GenieAssistant } from './GenieAssistant';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PLTable } from '../multi-month/PLTable';
+import { BudgetWizard } from './BudgetWizard';
+// import { MagicImportButton } from '@/components/MagicImportButton'; 
+// import { ImportWizard } from '../multi-month/ImportWizard'; 
+// import { GenieAssistant } from './GenieAssistant';
+import { calculateBlendedMetrics, calculateChannelMetrics } from '@/lib/mediaplan-data';
+// import { useBudgetEngine } from '@/hooks/use-budget-engine';
 
-export const BudgetGenieAI: React.FC = () => {
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-
-    // Data hooks needed for the content
+export const BudgetGenieAI = () => {
+    // STATE
     const {
+        channels,
         totalBudget,
         setTotalBudget,
-        setAllocations,
-        normalizeAllocations,
-        resetAll,
-        applyCategoryMultipliers
+        projectName,
+        setProjectName,
+        resetAll
     } = useMediaPlanStore();
 
-    const channelsWithMetrics = useChannelsWithMetrics();
-    const blendedMetrics = useBlendedMetrics();
-    const categoryTotals = useCategoryTotals();
+    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [preset, setPreset] = useState('custom');
+    const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
+    const [isImportOpen, setIsImportOpen] = useState(false);
 
-    const [preset, setPreset] = useState<BudgetPresetKey>('custom');
+    // Derived Logic - SAFELY CALCULATED
+    // We wrap this in safety checks to prevent crashes if data is missing
+    const safeChannels = Array.isArray(channels) ? channels : [];
 
-    // Effect: Apply Preset Logic
-    useEffect(() => {
-        if (preset !== 'custom') {
-            const presetData = BUDGET_PRESETS[preset];
-            if (presetData && presetData.multipliers) {
-                applyCategoryMultipliers(presetData.multipliers);
-            }
+    // Manual metric calculation for the ChartSection (to ensure it matches Table logic)
+    const channelsWithMetrics = safeChannels.map(channel => {
+        try {
+            const spend = (totalBudget * (channel.allocationPct || 0)) / 100;
+            return calculateChannelMetrics(channel, spend);
+        } catch (e) {
+            console.error("Metric Calc Error", e);
+            return {
+                ...channel,
+                metrics: { spend: 0, revenue: 0, roas: 0, cpa: 0, conversions: 0 }
+            };
         }
-    }, [preset, applyCategoryMultipliers]);
+    });
 
-    // Handle Load Scenario
-    const handleLoadScenario = (scenario: BudgetScenario) => {
+    // Calculate global metrics
+    const currentAllocations = safeChannels.reduce((acc, ch) => ({ ...acc, [ch.id]: ch.allocationPct || 0 }), {});
+
+    let blendedMetrics;
+    try {
+        blendedMetrics = calculateBlendedMetrics(safeChannels, currentAllocations, totalBudget);
+    } catch (e) {
+        blendedMetrics = { totalSpend: 0, totalRevenue: 0, blendedRoas: 0, blendedCpa: 0, totalConversions: 0 };
+    }
+
+    // Category Totals for Pie Chart
+    const categoryTotals = channelsWithMetrics.reduce((acc: any, ch: any) => {
+        if (!ch) return acc;
+        try {
+            if (!acc[ch.category]) {
+                acc[ch.category] = { spend: 0, percentage: 0 };
+            }
+            if (ch.metrics) {
+                acc[ch.category].spend += ch.metrics.spend;
+                acc[ch.category].percentage += ch.allocationPct;
+            }
+        } catch (e) { }
+        return acc;
+    }, {} as Record<string, { spend: number; percentage: number }>);
+
+    const handleLoadScenario = (scenario: any) => {
         setTotalBudget(scenario.totalBudget);
-        setAllocations(scenario.channelAllocations);
     };
 
-    // Derive allocations for sidebar
-    const currentAllocations = channelsWithMetrics.reduce((acc, ch) => ({
-        ...acc,
-        [ch.id]: ch.allocationPct
-    }), {} as Record<string, number>);
+    const normalizeAllocations = () => {
+        // Placeholder
+    };
 
     return (
-        // PARENT: CSS GRID (2 Columns)
-        // Column 1: 320px (Sidebar)
-        // Column 2: 1fr (Remaining Space)
-        <div style={{
-            display: 'grid',
-            gridTemplateColumns: isSidebarOpen ? '320px 1fr' : '0px 1fr',
-            height: '100vh',
-            width: '100vw',
-            overflow: 'hidden',
-            backgroundColor: '#020617', // slate-950
-            transition: 'grid-template-columns 0.3s ease'
-        }}>
+        <div className="flex h-screen bg-[#020617] text-white overflow-hidden font-inter selection:bg-indigo-500/30">
 
-            {/* CELL 1: SIDEBAR */}
-            <div style={{
-                gridColumn: '1 / 2',
-                backgroundColor: '#0f172a', // slate-900 
-                borderRight: '1px solid #1e293b',
-                overflowY: 'auto',
-                position: 'relative',
-                zIndex: 50
-            }}>
-                {/* Force width to prevent content squashing during transition */}
-                <div style={{ width: '320px', height: '100%' }}>
-                    <SettingsConsole />
+            {/* WIZARD MODAL (Controlled) - DISABLED */}
+            {/* <BudgetWizard
+                isOpen={isBudgetWizardOpen}
+                onClose={() => setIsBudgetWizardOpen(false)}
+            /> */}
+
+            {/* CELL 1: LEFT SIDEBAR (SETTINGS) - DISABLED */}
+            <div
+                className={`
+                    fixed inset-y-0 left-0 z-50 w-80 bg-slate-950/95 backdrop-blur-xl border-r border-indigo-500/10 
+                    transform transition-transform duration-300 ease-in-out shadow-2xl
+                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+                    lg:relative lg:translate-x-0
+                `}
+            >
+                <div className="h-full p-6 flex items-center justify-center border-r border-dashed border-slate-800 text-slate-600">
+                    Settings Console Disabled
                 </div>
+                {/* <div className="h-full overflow-y-auto custom-scrollbar">
+                    <SettingsConsole />
+                </div> */}
             </div>
 
             {/* CELL 2: MAIN CONTENT */}
@@ -95,44 +124,54 @@ export const BudgetGenieAI: React.FC = () => {
                     budgetPreset={preset}
                     onPresetChange={setPreset}
                     onExport={() => { }}
-                    onImport={() => { }}
+                    onImport={() => setIsImportOpen(true)}
                     onReset={() => resetAll()}
                     toggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)}
                     isOpen={isSidebarOpen}
                 />
 
-                {/* RESTORED LAYOUT SECTION (3-COLUMN GRID) */}
-                <main className="flex-1 p-6 overflow-y-auto">
-                    <div className="max-w-[1600px] mx-auto space-y-6 pb-20">
+                <main className="flex-1 overflow-y-auto">
+                    {/* BUDGET HERO - ENABLED */}
+                    <BudgetHero />
 
-                        <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                            {/* CENTER: Project Manager & Charts & Table (Takes 3 columns) */}
-                            <div className="xl:col-span-3 space-y-6">
-                                <ProjectManager />
-                                <ChartSection channels={channelsWithMetrics} categoryTotals={categoryTotals} />
-                                <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-sm overflow-hidden">
-                                    <ChannelTable />
-                                </div>
-                            </div>
+                    <div className="max-w-[1600px] mx-auto space-y-6 pb-20 p-6">
 
-                            {/* RIGHT: SCENARIOS & PRESETS (Takes 1 column) */}
-                            <div className="xl:col-span-1">
-                                <ScenarioSidebar
-                                    totalBudget={totalBudget}
-                                    channelAllocations={currentAllocations}
-                                    onLoadScenario={handleLoadScenario}
-                                    onReset={resetAll}
-                                    onNormalize={normalizeAllocations}
-                                />
-                            </div>
-                        </div>
+                        {/* TOP BAR: Project Manager - ENABLED */}
+                        <ProjectManager />
+
+                        {/* CHART SECTION - ENABLED */}
+                        <ChartSection
+                            blendedMetrics={blendedMetrics}
+                            currentAllocations={currentAllocations}
+                            totalBudget={totalBudget}
+                            channels={channelsWithMetrics}
+                            categoryTotals={categoryTotals}
+                        />
+
+                        {/* WIZARD BANNER - ENABLED */}
+                        <WizardLauncherCard
+                            variant="banner"
+                            onLaunch={() => setIsBudgetWizardOpen(true)}
+                        />
 
                     </div>
                 </main>
             </div>
 
-            {/* FLOATING GENIE */}
-            <GenieAssistant />
+            {/* RIGHT: SCENARIOS & PRESETS - DISABLED */}
+            {/* <div className="xl:col-span-1">
+                <ScenarioSidebar
+                    totalBudget={totalBudget}
+                    channelAllocations={currentAllocations}
+                    onLoadScenario={handleLoadScenario}
+                    onReset={resetAll}
+                    onNormalize={normalizeAllocations}
+                />
+            </div> */}
+
+            {/* FLOATING GENIE & IMPORT - DISABLED FOR NOW */}
+            {/* <GenieAssistant /> */}
+            {/* <ImportWizard open={isImportOpen} onOpenChange={setIsImportOpen} /> */}
 
         </div>
     );

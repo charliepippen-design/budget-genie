@@ -66,11 +66,30 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
   // Config comes directly from store channel object
   const config = channel.typeConfig;
 
+  // SAFETY CHECK: Ensure critical data exists
+  if (!channel || !family || !buyingModel || !config) {
+    console.warn(`[ChannelEditor] Invalid channel data for ID: ${channel?.id}`, channel);
+    return null;
+  }
+
+  // SAFETY CHECK: Ensure model/family info exists in dictionaries
+  const familyInfo = FAMILY_INFO[family];
+  const modelInfo = BUYING_MODEL_INFO[buyingModel];
+
+  if (!familyInfo || !modelInfo) {
+    console.warn(`[ChannelEditor] Unknown family/model for ID: ${channel.id}`, { family, buyingModel });
+    // Fallback UI for corrupt data
+    return (
+      <div className="text-red-500 text-xs p-2 border border-red-500 rounded">
+        Invalid Data
+      </div>
+    );
+  }
+
   // Get allowed models for selected family
   const allowedModels = useMemo(() => {
-    const familyInfo = FAMILY_INFO[family];
-    return familyInfo?.allowedModels || ['CPM', 'CPC'];
-  }, [family]);
+    return familyInfo.allowedModels || ['CPM', 'CPC'];
+  }, [familyInfo]);
 
   // Calculate preview metrics using dummy spend
   const previewMetrics = useMemo(() => {
@@ -306,7 +325,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
           </div>
 
           <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            {BUYING_MODEL_INFO[buyingModel].description}
+            {modelInfo.description}
           </div>
 
           <Separator />

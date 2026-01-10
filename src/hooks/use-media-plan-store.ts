@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
+import { ChannelCategory, CATEGORY_INFO, calculateChannelMetrics } from '@/lib/mediaplan-data';
 import {
   ChannelFamily,
   BuyingModel,
@@ -11,6 +11,7 @@ import {
   inferBuyingModel,
   getLikelyModel
 } from '@/types/channel';
+import { calculateScoredAllocation } from '@/lib/distribution-logic';
 
 // ========== DATA MODEL ==========
 
@@ -26,6 +27,10 @@ export interface ChannelData {
   family: ChannelFamily;
   buyingModel: BuyingModel;
   typeConfig: ChannelTypeConfig;
+
+  // Tier System (Engine Overhaul)
+  tier: 'fixed' | 'scalable' | 'capped';
+  maxSpendLimit?: number;
 
   // UI State / Meta
   locked: boolean;
@@ -134,7 +139,8 @@ function createTypeConfigFromLegacy(ch: typeof BASE_CHANNELS_DATA[0]): ChannelTy
       ctr: ch.ctr,
       conversionRate: 2.5,
       aov: 150,
-      trafficPerUnit: 1000
+      trafficPerUnit: 1000,
+      saturationCeiling: ch.baseSpend * 3 // Default saturation at 3x base spend
     }
   };
 }
@@ -147,6 +153,12 @@ function createInitialChannels(): ChannelData[] {
     const buyingModel = inferBuyingModel(ch.name, family);
     const typeConfig = createTypeConfigFromLegacy(ch);
 
+    // Auto-detect tier based on buying model
+    let tier: 'fixed' | 'scalable' | 'capped' = 'scalable';
+    if (buyingModel === 'RETAINER' || buyingModel === 'FLAT_FEE') {
+      tier = 'fixed';
+    }
+
     return {
       id: ch.id,
       name: ch.name,
@@ -157,10 +169,14 @@ function createInitialChannels(): ChannelData[] {
       buyingModel,
       typeConfig,
 
+      tier,
+      maxSpendLimit: 0, // 0 = no limit
+
       locked: false,
     };
   });
 }
+
 
 // ========== CALCULATION FUNCTIONS ==========
 
@@ -374,8 +390,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
               family,
               buyingModel,
               price: 5,
-              baselineMetrics: { ctr: 1, conversionRate: 2.5 }
+              baselineMetrics: {
+                ctr: 1,
+                conversionRate: 2.5,
+                saturationCeiling: 50000 // Default for new manual channels
+              }
             },
+
+            tier: (likelyModel === 'RETAINER' || likelyModel === 'FLAT_FEE') ? 'fixed' : 'scalable',
+            maxSpendLimit: 0,
+
             locked: false,
           };
 
@@ -452,49 +476,26 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         const channelsWithMetrics = state.channels.map((ch) => ({
           ...ch,
           metrics: calculateChannelMetrics(ch, state.totalBudget, state.globalMultipliers),
-        }));
+          aboveCpaTarget: false, // Not needed for calculation but fitting the type
+          belowRoasTarget: false
+        })) as ChannelWithMetrics[]; // Casting mainly because we don't need the boolean flags for the calc
 
-        // Find good and bad performers
-        const poor: string[] = [];
-        const good: string[] = [];
-
-        channelsWithMetrics.forEach((ch) => {
-          if (ch.locked) return;
-
-          const aboveCpa = cpaTarget && ch.metrics.cpa && ch.metrics.cpa > cpaTarget;
-          const belowRoas = roasTarget && ch.metrics.roas < roasTarget;
-
-          if (aboveCpa || belowRoas) {
-            poor.push(ch.id);
-          } else {
-            good.push(ch.id);
-          }
-        });
-
-        if (poor.length === 0 || good.length === 0) return;
-
-        const shiftAmount = 10 / poor.length;
-        const addAmount = (shiftAmount * poor.length) / good.length;
+        // Calculate new allocations based on weighted scoring
+        const newAllocations = calculateScoredAllocation(channelsWithMetrics, cpaTarget, roasTarget);
 
         set({
           channels: state.channels.map((ch) => {
             if (ch.locked) return ch;
-
-            if (poor.includes(ch.id)) {
-              return {
-                ...ch,
-                allocationPct: Math.max(0.5, ch.allocationPct - shiftAmount),
-              };
-            }
-            if (good.includes(ch.id)) {
-              return {
-                ...ch,
-                allocationPct: Math.min(100, ch.allocationPct + addAmount),
-              };
+            // Apply new allocation if calculated
+            if (newAllocations[ch.id] !== undefined) {
+              return { ...ch, allocationPct: newAllocations[ch.id] };
             }
             return ch;
           }),
         });
+
+        // Ensure normalization maintains 100% total
+        get().normalizeAllocations();
       },
 
       // Presets
@@ -532,30 +533,34 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
+        // "Reset to Zero" - User Request
+        // We keep the channels structure so they don't have to re-add everything,
+        // but we zero out the budget and targets.
+
         const DEFAULT_CHANNELS_DATA = [
           {
             id: '1', name: 'Paid Search', category: 'Paid Search',
-            buyingModel: 'CPC', price: 2.50, allocation: 20,
+            buyingModel: 'CPC', price: 0, allocation: 0,
             baselineMetrics: { conversionRate: 3.5, ctr: 2.0 }, isLocked: false
           },
           {
             id: '2', name: 'Facebook Ads', category: 'Paid Social',
-            buyingModel: 'CPM', price: 12.00, allocation: 30,
+            buyingModel: 'CPM', price: 0, allocation: 0,
             baselineMetrics: { ctr: 1.2, conversionRate: 1.5 }, isLocked: false
           },
           {
             id: '3', name: 'Affiliates', category: 'Affiliate',
-            buyingModel: 'CPA', price: 45.00, allocation: 15,
+            buyingModel: 'CPA', price: 0, allocation: 0,
             baselineMetrics: { conversionRate: 5.0 }, isLocked: false
           },
           {
             id: '4', name: 'Display / Programmatic', category: 'Display/Programmatic',
-            buyingModel: 'CPM', price: 4.50, allocation: 15,
+            buyingModel: 'CPM', price: 0, allocation: 0,
             baselineMetrics: { ctr: 0.8, conversionRate: 0.5 }, isLocked: false
           },
           {
             id: '5', name: 'SEO Content', category: 'SEO/Content',
-            buyingModel: 'FLAT_FEE', price: 2000, allocation: 20,
+            buyingModel: 'FLAT_FEE', price: 0, allocation: 0,
             baselineMetrics: { trafficPerUnit: 5000, conversionRate: 1.8 }, isLocked: false
           }
         ];
@@ -563,29 +568,43 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         // Map to Schema
         const newChannels: ChannelData[] = DEFAULT_CHANNELS_DATA.map(d => {
           const family = inferChannelFamily(d.name);
+          const buyingModel = d.buyingModel as BuyingModel;
+
+          let tier: 'fixed' | 'scalable' | 'capped' = 'scalable';
+          if (buyingModel === 'RETAINER' || buyingModel === 'FLAT_FEE') {
+            tier = 'fixed';
+          }
+
           return {
             id: d.id,
             name: d.name,
             category: d.category as ChannelCategory,
-            allocationPct: d.allocation,
+            allocationPct: d.allocation, // Now 0
             family,
-            buyingModel: d.buyingModel as BuyingModel,
+            buyingModel,
             typeConfig: {
               family,
-              buyingModel: d.buyingModel as BuyingModel,
+              buyingModel,
               price: d.price,
               baselineMetrics: d.baselineMetrics,
-              secondaryPrice: 0
+              secondaryPrice: 0,
+              saturationCeiling: 50000 // Default
             },
+            tier,
+            maxSpendLimit: 0,
             locked: d.isLocked
           };
         });
 
         localStorage.removeItem('mediaplan-store-v2');
         set({
-          totalBudget: 50000,
+          totalBudget: 0, // Reset to 0
           channels: newChannels,
-          globalMultipliers: { ...DEFAULT_MULTIPLIERS },
+          globalMultipliers: {
+            ...DEFAULT_MULTIPLIERS,
+            cpaTarget: null,
+            roasTarget: null
+          },
         });
       },
 
@@ -647,10 +666,19 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
 export function useChannelsWithMetrics(): ChannelWithMetrics[] {
   const { totalBudget, channels, globalMultipliers } = useMediaPlanStore();
-  const { cpaTarget, roasTarget } = globalMultipliers;
+  const { cpaTarget, roasTarget } = globalMultipliers || {}; // Safety check
+
+  if (!Array.isArray(channels)) return [];
 
   return channels.map((channel) => {
-    const metrics = calculateChannelMetrics(channel, totalBudget, globalMultipliers);
+    // Correct Logic: Calculate Spend first
+    const safeAlloc = channel.allocationPct || 0;
+    const spend = (totalBudget * safeAlloc) / 100;
+
+    // Correct Signature: (channel, spend)
+    // Note: If calculateChannelMetrics needs multipliers support, we might need to update that function later.
+    // For now, we match the existing strict signature to prevent crashes.
+    const metrics = calculateChannelMetrics(channel, spend);
 
     const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
     const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);
@@ -666,6 +694,19 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
 
 export function useBlendedMetrics(): BlendedMetrics {
   const { totalBudget, channels, globalMultipliers } = useMediaPlanStore();
+
+  // HARD ZERO GUARD
+  if (totalBudget === 0) {
+    return {
+      totalSpend: 0,
+      totalImpressions: 0,
+      totalClicks: 0,
+      totalConversions: 0,
+      blendedCpa: null,
+      projectedRevenue: 0,
+      blendedRoas: 0
+    };
+  }
 
   let totalSpend = 0;
   let totalImpressions = 0;

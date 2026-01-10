@@ -58,41 +58,54 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
     return null;
   };
 
-  // Pie chart data - by category
+  // Pie chart data - by category (Defensive)
   const pieData = useMemo(() => {
-    return Object.entries(categoryTotals).map(([category, data], index) => ({
-      name: CATEGORY_INFO[category as keyof typeof CATEGORY_INFO].name,
-      value: data.spend,
-      percentage: data.percentage,
-      color: CHART_COLORS[index % CHART_COLORS.length],
-    }));
+    if (!categoryTotals) return [];
+    return Object.entries(categoryTotals)
+      .map(([category, data], index) => {
+        const catInfo = CATEGORY_INFO[category as keyof typeof CATEGORY_INFO];
+        return {
+          name: catInfo ? catInfo.name : category,
+          value: data?.spend || 0,
+          percentage: data?.percentage || 0,
+          color: CHART_COLORS[index % CHART_COLORS.length],
+        };
+      })
+      .filter(item => item.value > 0); // Recharts doesn't like 0/NaN slices sometimes
   }, [categoryTotals]);
 
-  // Bar chart data - ROAS by channel (top performers)
+  // Bar chart data - ROAS by channel (top performers) (Defensive)
   const barData = useMemo(() => {
+    if (!Array.isArray(channels)) return [];
+
     return channels
-      .filter((ch) => ch.metrics.spend > 0)
-      .sort((a, b) => b.metrics.roas - a.metrics.roas)
+      .filter((ch) => ch && ch.metrics && ch.metrics.spend > 0)
+      .sort((a, b) => (b.metrics?.roas || 0) - (a.metrics?.roas || 0))
       .slice(0, 8)
-      .map((ch) => ({
-        name: ch.name.replace(/^(SEO|Paid|Affiliate|Influencer) - /, ''),
-        roas: ch.metrics.roas,
-        spend: ch.metrics.spend,
-        fill: CHART_COLORS[
-          Object.keys(CATEGORY_INFO).indexOf(ch.category) % CHART_COLORS.length
-        ],
-      }));
+      .map((ch) => {
+        const catInfo = CATEGORY_INFO[ch.category as keyof typeof CATEGORY_INFO];
+        // Fallback color logic
+        const catIndex = Object.keys(CATEGORY_INFO).indexOf(ch.category);
+        const color = CHART_COLORS[catIndex >= 0 ? catIndex % CHART_COLORS.length : 0];
+
+        return {
+          name: ch.name.replace(/^(SEO|Paid|Affiliate|Influencer) - /, ''),
+          roas: ch.metrics?.roas || 0,
+          spend: ch.metrics?.spend || 0,
+          fill: color,
+        };
+      });
   }, [channels]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Pie Chart - Spend Allocation */}
-      <Card className="bg-card border-border/50 card-shadow">
+      {/* 1. Pie Chart - Spend Allocation */}
+      <Card className="bg-card border-border/50 card-shadow h-[320px]">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">Spend Allocation</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px]">
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie
@@ -100,15 +113,15 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
                   cx="50%"
                   cy="50%"
                   innerRadius={60}
-                  outerRadius={100}
+                  outerRadius={90}
                   paddingAngle={2}
                   dataKey="value"
                   animationDuration={500}
                   animationBegin={0}
                 >
                   {pieData.map((entry, index) => (
-                    <Cell 
-                      key={`cell-${index}`} 
+                    <Cell
+                      key={`cell-${index}`}
                       fill={entry.color}
                       stroke="hsl(var(--background))"
                       strokeWidth={2}
@@ -116,11 +129,11 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
                   ))}
                 </Pie>
                 <Tooltip content={<CustomTooltip />} />
-                <Legend 
+                <Legend
                   formatter={(value: string) => (
-                    <span className="text-sm text-foreground">{value}</span>
+                    <span className="text-xs text-foreground">{value}</span>
                   )}
-                  wrapperStyle={{ paddingTop: '20px' }}
+                  wrapperStyle={{ paddingTop: '10px' }}
                 />
               </PieChart>
             </ResponsiveContainer>
@@ -128,42 +141,42 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
         </CardContent>
       </Card>
 
-      {/* Bar Chart - ROAS by Channel */}
-      <Card className="bg-card border-border/50 card-shadow">
+      {/* 2. Bar Chart - ROAS by Channel */}
+      <Card className="bg-card border-border/50 card-shadow h-[320px]">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-semibold">ROAS by Channel</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-[280px]">
+          <div className="h-[250px]">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart 
-                data={barData} 
+              <BarChart
+                data={barData}
                 layout="vertical"
                 margin={{ top: 5, right: 30, left: 0, bottom: 5 }}
               >
-                <CartesianGrid 
-                  strokeDasharray="3 3" 
+                <CartesianGrid
+                  strokeDasharray="3 3"
                   horizontal={true}
                   vertical={false}
                   stroke="hsl(var(--border))"
                 />
-                <XAxis 
-                  type="number" 
+                <XAxis
+                  type="number"
                   domain={[0, 'dataMax']}
                   tickFormatter={(value) => `${value}x`}
                   tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 12 }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                 />
-                <YAxis 
-                  type="category" 
-                  dataKey="name" 
-                  width={120}
-                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 11 }}
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={100}
+                  tick={{ fill: 'hsl(var(--foreground))', fontSize: 10 }}
                   axisLine={{ stroke: 'hsl(var(--border))' }}
                 />
                 <Tooltip content={<RoasTooltip />} cursor={{ fill: 'hsl(var(--muted) / 0.3)' }} />
-                <Bar 
-                  dataKey="roas" 
+                <Bar
+                  dataKey="roas"
                   radius={[0, 4, 4, 0]}
                   animationDuration={500}
                   animationBegin={100}

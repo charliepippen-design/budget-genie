@@ -578,7 +578,11 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       generateMonths: (totalBudgetOverride?: number) => {
         const state = get();
         const totalMonths = state.planningMonths + (state.includeSoftLaunch ? 1 : 0);
-        const startDate = new Date(state.startMonth + '-01');
+
+        // FIX: Start Date Off-By-One (Timezone Issue)
+        // Parse "YYYY-MM" manually to ensure we stay in correct local period
+        const [yearStr, monthStr] = state.startMonth.split('-');
+        const startDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
 
         // Logic: Use passed budget, OR fetch from global store, OR fallback to base
         let targetBudget = totalBudgetOverride;

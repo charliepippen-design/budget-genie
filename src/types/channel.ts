@@ -120,6 +120,7 @@ export interface ChannelTypeConfig {
     conversionRate?: number;  // % Conversion Rate (or Lead -> FTD)
     aov?: number;             // Average Order Value / LTV / NGR per FTD
     trafficPerUnit?: number;  // Est. Traffic for Flat Fee / Retainer
+    saturationCeiling?: number; // Spend level where returns diminish significantly (Half-Efficiency point in Michaelis-Menten)
   };
 }
 
@@ -245,8 +246,21 @@ export function calculateUnifiedMetrics(
       break;
   }
 
-  const revenue = ftds * playerValue;
+  // 1. Calculate Linear Revenue (Pre-Saturation)
+  let revenue = ftds * playerValue;
+
+  // 2. Apply Diminishing Returns (Saturation)
+  // Formula: Revenue = LinearRevenue * (1 / (1 + (Spend / Saturation)))
+  // Ideally, SaturationCeiling is the point where efficiency is halved.
+  const saturation = baselineMetrics.saturationCeiling;
+
+  if (saturation && saturation > 0 && finalSpend > 0) {
+    const decayFactor = 1 / (1 + (finalSpend / saturation));
+    revenue = revenue * decayFactor;
+  }
+
   const cpa = ftds > 0 ? finalSpend / ftds : null;
+  // Recalculate ROAS based on decayed revenue
   const roas = finalSpend > 0 ? revenue / finalSpend : 0;
 
   return {
