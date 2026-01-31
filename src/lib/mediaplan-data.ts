@@ -1,0 +1,401 @@
+// Media Plan Budget Calibrator - Data Layer
+// Based on iGaming media plan structure
+
+export interface Channel {
+  id: string;
+  name: string;
+  category: ChannelCategory;
+  baseSpend: number; // Reference spend (Month 2 - representative month)
+  basePercentage: number; // Calculated percentage of total
+  cpm?: number; // Cost per mille (estimated for channel type)
+  ctr?: number; // Click-through rate (estimated for channel type)
+  estimatedRoas?: number; // Return on ad spend
+}
+
+export type ChannelCategory =
+  | 'Paid Search'
+  | 'Paid Social'
+  | 'Display/Programmatic'
+  | 'Affiliate'
+  | 'SEO/Content'
+  | 'Offline/TV'
+  | 'Email/SMS'
+  | 'Other';
+
+export interface BudgetScenario {
+  id: string;
+  name: string;
+  totalBudget: number;
+  channelAllocations: Record<string, number>; // channelId -> percentage
+  createdAt: Date;
+}
+
+export interface CalculatedMetrics {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  conversions: number;
+  cpa: number | null;
+  revenue: number;
+  roas: number;
+}
+
+// Channel data extracted from CSV with estimated performance metrics
+// Using Month 2 (May) as the reference baseline for balanced allocation
+export const CHANNELS: Channel[] = [
+  // SEO & Content
+  {
+    id: 'seo-tech',
+    name: 'SEO - Tech Audit & On-Page',
+    category: 'SEO/Content',
+    baseSpend: 500,
+    basePercentage: 0,
+    cpm: 2.5,
+    ctr: 0.8,
+    estimatedRoas: 3.2,
+  },
+  {
+    id: 'seo-content',
+    name: 'SEO - Content Production',
+    category: 'SEO/Content',
+    baseSpend: 1500,
+    basePercentage: 0,
+    cpm: 1.8,
+    ctr: 1.2,
+    estimatedRoas: 4.5,
+  },
+  {
+    id: 'seo-backlinks',
+    name: 'SEO - Backlinks / Guest Posts',
+    category: 'SEO/Content',
+    baseSpend: 1000,
+    basePercentage: 0,
+    cpm: 3.5,
+    ctr: 0.5,
+    estimatedRoas: 2.8,
+  },
+  // Paid Media
+  {
+    id: 'paid-native',
+    name: 'Paid - Native Ads (Adult/Crypto)',
+    category: 'Display/Programmatic',
+    baseSpend: 2500,
+    basePercentage: 0,
+    cpm: 4.2,
+    ctr: 0.35,
+    estimatedRoas: 1.8,
+  },
+  {
+    id: 'paid-push',
+    name: 'Paid - Push Notifications',
+    category: 'Display/Programmatic',
+    baseSpend: 1500,
+    basePercentage: 0,
+    cpm: 1.2,
+    ctr: 2.5,
+    estimatedRoas: 2.2,
+  },
+  {
+    id: 'paid-programmatic',
+    name: 'Paid - Programmatic / Display',
+    category: 'Display/Programmatic',
+    baseSpend: 1000,
+    basePercentage: 0,
+    cpm: 5.5,
+    ctr: 0.15,
+    estimatedRoas: 1.5,
+  },
+  {
+    id: 'paid-retargeting',
+    name: 'Paid - Retargeting (Pixel)',
+    category: 'Display/Programmatic',
+    baseSpend: 500,
+    basePercentage: 0,
+    cpm: 8.0,
+    ctr: 1.8,
+    estimatedRoas: 4.2,
+  },
+  // Affiliates
+  {
+    id: 'affiliate-listing',
+    name: 'Affiliate - Listing Fees (Fixed)',
+    category: 'Affiliate',
+    baseSpend: 1000,
+    basePercentage: 0,
+    cpm: 15.0,
+    ctr: 3.5,
+    estimatedRoas: 2.0,
+  },
+  {
+    id: 'affiliate-cpa',
+    name: 'Affiliate - CPA Commissions',
+    category: 'Affiliate',
+    baseSpend: 8500,
+    basePercentage: 0,
+    cpm: 25.0,
+    ctr: 4.2,
+    estimatedRoas: 3.5,
+  },
+  // Influencers
+  {
+    id: 'influencer-retainers',
+    name: 'Influencer - Monthly Retainers',
+    category: 'Paid Social',
+    baseSpend: 2000,
+    basePercentage: 0,
+    cpm: 12.0,
+    ctr: 1.5,
+    estimatedRoas: 2.5,
+  },
+  {
+    id: 'influencer-funds',
+    name: 'Influencer - Play Funds (Bal)',
+    category: 'Paid Social',
+    baseSpend: 1500,
+    basePercentage: 0,
+    cpm: 10.0,
+    ctr: 2.0,
+    estimatedRoas: 3.0,
+  },
+];
+
+// Calculate base percentages
+const totalBaseSpend = CHANNELS.reduce((sum, ch) => sum + ch.baseSpend, 0);
+CHANNELS.forEach((ch) => {
+  ch.basePercentage = (ch.baseSpend / totalBaseSpend) * 100;
+});
+
+// Budget type presets
+export const BUDGET_PRESETS = {
+  aggressive: {
+    name: 'Aggressive',
+    description: 'Higher paid media allocation for rapid growth',
+    multipliers: {
+      'SEO/Content': 0.8,
+      'Display/Programmatic': 1.5,
+      'Paid Search': 1.5,
+      'Affiliate': 1.2,
+      'Paid Social': 0.8, // Influencer
+    },
+  },
+  growth_mode: {
+    name: 'Growth Mode',
+    description: 'Maximum scale on paid channels',
+    multipliers: {
+      'SEO/Content': 0.5,
+      'Display/Programmatic': 2.0,
+      'Paid Search': 2.0,
+      'Affiliate': 1.2,
+      'Paid Social': 1.2,
+    },
+  },
+  affiliate_dominant: {
+    name: 'Affiliate Dominant',
+    description: 'Scale via partner networks',
+    multipliers: {
+      'SEO/Content': 0.8,
+      'Display/Programmatic': 0.5,
+      'Paid Search': 0.5,
+      'Affiliate': 2.5,
+      'Paid Social': 1.0,
+    },
+  },
+  balanced: {
+    name: 'Balanced',
+    description: 'Equal distribution across all channels',
+    multipliers: {
+      'SEO/Content': 1.0,
+      'Display/Programmatic': 1.0,
+      'Paid Search': 1.0,
+      'Affiliate': 1.0,
+      'Paid Social': 1.0,
+    },
+  },
+  brand: {
+    name: 'Brand',
+    description: 'Focus on organic and influencer reach',
+    multipliers: {
+      'SEO/Content': 1.5,
+      'Display/Programmatic': 0.6,
+      'Paid Search': 0.6,
+      'Affiliate': 0.8,
+      'Paid Social': 1.6,
+    },
+  },
+  custom: {
+    name: 'Custom',
+    description: 'Manual allocation control',
+    multipliers: {
+      'SEO/Content': 1.0,
+      'Display/Programmatic': 1.0,
+      'Paid Search': 1.0,
+      'Affiliate': 1.0,
+      'Paid Social': 1.0,
+    },
+  },
+} as const;
+
+export type BudgetPresetKey = keyof typeof BUDGET_PRESETS;
+
+// Category metadata
+export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: string; icon: string }> = {
+  'SEO/Content': { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
+  'Display/Programmatic': { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
+  'Affiliate': { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
+  'Paid Social': { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
+  'Paid Search': { name: 'Paid Search', color: 'hsl(var(--chart-5))', icon: 'Search' },
+  'Offline/TV': { name: 'Offline/TV', color: 'hsl(var(--muted-foreground))', icon: 'Tv' },
+  'Email/SMS': { name: 'Email/SMS', color: 'hsl(var(--primary))', icon: 'Mail' },
+  'Other': { name: 'Other', color: 'hsl(var(--secondary))', icon: 'HelpCircle' },
+};
+
+// Utility functions
+export function formatCurrency(value: number, compact = false): string {
+  // Default to EUR for legacy/fallback usage
+  const info = { symbol: '€', locale: 'de-DE', symbolPosition: 'after' };
+
+  if (compact) {
+    let formatted: string;
+    if (value >= 1000000) {
+      formatted = `${(value / 1000000).toFixed(1)}M`;
+    } else if (value >= 1000) {
+      formatted = `${(value / 1000).toFixed(1)}K`;
+    } else {
+      formatted = value.toFixed(0);
+    }
+    return info.symbolPosition === 'before'
+      ? `${info.symbol}${formatted}`
+      : `${formatted}${info.symbol}`;
+  }
+
+  const formatter = new Intl.NumberFormat(info.locale, {
+    style: 'currency',
+    currency: 'EUR',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  });
+
+  return formatter.format(value);
+}
+
+export function formatNumber(value: number, compact = false): string {
+  if (compact) {
+    if (value >= 1000000000) {
+      return `${(value / 1000000000).toFixed(1)}B`;
+    }
+    if (value >= 1000000) {
+      return `${(value / 1000000).toFixed(1)}M`;
+    }
+    if (value >= 1000) {
+      return `${(value / 1000).toFixed(1)}K`;
+    }
+  }
+  return new Intl.NumberFormat('de-DE').format(Math.round(value));
+}
+
+export function formatPercentage(value: number): string {
+  return `${value.toFixed(1)}%`;
+}
+
+// Calculate metrics for a channel given spend
+export function calculateChannelMetrics(
+  channel: Channel,
+  spend: number
+): CalculatedMetrics {
+  const cpm = channel.cpm || 5;
+  const ctr = channel.ctr || 1;
+  const roas = channel.estimatedRoas || 2;
+
+  const impressions = (spend / cpm) * 1000;
+  const clicks = impressions * (ctr / 100);
+  const conversionRate = 0.025; // 2.5% average conversion rate
+  const conversions = clicks * conversionRate;
+  const cpa = conversions > 0 ? spend / conversions : null;
+  const revenue = spend * roas;
+
+  return {
+    spend,
+    impressions,
+    clicks,
+    conversions,
+    cpa,
+    revenue,
+    roas,
+  };
+}
+
+// Calculate blended metrics across all channels
+export function calculateBlendedMetrics(
+  channels: Channel[],
+  allocations: Record<string, number>,
+  totalBudget: number
+): {
+  totalSpend: number;
+  totalImpressions: number;
+  totalClicks: number;
+  totalConversions: number;
+  blendedCpa: number | null;
+  projectedRevenue: number;
+  blendedRoas: number;
+} {
+  let totalSpend = 0;
+  let totalImpressions = 0;
+  let totalClicks = 0;
+  let totalConversions = 0;
+  let totalRevenue = 0;
+
+  channels.forEach((channel) => {
+    const percentage = allocations[channel.id] ?? channel.basePercentage;
+    const spend = (percentage / 100) * totalBudget;
+    const metrics = calculateChannelMetrics(channel, spend);
+
+    totalSpend += metrics.spend;
+    totalImpressions += metrics.impressions;
+    totalClicks += metrics.clicks;
+    totalConversions += metrics.conversions;
+    totalRevenue += metrics.revenue;
+  });
+
+  const blendedCpa = totalConversions > 0 ? totalSpend / totalConversions : null;
+  const blendedRoas = totalSpend > 0 ? totalRevenue / totalSpend : 0;
+
+  return {
+    totalSpend,
+    totalImpressions,
+    totalClicks,
+    totalConversions,
+    blendedCpa,
+    projectedRevenue: totalRevenue,
+    blendedRoas,
+  };
+}
+
+// Local storage helpers
+const STORAGE_KEY = 'mediaplan-scenarios';
+
+export function saveScenario(scenario: BudgetScenario): void {
+  const existing = loadScenarios();
+  const updated = [...existing.filter((s) => s.id !== scenario.id), scenario];
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+}
+
+export function loadScenarios(): BudgetScenario[] {
+  try {
+    const data = localStorage.getItem(STORAGE_KEY);
+    if (!data) return [];
+    return JSON.parse(data).map((s: BudgetScenario) => ({
+      ...s,
+      createdAt: new Date(s.createdAt),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export function deleteScenario(id: string): void {
+  const existing = loadScenarios();
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify(existing.filter((s) => s.id !== id))
+  );
+}

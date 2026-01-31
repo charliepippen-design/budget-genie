@@ -1,0 +1,277 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* MediaPlan Pro Design System - Professional Dashboard Theme */
+
+@layer base {
+  :root {
+    /* Light mode - Clean professional whites */
+    --background: 220 20% 97%;
+    --foreground: 224 71% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 224 71% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 224 71% 10%;
+
+    --primary: 224 76% 40%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 14% 90%;
+    --secondary-foreground: 224 71% 10%;
+
+    --muted: 220 14% 94%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 187 92% 35%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 36%;
+    --success-foreground: 0 0% 100%;
+
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 220 13% 88%;
+    --input: 220 13% 88%;
+    --ring: 224 76% 40%;
+
+    --radius: 0.75rem;
+
+    /* Chart colors */
+    --chart-1: 224 76% 40%;
+    --chart-2: 187 92% 35%;
+    --chart-3: 142 76% 36%;
+    --chart-4: 38 92% 50%;
+    --chart-5: 280 65% 60%;
+    --chart-6: 350 80% 55%;
+
+    --sidebar-background: 224 71% 10%;
+    --sidebar-foreground: 220 14% 94%;
+    --sidebar-primary: 187 92% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 224 50% 18%;
+    --sidebar-accent-foreground: 220 14% 94%;
+    --sidebar-border: 224 50% 18%;
+    --sidebar-ring: 187 92% 35%;
+
+    /* Custom gradient tokens */
+    --gradient-primary: linear-gradient(135deg, hsl(224 76% 40%), hsl(187 92% 35%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(220 20% 98%));
+    --gradient-accent: linear-gradient(135deg, hsl(187 92% 35%), hsl(224 76% 40%));
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 hsl(224 71% 10% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(224 71% 10% / 0.1), 0 2px 4px -2px hsl(224 71% 10% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(224 71% 10% / 0.1), 0 4px 6px -4px hsl(224 71% 10% / 0.1);
+    --shadow-glow: 0 0 20px hsl(187 92% 35% / 0.3);
+  }
+
+  .dark {
+    --background: 224 71% 4%;
+    --foreground: 220 14% 94%;
+
+    --card: 224 50% 8%;
+    --card-foreground: 220 14% 94%;
+
+    --popover: 224 50% 8%;
+    --popover-foreground: 220 14% 94%;
+
+    --primary: 224 76% 48%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 224 50% 14%;
+    --secondary-foreground: 220 14% 94%;
+
+    --muted: 224 50% 14%;
+    --muted-foreground: 220 9% 60%;
+
+    --accent: 187 92% 42%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --success: 142 76% 45%;
+    --success-foreground: 0 0% 10%;
+
+    --warning: 38 92% 55%;
+    --warning-foreground: 0 0% 10%;
+
+    --border: 224 30% 18%;
+    --input: 224 30% 18%;
+    --ring: 187 92% 42%;
+
+    --chart-1: 224 76% 55%;
+    --chart-2: 187 92% 50%;
+    --chart-3: 142 76% 50%;
+    --chart-4: 38 92% 55%;
+    --chart-5: 280 65% 65%;
+    --chart-6: 350 80% 60%;
+
+    --sidebar-background: 224 71% 6%;
+    --sidebar-foreground: 220 14% 94%;
+    --sidebar-primary: 187 92% 42%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 224 50% 12%;
+    --sidebar-accent-foreground: 220 14% 94%;
+    --sidebar-border: 224 30% 18%;
+    --sidebar-ring: 187 92% 42%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(224 76% 48%), hsl(187 92% 42%));
+    --gradient-card: linear-gradient(180deg, hsl(224 50% 10%), hsl(224 50% 8%));
+    --gradient-accent: linear-gradient(135deg, hsl(187 92% 42%), hsl(224 76% 48%));
+
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.3);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.4), 0 2px 4px -2px hsl(0 0% 0% / 0.3);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.4), 0 4px 6px -4px hsl(0 0% 0% / 0.3);
+    --shadow-glow: 0 0 30px hsl(187 92% 42% / 0.25);
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  /* Custom Scrollbar Scaling for all browsers */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/30 rounded-full hover:bg-muted-foreground/50 transition-colors;
+  }
+
+  /* Firefox Support */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-semibold tracking-tight;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-border/50;
+  }
+
+  .gradient-text {
+    @apply bg-clip-text text-transparent;
+    background-image: var(--gradient-primary);
+  }
+
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  .transition-smooth {
+    @apply transition-all duration-300 ease-out;
+  }
+
+  .glow {
+    box-shadow: var(--shadow-glow);
+  }
+
+  .card-shadow {
+    box-shadow: var(--shadow-md);
+  }
+
+  .card-shadow-lg {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes scaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.shimmer {
+  background: linear-gradient(90deg,
+      hsl(var(--muted)) 0%,
+      hsl(var(--background)) 50%,
+      hsl(var(--muted)) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
