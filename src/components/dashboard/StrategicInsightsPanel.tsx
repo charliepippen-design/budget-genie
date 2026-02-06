@@ -43,14 +43,23 @@ export const StrategicInsightsPanel = () => {
         // Simple way: Add saving / N to remaining channels.
 
         const others = candidates.filter(ch => ch.id !== highestCpa.id);
-        if (others.length > 0) {
+        const totalOtherAlloc = others.reduce((sum, ch) => sum + ch.allocationPct, 0);
+
+        if (others.length > 0 && totalOtherAlloc > 0) {
+            others.forEach(ch => {
+                const share = ch.allocationPct / totalOtherAlloc;
+                const boost = saving * share;
+                updateChannelAllocation(ch.id, ch.allocationPct + boost);
+            });
+        } else if (others.length > 0) {
+            // Fallback to equal if others have 0 allocation
             const boost = saving / others.length;
             others.forEach(ch => updateChannelAllocation(ch.id, ch.allocationPct + boost));
         }
 
         toast({
-            title: "Efficiency Improved",
-            description: `Reduced ${highestCpa.name} spend by 10% due to high CPA (${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(highestCpa.metrics.cpa)}). Savings redistributed.`,
+            title: "Optimized",
+            description: `Reduced ${highestCpa.name} budget by 10% due to high CPA.`,
         });
     };
 
@@ -84,8 +93,8 @@ export const StrategicInsightsPanel = () => {
         updateChannelAllocation(winner.id, winner.allocationPct + amount);
 
         toast({
-            title: "Arbitrage Executed",
-            description: `Moved 5% budget from ${loser.name} (Low ROAS) to ${winner.name} (High ROAS).`,
+            title: "Strategy",
+            description: `Moved 5% budget from ${loser.name} to ${winner.name} to maximize ROAS.`,
             className: "border-green-500/30 bg-green-500/10"
         });
     };
