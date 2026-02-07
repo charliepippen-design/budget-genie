@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { ChannelCategory, CATEGORY_INFO, calculateChannelMetrics } from '@/lib/mediaplan-data';
+import { ChannelCategory, CATEGORY_INFO } from '@/lib/mediaplan-data';
 import {
   ChannelFamily,
   BuyingModel,
@@ -11,6 +11,7 @@ import {
   inferBuyingModel,
   getLikelyModel
 } from '@/types/channel';
+import { normalizeAllocations as normalizeAllocationsUtil } from '@/lib/math-utils';
 import { calculateScoredAllocation } from '@/lib/distribution-logic';
 
 // ========== DATA MODEL ==========
@@ -34,6 +35,7 @@ export interface ChannelData {
 
   // UI State / Meta
   locked: boolean;
+  isActive: boolean; // New Ghost Math Flag
   warnings?: string[];
 }
 
@@ -173,6 +175,7 @@ function createInitialChannels(): ChannelData[] {
       maxSpendLimit: 0, // 0 = no limit
 
       locked: false,
+      isActive: true,
     };
   });
 }
@@ -180,11 +183,27 @@ function createInitialChannels(): ChannelData[] {
 
 // ========== CALCULATION FUNCTIONS ==========
 
-function calculateChannelMetrics(
+export function calculateChannelMetrics(
   channel: ChannelData,
   totalBudget: number,
   multipliers: GlobalMultipliers
 ): CalculatedChannelMetrics {
+  // Ghost Math: If inactive, return zeroed metrics
+  if (channel.isActive === false) {
+    return {
+      spend: 0,
+      impressions: 0,
+      clicks: 0,
+      conversions: 0,
+      cpa: 0,
+      revenue: 0,
+      roas: 0,
+      effectivePrice: 0,
+      effectiveCtr: 0,
+      effectiveCr: 0,
+    };
+  }
+
   // Spend = allocation × budget × spend multiplier
   const spend = (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
 
@@ -242,8 +261,12 @@ interface MediaPlanState {
   // Actions - Channels
   setChannelAllocation: (channelId: string, percentage: number) => void;
   setAllocations: (allocations: Record<string, number>) => void;
+
   normalizeAllocations: () => void;
   toggleChannelLock: (channelId: string) => void;
+  toggleChannelActive: (channelId: string) => void;
+
+  restoreState: (snapshot: Partial<MediaPlanState>) => void; // For Time Travel
 
   addChannel: (channel: Partial<ChannelData> & { name: string; category: ChannelCategory }) => void;
   deleteChannel: (id: string) => void;
@@ -307,34 +330,19 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       normalizeAllocations: () => {
+        set((state) => ({
+          channels: normalizeAllocationsUtil(state.channels)
+        }));
+      },
+
+      toggleChannelActive: (channelId) => {
         set((state) => {
-          // Identify Fixed vs Variable
-          const isFixed = (ch: ChannelData) => ch.buyingModel === 'FLAT_FEE' || ch.buyingModel === 'RETAINER' || ch.tier === 'fixed';
+          const newChannels = state.channels.map((ch) =>
+            ch.id === channelId ? { ...ch, isActive: !ch.isActive } : ch
+          );
 
-          const variableChannels = state.channels.filter(ch => !isFixed(ch));
-
-          // Calculate factors strictly on VARIABLE channels
-          const lockedTotal = variableChannels
-            .filter(ch => ch.locked)
-            .reduce((sum, ch) => sum + ch.allocationPct, 0);
-
-          const unlockedInfo = variableChannels.filter(ch => !ch.locked);
-          const currentUnlockedTotal = unlockedInfo.reduce((sum, ch) => sum + ch.allocationPct, 0);
-
-          const targetUnlocked = Math.max(0, 100 - lockedTotal);
-          const factor = currentUnlockedTotal > 0 ? targetUnlocked / currentUnlockedTotal : 0;
-
-          return {
-            channels: state.channels.map((ch) => {
-              if (isFixed(ch)) return ch; // Fixed channels are ignored in normalization
-              if (ch.locked) return ch; // Locked variable channels stay put
-
-              return {
-                ...ch,
-                allocationPct: Math.max(0, ch.allocationPct * factor),
-              };
-            }),
-          };
+          // Re-normalize immediately after toggle
+          return { channels: normalizeAllocationsUtil(newChannels) };
         });
       },
 
@@ -410,19 +418,12 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             maxSpendLimit: 0,
 
             locked: false,
+            isActive: true,
           };
 
           // Normalize to include new channel
           const allChannels = [...state.channels, newChannel];
-          const total = allChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);
-          const factor = 100 / total;
-
-          return {
-            channels: allChannels.map((ch) => ({
-              ...ch,
-              allocationPct: ch.allocationPct * factor,
-            })),
-          };
+          return { channels: normalizeAllocationsUtil(allChannels) };
         });
       },
 
@@ -431,16 +432,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           const remaining = state.channels.filter((ch) => ch.id !== id);
           if (remaining.length === 0) return state;
 
-          // Re-normalize
-          const total = remaining.reduce((sum, ch) => sum + ch.allocationPct, 0);
-          const factor = total > 0 ? 100 / total : 1;
-
-          return {
-            channels: remaining.map((ch) => ({
-              ...ch,
-              allocationPct: ch.allocationPct * factor,
-            })),
-          };
+          return { channels: normalizeAllocationsUtil(remaining) };
         });
       },
 
@@ -601,7 +593,8 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             },
             tier,
             maxSpendLimit: 0,
-            locked: d.isLocked
+            locked: d.isLocked,
+            isActive: true
           };
         });
 
@@ -645,6 +638,13 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           };
         });
       },
+
+      restoreState: (snapshot) => {
+        set((state) => ({
+          ...state,
+          ...snapshot
+        }));
+      },
     }),
     {
       name: 'mediaplan-store-v2',
@@ -654,7 +654,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
       }),
-      version: 2, // Increment version to force migration/reset
+      version: 3, // Increment version to force migration/reset
       migrate: (persistedState: any, version) => {
         if (version < 2) {
           // Hard reset for version 2 (Types totally changed)
@@ -663,6 +663,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             channels: createInitialChannels(),
             globalMultipliers: { ...DEFAULT_MULTIPLIERS },
             presets: []
+          } as MediaPlanState;
+        }
+        // Migration to v3 for isActive
+        if (version < 3) {
+          return {
+            ...persistedState,
+            channels: (persistedState as any).channels.map((ch: any) => ({
+              ...ch,
+              isActive: true
+            }))
           } as MediaPlanState;
         }
         return persistedState as MediaPlanState;

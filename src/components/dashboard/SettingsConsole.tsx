@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Use the requested relative import for the store
+// FIX: Use the requested relative import for the store
 import { useProjectStore } from '../../store/useProjectStore';
+import { useHistoryStore } from '@/hooks/use-history';
 import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
 
 // FIX: Use relative imports for UI components as requested
@@ -26,6 +28,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 import { ChannelEditor } from './ChannelEditor';
 import { BudgetWizard } from './BudgetWizard';
+import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
 import { BuyingModel, BUYING_MODEL_INFO, inferChannelFamily, getLikelyModel } from '@/types/channel';
 
@@ -34,8 +37,9 @@ import { BuyingModel, BUYING_MODEL_INFO, inferChannelFamily, getLikelyModel } fr
 // ------------------------------------------------------------------
 const GlobalMultipliers: React.FC = () => {
   // We can use the same store hook here
-  const { globalMultipliers = { spendMultiplier: 1, cpaTarget: null, roasTarget: null }, setGlobalMultipliers } = useProjectStore();
-  const { symbol } = useCurrency();
+  const { globalMultipliers = { spendMultiplier: 1, cpaTarget: null, roasTarget: null }, setGlobalMultipliers, totalBudget } = useProjectStore();
+  const { symbol, format } = useCurrency();
+  const { toast } = useToast();
 
   return (
     <div className="space-y-4">
@@ -48,6 +52,13 @@ const GlobalMultipliers: React.FC = () => {
         <Slider
           value={[globalMultipliers.spendMultiplier]}
           onValueChange={([v]) => setGlobalMultipliers({ spendMultiplier: v })}
+          onValueCommit={([v]) => {
+            const newBudget = totalBudget * v;
+            toast({
+              title: "Budget Scaled",
+              description: `Effective budget is now ${format(newBudget)}`,
+            });
+          }}
           min={0.8} max={2} step={0.05}
           className="mt-1"
         />
@@ -151,7 +162,8 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
 // MAIN COMPONENT: SettingsConsole
 // ------------------------------------------------------------------
 export const SettingsConsole: React.FC = () => {
-  const { channels, addChannel, resetAll } = useProjectStore();
+  const { channels, addChannel, resetAll, totalBudget, globalMultipliers } = useProjectStore();
+  const { record } = useHistoryStore();
   const channelsWithMetrics = useChannelsWithMetrics();
   const { toast } = useToast();
 
@@ -205,7 +217,23 @@ export const SettingsConsole: React.FC = () => {
                 </Button>
               }
             />
-            <Button variant="ghost" size="sm" onClick={resetAll} className="text-xs text-slate-500 hover:text-white h-7 px-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                if (window.confirm("Are you sure you want to reset the entire plan? This cannot be undone (except via Undo).")) {
+                  // Snapshot current state for Undo
+                  record({
+                    channels,
+                    totalBudget,
+                    globalMultipliers
+                  });
+                  resetAll();
+                  toast({ title: "Plan Reset", description: "Use Undo (Ctrl+Z) to restore if needed." });
+                }
+              }}
+              className="text-xs text-slate-500 hover:text-white h-7 px-2"
+            >
               <RotateCcw className="w-3 h-3 mr-1.5" /> Reset
             </Button>
           </div>
@@ -214,6 +242,9 @@ export const SettingsConsole: React.FC = () => {
         {/* Render Global Multipliers safely in a Card */}
         <div className="bg-[#0f172a] p-4 rounded-xl border border-slate-800 shadow-sm mb-2">
           <GlobalMultipliers />
+          <div className="mt-3">
+            <OptimizationControls />
+          </div>
         </div>
       </div>
 

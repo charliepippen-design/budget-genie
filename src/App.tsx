@@ -12,6 +12,8 @@ import Settings from "./pages/Settings";
 import MaintenanceMode from "./pages/MaintenanceMode";
 import { CloudStatus } from "./components/common/CloudStatus";
 import { useStoreSync } from "./hooks/use-store-sync";
+import { useHistoryRecorder } from "@/hooks/use-history";
+import { KeyboardManager } from "@/components/common/KeyboardManager";
 import UnderConstruction from "./pages/UnderConstruction";
 
 const queryClient = new QueryClient();
@@ -29,6 +31,7 @@ const App = () => {
   }
 
   useStoreSync();
+  useHistoryRecorder();
   // ... rest of app
 
   return (
@@ -36,6 +39,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <KeyboardManager />
         <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
           <CurrencyProvider>
             <Routes>

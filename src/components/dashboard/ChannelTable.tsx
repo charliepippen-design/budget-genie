@@ -282,11 +282,12 @@ export function ChannelTable() {
                               )}
                             </Button>
                             <Slider
+                              data-channel-id={channel.id}
                               value={[channel.allocationPct]}
                               onValueChange={(values) => handleSliderChange(channel.id, values)}
                               min={0}
                               max={100}
-                              step={0.5}
+                              step={0.1}
                               className={cn(
                                 "w-20 [&_[role=slider]]:h-4 [&_[role=slider]]:w-4",
                                 (channel.locked || channel.tier === 'fixed') && "opacity-50 pointer-events-none grayscale"
@@ -414,11 +415,12 @@ export function ChannelTable() {
                       {/* Slider */}
                       <div className="flex items-center gap-3 mb-3">
                         <Slider
+                          data-channel-id={channel.id}
                           value={[channel.allocationPct]}
                           onValueChange={(values) => handleSliderChange(channel.id, values)}
                           min={0}
                           max={100}
-                          step={0.5}
+                          step={0.1}
                           className="flex-1"
                         />
                         <span className="font-mono text-sm w-14 text-right">
