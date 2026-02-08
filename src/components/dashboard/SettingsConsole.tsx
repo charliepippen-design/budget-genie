@@ -113,45 +113,60 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
 
   return (
     <div className={cn(
-      "group relative flex items-center justify-between p-3 rounded-lg border transition-all duration-200",
-      "bg-slate-800/20 border-slate-700/30 hover:bg-slate-800/50 hover:border-slate-600", // UPDATED: More subtle base, stronger hover
+      "group flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:border-slate-600 transition-all mb-2",
       isWarning && "border-red-900/50 bg-red-900/10"
     )}>
-      {/* Left Info */}
-      <div className="flex items-center gap-3 min-w-0">
+      {/* LEFT: Data Column (Never obscured) */}
+      <div className="flex items-center gap-3 min-w-0 overflow-hidden">
+        {/* Status Dot */}
         <div
-          className="w-2.5 h-2.5 rounded-full shrink-0 ring-2 ring-slate-900/50"
-          style={{ backgroundColor: CATEGORY_INFO[channel.category]?.color || '#cbd5e1' }}
+          className={cn(
+            "w-2.5 h-2.5 rounded-full shrink-0",
+            channel.isActive ? "bg-emerald-500" : "bg-slate-600"
+          )}
+          style={channel.isActive ? { backgroundColor: CATEGORY_INFO[channel.category]?.color || '#10b981' } : undefined}
         />
+
         <div className="flex flex-col min-w-0">
           <span className={cn(
-            "text-sm font-medium pr-2 break-words leading-tight transition-colors",
-            isWarning ? "text-red-400" : "text-slate-300 group-hover:text-white" // UPDATED: text-slate-300 base
+            "text-sm font-medium truncate",
+            isWarning ? "text-red-400" : "text-slate-200"
           )}>
             {channel.name}
           </span>
-          <div className="flex items-center gap-2 mt-1">
-            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-slate-700/50 text-slate-400 border-0">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
+            <span className="uppercase tracking-wider font-bold text-[10px] bg-slate-800 px-1.5 rounded">
               {channel.buyingModel}
-            </Badge>
-            <span className="text-[10px] text-slate-600 truncate">
+            </span>
+            <span className="truncate text-slate-400">
               {channel.allocationPct.toFixed(1)}% Alloc
             </span>
           </div>
         </div>
       </div>
 
-      {/* Right Actions */}
-      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-        <ChannelEditor channel={channel} />
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md"
-          onClick={handleDelete}
+      {/* RIGHT: Action Icons (Visible on group-hover) */}
+      <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity pl-2">
+        <ChannelEditor
+          channel={channel}
+          trigger={
+            <button
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+              title="Configure"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          }
+        />
+
+        <button
+          onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+          className="p-1.5 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors"
+          title="Delete"
         >
-          <Trash2 className="h-3.5 w-3.5" />
-        </Button>
+          <Trash2 className="w-4 h-4" />
+        </button>
       </div>
     </div>
   );
