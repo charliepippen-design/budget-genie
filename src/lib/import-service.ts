@@ -1,5 +1,4 @@
 import Papa from 'papaparse';
-import * as XLSX from 'xlsx';
 import { z } from 'zod';
 import { ChannelMonthConfig, MonthData, GlobalPlanSettings, ProgressionPattern } from '@/hooks/use-multi-month-store';
 import { ChannelCategory } from '@/lib/mediaplan-data';
@@ -56,7 +55,7 @@ const parsedMonthDataSchema = z.object({
 
 // ========== TYPES ==========
 
-export type FileFormat = 'csv' | 'xlsx' | 'json';
+export type FileFormat = 'csv' | 'json';
 export type DataStructure = 'row-based' | 'column-based' | 'monthly-summary' | 'pivot' | 'annual-totals';
 export type ImportGranularity = 'monthly' | 'annual';
 
@@ -315,7 +314,7 @@ function parseNumber(value: string | number | undefined): number {
     .replace(/[€$£¥₹,\s]/g, '')
     .replace(/\(([^)]+)\)/, '-$1') // Handle negative in parentheses
     .replace(/%$/, '') // Remove trailing %
-    .replace(/[^0-9.\-]/g, ''); // Remove any other non-numeric characters
+    .replace(/[^0-9.-]/g, ''); // Remove any other non-numeric characters
 
   const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
@@ -369,7 +368,7 @@ export function validateFile(file: File): { valid: boolean; error?: string } {
 
   // Check file extension
   const ext = file.name.split('.').pop()?.toLowerCase();
-  const allowedExtensions = ['csv', 'txt', 'xlsx', 'xls', 'json'];
+  const allowedExtensions = ['csv', 'txt', 'json'];
   if (!ext || !allowedExtensions.includes(ext)) {
     return {
       valid: false,
@@ -417,8 +416,6 @@ export async function parseFile(file: File): Promise<string[][]> {
 
   if (ext === 'csv' || ext === 'txt') {
     data = await parseCSV(file);
-  } else if (ext === 'xlsx' || ext === 'xls') {
-    data = await parseExcel(file);
   } else if (ext === 'json') {
     data = await parseJSON(file);
   } else {
@@ -442,45 +439,6 @@ async function parseCSV(file: File): Promise<string[][]> {
       },
       error: reject,
     });
-  });
-}
-
-async function parseExcel(file: File): Promise<string[][]> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        // Limit parsing options to prevent resource exhaustion
-        const workbook = XLSX.read(data, {
-          type: 'array',
-          sheetRows: MAX_ROWS, // Limit rows read
-          cellFormula: false, // Don't evaluate formulas
-          cellHTML: false, // Don't parse HTML
-        });
-
-        if (workbook.SheetNames.length === 0) {
-          reject(new Error('Excel file contains no sheets'));
-          return;
-        }
-
-        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-        const jsonData = XLSX.utils.sheet_to_json(firstSheet, { header: 1, defval: '' });
-
-        // Sanitize all string values and convert to strings
-        const sanitizedData = (jsonData as unknown[][]).map(row =>
-          Array.isArray(row) ? row.map(cell =>
-            typeof cell === 'string' ? sanitizeString(cell) : String(cell ?? '')
-          ) : []
-        );
-
-        resolve(sanitizedData);
-      } catch (err) {
-        reject(new Error('Failed to parse Excel file. The file may be corrupted or in an unsupported format.'));
-      }
-    };
-    reader.onerror = () => reject(new Error('Failed to read file'));
-    reader.readAsArrayBuffer(file);
   });
 }
 
@@ -686,8 +644,7 @@ function fingerprintColumns(headerRow: string[], rawDataBelow: string[][]): Reco
 export function detectStructure(rawData: string[][], fileName: string): DetectedStructure {
   console.log("[Import] Raw Data Preview (First 5 Rows):", rawData.slice(0, 5));
 
-  const format: FileFormat = fileName.endsWith('.json') ? 'json' :
-    fileName.endsWith('.xlsx') || fileName.endsWith('.xls') ? 'xlsx' : 'csv';
+  const format: FileFormat = fileName.endsWith('.json') ? 'json' : 'csv';
 
   // Step 1: Find Anchor
   const { rowIndex: headerRowIndex } = findHeaderRow(rawData);
@@ -975,14 +932,19 @@ export function convertToMonthData(
       const typeConfig: ChannelTypeConfig = {
         family,
         buyingModel,
-        cpm: defaults.cpm,
-        ctr: defaults.ctr,
-        cr: defaults.cr,
-        // Set model-specific defaults
-        ...(buyingModel === 'flat_fee' && { fixedCost: spend || 1000, estFtds: 5 }),
-        ...(buyingModel === 'retainer' && { fixedCost: spend || 1000, estTraffic: 5000, cr: defaults.cr }),
-        ...(buyingModel === 'cpa' && { targetCpa: 50, targetFtds: 10 }),
-        ...(buyingModel === 'unit_based' && { unitCount: 4, costPerUnit: 500, estReachPerUnit: 50000, ctr: defaults.ctr, cr: defaults.cr }),
+        price:
+          buyingModel === 'FLAT_FEE' || buyingModel === 'RETAINER'
+            ? (spend || 1000)
+            : buyingModel === 'CPA'
+              ? 50
+              : defaults.cpm,
+        secondaryPrice: 0,
+        baselineMetrics: {
+          ctr: defaults.ctr,
+          conversionRate: defaults.cr,
+          aov: 150,
+          trafficPerUnit: 5000,
+        },
       };
 
       return {

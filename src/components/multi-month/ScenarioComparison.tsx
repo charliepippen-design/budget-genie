@@ -78,9 +78,9 @@ export function ScenarioComparison() {
     return [
       {
         label: 'Total Budget',
-        scenarioA: a.totalBudget,
-        scenarioB: b.totalBudget,
-        ...compare(a.totalBudget, b.totalBudget, false),
+        scenarioA: a.totalAllocatedBudget,
+        scenarioB: b.totalAllocatedBudget,
+        ...compare(a.totalAllocatedBudget, b.totalAllocatedBudget, false),
         format: 'currency' as const,
       },
       {

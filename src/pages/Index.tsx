@@ -1,11 +1,7 @@
 import { Helmet } from 'react-helmet';
 import { BudgetGenieAI } from '@/components/dashboard/BudgetGenieAI';
-import { ImportWizard } from '@/components/multi-month/ImportWizard';
-import { useState } from 'react';
 
 const Index = () => {
-  const [importOpen, setImportOpen] = useState(false);
-
   return (
     <>
       <Helmet>
@@ -15,8 +11,6 @@ const Index = () => {
 
       {/* The entire application layout is now handled by BudgetGenieAI */}
       <BudgetGenieAI />
-
-      <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
     </>
   );
 };

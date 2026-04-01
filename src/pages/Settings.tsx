@@ -1,17 +1,18 @@
 
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, User, Cloud, Database, CreditCard, ShieldCheck } from "lucide-react";
+import { ArrowLeft, User as UserIcon, Cloud, Database, CreditCard, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
+import type { User } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 
 export default function Settings() {
     const navigate = useNavigate();
-    const [user, setUser] = useState<any>(null);
+    const [user, setUser] = useState<User | null>(null);
     const [projectCount, setProjectCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -87,7 +88,7 @@ export default function Settings() {
                     <Card className="bg-[#1e293b] border-slate-700">
                         <CardHeader>
                             <div className="flex items-center gap-2">
-                                <User className="h-5 w-5 text-blue-400" />
+                                <UserIcon className="h-5 w-5 text-blue-400" />
                                 <CardTitle className="text-xl text-white">User Profile</CardTitle>
                             </div>
                         </CardHeader>

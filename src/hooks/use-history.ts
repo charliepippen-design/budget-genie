@@ -1,181 +1,275 @@
 import { create } from 'zustand';
-import { useMediaPlanStore, MediaPlanState } from './use-media-plan-store';
 import { useEffect, useRef } from 'react';
+import { useMediaPlanStore } from './use-media-plan-store';
+import { useMultiMonthStore } from './use-multi-month-store';
 
-interface HistoryState {
-    past: Partial<MediaPlanState>[];
-    future: Partial<MediaPlanState>[];
+const HISTORY_LIMIT = 120;
+const RECORD_DEBOUNCE_MS = 220;
 
-    undo: () => void;
-    redo: () => void;
-    record: (state: Partial<MediaPlanState>) => void;
-    canUndo: boolean;
-    canRedo: boolean;
-
-    isUndoing: boolean;
+interface MediaPlanSnapshot {
+  totalBudget: number;
+  channels: ReturnType<typeof useMediaPlanStore.getState>['channels'];
+  globalMultipliers: ReturnType<typeof useMediaPlanStore.getState>['globalMultipliers'];
+  presets: ReturnType<typeof useMediaPlanStore.getState>['presets'];
+  projectName: ReturnType<typeof useMediaPlanStore.getState>['projectName'];
 }
 
-const HISTORY_LIMIT = 50;
+interface MultiMonthSnapshot {
+  includeSoftLaunch: ReturnType<typeof useMultiMonthStore.getState>['includeSoftLaunch'];
+  planningMonths: ReturnType<typeof useMultiMonthStore.getState>['planningMonths'];
+  startMonth: ReturnType<typeof useMultiMonthStore.getState>['startMonth'];
+  progressionPattern: ReturnType<typeof useMultiMonthStore.getState>['progressionPattern'];
+  patternParams: ReturnType<typeof useMultiMonthStore.getState>['patternParams'];
+  globalSettings: ReturnType<typeof useMultiMonthStore.getState>['globalSettings'];
+  months: ReturnType<typeof useMultiMonthStore.getState>['months'];
+  scenarios: ReturnType<typeof useMultiMonthStore.getState>['scenarios'];
+  activeScenarioId: ReturnType<typeof useMultiMonthStore.getState>['activeScenarioId'];
+  comparisonScenarioId: ReturnType<typeof useMultiMonthStore.getState>['comparisonScenarioId'];
+  optimizationGoal: ReturnType<typeof useMultiMonthStore.getState>['optimizationGoal'];
+  riskLevel: ReturnType<typeof useMultiMonthStore.getState>['riskLevel'];
+  constraints: ReturnType<typeof useMultiMonthStore.getState>['constraints'];
+  optimizationResults: ReturnType<typeof useMultiMonthStore.getState>['optimizationResults'];
+  pdfSections: ReturnType<typeof useMultiMonthStore.getState>['pdfSections'];
+  userNotes: ReturnType<typeof useMultiMonthStore.getState>['userNotes'];
+}
+
+export interface VersionedBudgetState {
+  mediaPlan: MediaPlanSnapshot;
+  multiMonth: MultiMonthSnapshot;
+}
+
+interface HistoryState {
+  past: VersionedBudgetState[];
+  present: VersionedBudgetState | null;
+  future: VersionedBudgetState[];
+  canUndo: boolean;
+  canRedo: boolean;
+  isApplyingHistory: boolean;
+
+  initialize: (snapshot: VersionedBudgetState) => void;
+  record: (snapshot: VersionedBudgetState) => void;
+  undo: () => void;
+  redo: () => void;
+  clear: () => void;
+}
+
+function cloneSnapshot<T>(value: T): T {
+  if (typeof structuredClone === 'function') {
+    return structuredClone(value);
+  }
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+function createSnapshot(): VersionedBudgetState {
+  const mediaState = useMediaPlanStore.getState();
+  const multiMonthState = useMultiMonthStore.getState();
+
+  return cloneSnapshot({
+    mediaPlan: {
+      totalBudget: mediaState.totalBudget,
+      channels: mediaState.channels,
+      globalMultipliers: mediaState.globalMultipliers,
+      presets: mediaState.presets,
+      projectName: mediaState.projectName,
+    },
+    multiMonth: {
+      includeSoftLaunch: multiMonthState.includeSoftLaunch,
+      planningMonths: multiMonthState.planningMonths,
+      startMonth: multiMonthState.startMonth,
+      progressionPattern: multiMonthState.progressionPattern,
+      patternParams: multiMonthState.patternParams,
+      globalSettings: multiMonthState.globalSettings,
+      months: multiMonthState.months,
+      scenarios: multiMonthState.scenarios,
+      activeScenarioId: multiMonthState.activeScenarioId,
+      comparisonScenarioId: multiMonthState.comparisonScenarioId,
+      optimizationGoal: multiMonthState.optimizationGoal,
+      riskLevel: multiMonthState.riskLevel,
+      constraints: multiMonthState.constraints,
+      optimizationResults: multiMonthState.optimizationResults,
+      pdfSections: multiMonthState.pdfSections,
+      userNotes: multiMonthState.userNotes,
+    },
+  });
+}
+
+function snapshotHash(snapshot: VersionedBudgetState): string {
+  return JSON.stringify(snapshot);
+}
+
+function applySnapshot(snapshot: VersionedBudgetState) {
+  const mediaState = useMediaPlanStore.getState();
+  const multiMonthState = useMultiMonthStore.getState();
+
+  mediaState.restoreState({
+    totalBudget: snapshot.mediaPlan.totalBudget,
+    channels: cloneSnapshot(snapshot.mediaPlan.channels),
+    globalMultipliers: cloneSnapshot(snapshot.mediaPlan.globalMultipliers),
+    presets: cloneSnapshot(snapshot.mediaPlan.presets),
+    projectName: snapshot.mediaPlan.projectName,
+  });
+
+  useMultiMonthStore.setState({
+    includeSoftLaunch: snapshot.multiMonth.includeSoftLaunch,
+    planningMonths: snapshot.multiMonth.planningMonths,
+    startMonth: snapshot.multiMonth.startMonth,
+    progressionPattern: snapshot.multiMonth.progressionPattern,
+    patternParams: cloneSnapshot(snapshot.multiMonth.patternParams),
+    globalSettings: cloneSnapshot(snapshot.multiMonth.globalSettings),
+    months: cloneSnapshot(snapshot.multiMonth.months),
+    scenarios: cloneSnapshot(snapshot.multiMonth.scenarios),
+    activeScenarioId: snapshot.multiMonth.activeScenarioId,
+    comparisonScenarioId: snapshot.multiMonth.comparisonScenarioId,
+    optimizationGoal: snapshot.multiMonth.optimizationGoal,
+    riskLevel: snapshot.multiMonth.riskLevel,
+    constraints: cloneSnapshot(snapshot.multiMonth.constraints),
+    optimizationResults: cloneSnapshot(snapshot.multiMonth.optimizationResults),
+    pdfSections: cloneSnapshot(snapshot.multiMonth.pdfSections),
+    userNotes: snapshot.multiMonth.userNotes,
+    isOptimizing: multiMonthState.isOptimizing,
+  });
+}
 
 export const useHistoryStore = create<HistoryState>((set, get) => ({
-    past: [],
-    future: [],
-    canUndo: false,
-    canRedo: false,
-    isUndoing: false,
+  past: [],
+  present: null,
+  future: [],
+  canUndo: false,
+  canRedo: false,
+  isApplyingHistory: false,
 
-    record: (snapshot) => {
-        const { isUndoing, past } = get();
-        if (isUndoing) return;
+  initialize: (snapshot) => {
+    set((state) => {
+      if (state.present) return state;
+      return {
+        ...state,
+        present: cloneSnapshot(snapshot),
+        canUndo: state.past.length > 0,
+        canRedo: state.future.length > 0,
+      };
+    });
+  },
 
-        // Optional: Deep compare or just crude check to avoid duplicates?
-        // For now, simple push.
+  record: (snapshot) => {
+    const state = get();
+    if (state.isApplyingHistory) return;
 
-        // Check if new snapshot is identical to last past (if strict)
-        // But object refs change in Zustand.
+    const snapshotToStore = cloneSnapshot(snapshot);
+    if (state.present && snapshotHash(state.present) === snapshotHash(snapshotToStore)) {
+      return;
+    }
 
-        set((state) => {
-            const newPast = [...state.past, snapshot].slice(-HISTORY_LIMIT);
-            return {
-                past: newPast,
-                future: [],
-                canUndo: true,
-                canRedo: false
-            };
-        });
-    },
+    if (!state.present) {
+      set({
+        present: snapshotToStore,
+        past: [],
+        future: [],
+        canUndo: false,
+        canRedo: false,
+      });
+      return;
+    }
 
-    undo: () => {
-        const { past, future } = get();
-        if (past.length === 0) return;
+    const nextPast = [...state.past, cloneSnapshot(state.present)].slice(-HISTORY_LIMIT);
+    set({
+      past: nextPast,
+      present: snapshotToStore,
+      future: [],
+      canUndo: nextPast.length > 0,
+      canRedo: false,
+    });
+  },
 
-        // We need the CURRENT state to put into future
-        const currentState = useMediaPlanStore.getState();
-        const currentSnapshot = {
-            totalBudget: currentState.totalBudget,
-            channels: currentState.channels,
-            globalMultipliers: currentState.globalMultipliers,
-        };
+  undo: () => {
+    const state = get();
+    if (!state.present || state.past.length === 0) return;
 
-        const previous = past[past.length - 1];
-        const newPast = past.slice(0, past.length - 1);
+    const previous = state.past[state.past.length - 1];
+    const nextPast = state.past.slice(0, -1);
+    const nextFuture = [cloneSnapshot(state.present), ...state.future];
 
-        set({
-            past: newPast,
-            future: [currentSnapshot, ...future],
-            canUndo: newPast.length > 0,
-            canRedo: true,
-            isUndoing: true
-        });
+    set({
+      past: nextPast,
+      present: cloneSnapshot(previous),
+      future: nextFuture,
+      canUndo: nextPast.length > 0,
+      canRedo: true,
+      isApplyingHistory: true,
+    });
 
-        // Restore
-        useMediaPlanStore.getState().restoreState(previous);
+    applySnapshot(previous);
+    set({ isApplyingHistory: false });
+  },
 
-        // Reset flag
-        setTimeout(() => set({ isUndoing: false }), 0);
-    },
+  redo: () => {
+    const state = get();
+    if (!state.present || state.future.length === 0) return;
 
-    redo: () => {
-        const { past, future } = get();
-        if (future.length === 0) return;
+    const next = state.future[0];
+    const nextFuture = state.future.slice(1);
+    const nextPast = [...state.past, cloneSnapshot(state.present)].slice(-HISTORY_LIMIT);
 
-        // Current state to past
-        const currentState = useMediaPlanStore.getState();
-        const currentSnapshot = {
-            totalBudget: currentState.totalBudget,
-            channels: currentState.channels,
-            globalMultipliers: currentState.globalMultipliers,
-        };
+    set({
+      past: nextPast,
+      present: cloneSnapshot(next),
+      future: nextFuture,
+      canUndo: nextPast.length > 0,
+      canRedo: nextFuture.length > 0,
+      isApplyingHistory: true,
+    });
 
-        const next = future[0];
-        const newFuture = future.slice(1);
+    applySnapshot(next);
+    set({ isApplyingHistory: false });
+  },
 
-        set({
-            past: [...past, currentSnapshot].slice(-HISTORY_LIMIT),
-            future: newFuture,
-            canUndo: true,
-            canRedo: newFuture.length > 0,
-            isUndoing: true
-        });
-
-        useMediaPlanStore.getState().restoreState(next);
-
-        setTimeout(() => set({ isUndoing: false }), 0);
-    },
+  clear: () => {
+    set({
+      past: [],
+      present: null,
+      future: [],
+      canUndo: false,
+      canRedo: false,
+      isApplyingHistory: false,
+    });
+  },
 }));
 
-/**
- * Hook to attach history recording to the main store.
- * Should be mounted once in the app layout.
- */
 export function useHistoryRecorder() {
-    const record = useHistoryStore((s) => s.record);
-    const isUndoing = useHistoryStore((s) => s.isUndoing);
+  const initialize = useHistoryStore((state) => state.initialize);
+  const record = useHistoryStore((state) => state.record);
+  const isApplyingHistory = useHistoryStore((state) => state.isApplyingHistory);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // Ref to track last saved state to debounce or dedupe
-    // We'll use a timeout to debounce slider drags
-    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  useEffect(() => {
+    const initialSnapshot = createSnapshot();
+    initialize(initialSnapshot);
 
-    useEffect(() => {
-        const unsub = useMediaPlanStore.subscribe((state, prevState) => {
-            // Ignore if we are undoing/redoing
-            if (useHistoryStore.getState().isUndoing) return;
+    const handleStoreChange = () => {
+      if (useHistoryStore.getState().isApplyingHistory || isApplyingHistory) return;
 
-            // We want to record 'prevState' when state changes, 
-            // so that we can go BACK to it.
-            // Wait, standard undo:
-            // State A -> (User Action) -> State B.
-            // We want to record State A.
-            // So 'undo' takes us back to A.
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
 
-            // Zustand subscribe gives (state, prevState).
-            // If we record prevState, we have the history.
+      debounceRef.current = setTimeout(() => {
+        record(createSnapshot());
+        debounceRef.current = null;
+      }, RECORD_DEBOUNCE_MS);
+    };
 
-            // DEBOUNCE:
-            // If user drags slider, we get multpile updates.
-            // We only want to record usage of "start of drag".
-            // But we don't know when drag starts vs continues.
+    const unsubMedia = useMediaPlanStore.subscribe(handleStoreChange);
+    const unsubMulti = useMultiMonthStore.subscribe(handleStoreChange);
 
-            // Simple approach: Debounce the RECORDING.
-            // But we need to record the *state before the burst of changes*.
-            // So we record prevState on the *first* change of a burst.
-
-            if (timeoutRef.current) {
-                clearTimeout(timeoutRef.current);
-            } else {
-                // First change of a sequence? Record the prevState.
-                // This is tricky. 
-                // Let's rely on a simpler model: Record `state` after 500ms stable? 
-                // No, that's not undo.
-
-                // Let's just record every change for now, and rely on the fact that
-                // `useMediaPlanStore` updates might be granular.
-                // If it's too much, we'll fix it.
-
-                const snapshot = {
-                    totalBudget: prevState.totalBudget,
-                    channels: prevState.channels,
-                    globalMultipliers: prevState.globalMultipliers,
-                };
-                record(snapshot);
-            }
-
-            // Reset timeout
-            timeoutRef.current = setTimeout(() => {
-                timeoutRef.current = null;
-            }, 1000); // 1 sec debounce window effectively merging frequent updates? 
-            // This logic is flawed for a true undo stack.
-            // True undo: save snapshot immediately before mutation.
-            // Since we are external, we see it after.
-        });
-
-        return () => {
-            unsub();
-            if (timeoutRef.current) clearTimeout(timeoutRef.current);
-        };
-    }, [record]);
+    return () => {
+      unsubMedia();
+      unsubMulti();
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+    };
+  }, [initialize, isApplyingHistory, record]);
 }
 
 export function useHistory() {
-    return useHistoryStore();
+  return useHistoryStore();
 }

@@ -25,25 +25,59 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/mediaplan-data';
-import {
-  useMultiMonthStore,
-  OptimizationGoal,
-  RiskLevel,
-} from '@/hooks/use-multi-month-store';
+import { useMultiMonthStore, OptimizationGoal, RiskLevel } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
-const GOAL_OPTIONS: { value: OptimizationGoal; label: string; icon: React.ReactNode; description: string }[] = [
-  { value: 'maximize-roas', label: 'Maximize ROAS', icon: <TrendingUp className="h-4 w-4" />, description: 'Best return per spend' },
-  { value: 'minimize-cac', label: 'Minimize CAC', icon: <DollarSign className="h-4 w-4" />, description: 'Lowest cost per acquisition' },
-  { value: 'maximize-revenue', label: 'Maximize Revenue', icon: <BarChart3 className="h-4 w-4" />, description: 'Highest total GGR' },
-  { value: 'maximize-profit', label: 'Maximize Profit', icon: <Target className="h-4 w-4" />, description: 'Highest net P&L' },
-  { value: 'breakeven-fastest', label: 'Break-even Fastest', icon: <Timer className="h-4 w-4" />, description: 'Reach profitability quickly' },
-  { value: 'balanced', label: 'Balanced', icon: <Scale className="h-4 w-4" />, description: 'Compromise between profit & efficiency' },
+const GOAL_OPTIONS: {
+  value: OptimizationGoal;
+  label: string;
+  icon: React.ReactNode;
+  description: string;
+}[] = [
+  {
+    value: 'maximize-roas',
+    label: 'Maximize ROAS',
+    icon: <TrendingUp className="h-4 w-4" />,
+    description: 'Best return per spend',
+  },
+  {
+    value: 'minimize-cac',
+    label: 'Minimize CAC',
+    icon: <DollarSign className="h-4 w-4" />,
+    description: 'Lowest cost per acquisition',
+  },
+  {
+    value: 'maximize-revenue',
+    label: 'Maximize Revenue',
+    icon: <BarChart3 className="h-4 w-4" />,
+    description: 'Highest total GGR',
+  },
+  {
+    value: 'maximize-profit',
+    label: 'Maximize Profit',
+    icon: <Target className="h-4 w-4" />,
+    description: 'Highest net P&L',
+  },
+  {
+    value: 'breakeven-fastest',
+    label: 'Break-even Fastest',
+    icon: <Timer className="h-4 w-4" />,
+    description: 'Reach profitability quickly',
+  },
+  {
+    value: 'balanced',
+    label: 'Balanced',
+    icon: <Scale className="h-4 w-4" />,
+    description: 'Compromise between profit & efficiency',
+  },
 ];
 
 const RISK_OPTIONS: { value: RiskLevel; label: string; description: string }[] = [
-  { value: 'conservative', label: 'Conservative', description: 'Gradual growth, stability prioritized' },
+  {
+    value: 'conservative',
+    label: 'Conservative',
+    description: 'Gradual growth, stability prioritized',
+  },
   { value: 'moderate', label: 'Moderate', description: 'Balanced progression, allows variance' },
   { value: 'aggressive', label: 'Aggressive', description: 'Maximize spend early, chase volume' },
 ];
@@ -61,8 +95,8 @@ export function AutoOptimizer() {
     runOptimization,
     loadOptimizationResult,
   } = useMultiMonthStore();
-  
-  const { symbol } = useCurrency();
+
+  const { format: formatCurrency, symbol } = useCurrency();
 
   const [progress, setProgress] = useState(0);
 
@@ -71,9 +105,9 @@ export function AutoOptimizer() {
     const interval = setInterval(() => {
       setProgress((p) => Math.min(95, p + 15));
     }, 200);
-    
+
     await runOptimization();
-    
+
     clearInterval(interval);
     setProgress(100);
     setTimeout(() => setProgress(0), 500);
@@ -96,16 +130,20 @@ export function AutoOptimizer() {
                 key={goal.value}
                 onClick={() => setOptimizationGoal(goal.value)}
                 className={cn(
-                  "w-full flex items-center gap-3 p-2 rounded-lg border text-left transition-all",
+                  'w-full flex items-center gap-3 p-2 rounded-lg border text-left transition-all',
                   optimizationGoal === goal.value
-                    ? "border-primary bg-primary/10"
-                    : "border-border hover:bg-muted/50"
+                    ? 'border-primary bg-primary/10'
+                    : 'border-border hover:bg-muted/50'
                 )}
               >
-                <div className={cn(
-                  "p-1.5 rounded",
-                  optimizationGoal === goal.value ? "bg-primary text-primary-foreground" : "bg-muted"
-                )}>
+                <div
+                  className={cn(
+                    'p-1.5 rounded',
+                    optimizationGoal === goal.value
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-muted'
+                  )}
+                >
                   {goal.icon}
                 </div>
                 <div className="flex-1">
@@ -153,7 +191,9 @@ export function AutoOptimizer() {
                 <Input
                   type="number"
                   value={constraints.minMonthlyBudget}
-                  onChange={(e) => setConstraints({ minMonthlyBudget: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setConstraints({ minMonthlyBudget: parseFloat(e.target.value) || 0 })
+                  }
                   className="h-7 text-xs"
                 />
               </div>
@@ -162,7 +202,9 @@ export function AutoOptimizer() {
                 <Input
                   type="number"
                   value={constraints.maxMonthlyBudget}
-                  onChange={(e) => setConstraints({ maxMonthlyBudget: parseFloat(e.target.value) || 0 })}
+                  onChange={(e) =>
+                    setConstraints({ maxMonthlyBudget: parseFloat(e.target.value) || 0 })
+                  }
                   className="h-7 text-xs"
                 />
               </div>
@@ -175,9 +217,11 @@ export function AutoOptimizer() {
                 <Input
                   type="number"
                   value={constraints.maxCacTolerance ?? ''}
-                  onChange={(e) => setConstraints({ 
-                    maxCacTolerance: e.target.value ? parseFloat(e.target.value) : null 
-                  })}
+                  onChange={(e) =>
+                    setConstraints({
+                      maxCacTolerance: e.target.value ? parseFloat(e.target.value) : null,
+                    })
+                  }
                   placeholder="None"
                   className="h-7 text-xs"
                 />
@@ -187,9 +231,11 @@ export function AutoOptimizer() {
                 <Input
                   type="number"
                   value={constraints.minRoasTarget ?? ''}
-                  onChange={(e) => setConstraints({ 
-                    minRoasTarget: e.target.value ? parseFloat(e.target.value) : null 
-                  })}
+                  onChange={(e) =>
+                    setConstraints({
+                      minRoasTarget: e.target.value ? parseFloat(e.target.value) : null,
+                    })
+                  }
                   placeholder="None"
                   className="h-7 text-xs"
                 />
@@ -200,9 +246,11 @@ export function AutoOptimizer() {
               <Label className="text-xs">Break-even by Month</Label>
               <Select
                 value={constraints.breakEvenByMonth?.toString() ?? 'none'}
-                onValueChange={(v) => setConstraints({ 
-                  breakEvenByMonth: v === 'none' ? null : parseInt(v) 
-                })}
+                onValueChange={(v) =>
+                  setConstraints({
+                    breakEvenByMonth: v === 'none' ? null : parseInt(v),
+                  })
+                }
               >
                 <SelectTrigger className="h-7 text-xs">
                   <SelectValue placeholder="No constraint" />
@@ -210,7 +258,9 @@ export function AutoOptimizer() {
                 <SelectContent>
                   <SelectItem value="none">No constraint</SelectItem>
                   {[3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => (
-                    <SelectItem key={m} value={m.toString()}>Month {m}</SelectItem>
+                    <SelectItem key={m} value={m.toString()}>
+                      Month {m}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -235,9 +285,7 @@ export function AutoOptimizer() {
               )}
             </Button>
 
-            {progress > 0 && (
-              <Progress value={progress} className="h-1" />
-            )}
+            {progress > 0 && <Progress value={progress} className="h-1" />}
           </CardContent>
         </Card>
 
@@ -256,14 +304,17 @@ export function AutoOptimizer() {
               </div>
             ) : (
               optimizationResults.map((result, idx) => (
-                <Card key={idx} className={cn(
-                  "border cursor-pointer transition-all hover:border-primary",
-                  idx === 0 && "border-green-500 bg-green-500/5"
-                )}>
+                <Card
+                  key={idx}
+                  className={cn(
+                    'border cursor-pointer transition-all hover:border-primary',
+                    idx === 0 && 'border-green-500 bg-green-500/5'
+                  )}
+                >
                   <CardContent className="p-3">
                     <div className="flex items-start justify-between mb-2">
                       <div>
-                        <Badge variant={idx === 0 ? "default" : "secondary"} className="mb-1">
+                        <Badge variant={idx === 0 ? 'default' : 'secondary'} className="mb-1">
                           #{idx + 1} {result.scenario.progressionPattern?.replace('-', ' ')}
                         </Badge>
                         <div className="text-xs text-muted-foreground">{result.reasoning}</div>
@@ -272,27 +323,33 @@ export function AutoOptimizer() {
                         {result.confidence.toFixed(0)}%
                       </Badge>
                     </div>
-                    
+
                     <div className="grid grid-cols-3 gap-2 text-xs mb-2">
                       <div>
                         <div className="text-muted-foreground">Revenue</div>
-                        <div className="font-mono font-medium">{formatCurrency(result.metrics.totalRevenue, true)}</div>
+                        <div className="font-mono font-medium">
+                          {formatCurrency(result.metrics.totalRevenue, true)}
+                        </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">Profit</div>
-                        <div className={cn(
-                          "font-mono font-medium",
-                          result.metrics.netProfit > 0 ? "text-green-500" : "text-destructive"
-                        )}>
+                        <div
+                          className={cn(
+                            'font-mono font-medium',
+                            result.metrics.netProfit > 0 ? 'text-green-500' : 'text-destructive'
+                          )}
+                        >
                           {formatCurrency(result.metrics.netProfit, true)}
                         </div>
                       </div>
                       <div>
                         <div className="text-muted-foreground">ROAS</div>
-                        <div className="font-mono font-medium">{result.metrics.avgRoas.toFixed(2)}x</div>
+                        <div className="font-mono font-medium">
+                          {result.metrics.avgRoas.toFixed(2)}x
+                        </div>
                       </div>
                     </div>
-                    
+
                     <Button
                       variant="outline"
                       size="sm"

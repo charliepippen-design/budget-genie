@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, lazy, Suspense } from 'react';
 import {
   LayoutGrid,
   Upload,
@@ -27,8 +27,9 @@ import { cn } from '@/lib/utils';
 import {
   useMultiMonthStore,
 } from '@/hooks/use-multi-month-store';
-import { ImportWizard } from './ImportWizard';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
+
+const ImportWizard = lazy(() => import('./ImportWizard').then((m) => ({ default: m.ImportWizard })));
 
 // PATTERN_INFO moved to ProgressionPatternSelector.tsx
 
@@ -152,7 +153,9 @@ export function MonthConfigPanel() {
         </CardContent>
       </Card>
 
-      <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
+      <Suspense fallback={null}>
+        <ImportWizard open={importOpen} onOpenChange={setImportOpen} />
+      </Suspense>
     </>
   );
 }

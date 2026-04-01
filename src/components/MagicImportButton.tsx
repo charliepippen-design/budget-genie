@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 
 interface MagicImportButtonProps {
     fileContent: string | null;
-    onSuccess: (data: any[]) => void;
+    onSuccess: (data: Array<Record<string, unknown>>) => void;
     disabled?: boolean;
 }
 

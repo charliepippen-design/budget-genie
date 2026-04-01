@@ -1,11 +1,16 @@
 import { AlertTriangle, ArrowRight, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CURRENCIES, CurrencyCode } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
-export type CurrencyConflictResolution = 'keep-numbers' | 'convert';
+export type CurrencyConflictResolution = 'keep-numbers' | 'convert-estimate' | 'convert-latest';
 
 interface CurrencyConflictDialogProps {
   fileCurrency: CurrencyCode;
@@ -34,7 +39,14 @@ export function CurrencyConflictDialog({
         <div>
           <p className="font-medium text-foreground">Currency Mismatch Detected</p>
           <p className="text-sm text-muted-foreground mt-0.5">
-            File uses <span className="font-medium text-foreground">{fileInfo.symbol} ({fileInfo.name})</span> but app is set to <span className="font-medium text-foreground">{appInfo.symbol} ({appInfo.name})</span>
+            File uses{' '}
+            <span className="font-medium text-foreground">
+              {fileInfo.symbol} ({fileInfo.name})
+            </span>{' '}
+            but app is set to{' '}
+            <span className="font-medium text-foreground">
+              {appInfo.symbol} ({appInfo.name})
+            </span>
           </p>
         </div>
       </div>
@@ -49,53 +61,30 @@ export function CurrencyConflictDialog({
         </div>
       )}
 
-      <RadioGroup
-        value={resolution}
-        onValueChange={(v) => onResolutionChange(v as CurrencyConflictResolution)}
-        className="space-y-2"
-      >
-        <Label
-          htmlFor="keep-numbers"
-          className={cn(
-            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors",
-            resolution === 'keep-numbers'
-              ? "border-primary bg-primary/5"
-              : "border-border hover:bg-muted/50"
-          )}
+      <div className="space-y-2">
+        <Label className="text-sm">Auto-fix strategy</Label>
+        <Select
+          value={resolution}
+          onValueChange={(v) => onResolutionChange(v as CurrencyConflictResolution)}
         >
-          <RadioGroupItem value="keep-numbers" id="keep-numbers" className="mt-0.5" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Keep Numbers As-Is</p>
-              <span className="text-xs text-muted-foreground">(Recommended)</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              100{fileInfo.symbol} → 100{appInfo.symbol} — Just change the symbol
-            </p>
-          </div>
-        </Label>
-
-        <Label
-          htmlFor="convert"
-          className={cn(
-            "flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors opacity-50",
-            resolution === 'convert'
-              ? "border-primary bg-primary/5"
-              : "border-border"
-          )}
-        >
-          <RadioGroupItem value="convert" id="convert" className="mt-0.5" disabled />
-          <div className="flex-1">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium">Convert with Exchange Rate</p>
-              <span className="text-xs px-1.5 py-0.5 bg-muted rounded">Coming Soon</span>
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Apply real exchange rates to convert values
-            </p>
-          </div>
-        </Label>
-      </RadioGroup>
+          <SelectTrigger
+            className={cn('w-full', resolution !== 'keep-numbers' && 'border-warning/60')}
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="keep-numbers">Keep numbers as-is (symbol swap only)</SelectItem>
+            <SelectItem value="convert-estimate">Auto-convert using estimated rate</SelectItem>
+            <SelectItem value="convert-latest">Auto-convert using latest available rate</SelectItem>
+          </SelectContent>
+        </Select>
+        <p className="text-xs text-muted-foreground">
+          Source sample: 100{fileInfo.symbol}{' '}
+          {resolution === 'keep-numbers'
+            ? `-> 100${appInfo.symbol}`
+            : `-> converted to ${appInfo.symbol}`}
+        </p>
+      </div>
     </div>
   );
 }

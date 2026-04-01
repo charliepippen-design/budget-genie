@@ -174,7 +174,7 @@ export function calculateDistribution(
   if (months <= 0) return [];
   if (months === 1) return [totalBudget];
 
-  let weights: number[] = [];
+  const weights: number[] = [];
   const growthRate = params.growthRate ?? 10; // Default 10% per step
 
   for (let i = 0; i < months; i++) {

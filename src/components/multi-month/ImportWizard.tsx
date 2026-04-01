@@ -1,16 +1,42 @@
 import { useState, useCallback } from 'react';
-import { Upload, FileSpreadsheet, FileJson, FileText, CheckCircle2, AlertTriangle, ChevronRight, Loader2, RefreshCw, Sparkles, DollarSign, BarChart3 } from 'lucide-react';
+import {
+  Upload,
+  FileJson,
+  FileText,
+  CheckCircle2,
+  AlertTriangle,
+  ChevronRight,
+  Loader2,
+  RefreshCw,
+  Sparkles,
+  DollarSign,
+  BarChart3,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { useCurrency } from '@/contexts/CurrencyContext';
+import { useCurrency, type CurrencyCode } from '@/contexts/CurrencyContext';
 import { useToast } from '@/hooks/use-toast';
 import {
   importMediaPlan,
@@ -20,9 +46,18 @@ import {
   ValidationReport,
 } from '@/lib/import-service';
 import { ChannelData } from '@/hooks/use-media-plan-store';
-import { inferChannelFamily, inferBuyingModel, ChannelTypeConfig, getLikelyModel } from '@/types/channel';
+import {
+  inferChannelFamily,
+  inferBuyingModel,
+  ChannelTypeConfig,
+  getLikelyModel,
+} from '@/types/channel';
 import { ReconciliationTable } from './ReconciliationTable';
-import { GranularitySelector, ImportGranularity, DistributionStrategy } from './GranularitySelector';
+import {
+  GranularitySelector,
+  ImportGranularity,
+  DistributionStrategy,
+} from './GranularitySelector';
 import { CurrencyConflictDialog, CurrencyConflictResolution } from './CurrencyConflictDialog';
 
 interface ImportWizardProps {
@@ -32,10 +67,23 @@ interface ImportWizardProps {
 
 type WizardStep = 'upload' | 'detecting' | 'analyze' | 'reconcile' | 'preview' | 'success';
 
-const FORMAT_INFO: Record<FileFormat | 'txt', { icon: React.ReactNode; label: string; extensions: string }> = {
+const FX_TO_USD: Record<CurrencyCode, number> = {
+  USD: 1,
+  EUR: 1.08,
+  GBP: 1.26,
+  CHF: 1.11,
+  CAD: 0.74,
+  AUD: 0.66,
+  JPY: 0.0068,
+  CNY: 0.14,
+};
+
+const FORMAT_INFO: Record<
+  FileFormat | 'txt',
+  { icon: React.ReactNode; label: string; extensions: string }
+> = {
   csv: { icon: <FileText className="h-6 w-6" />, label: 'CSV', extensions: '.csv' },
   txt: { icon: <FileText className="h-6 w-6" />, label: 'Text', extensions: '.txt' },
-  xlsx: { icon: <FileSpreadsheet className="h-6 w-6" />, label: 'Excel', extensions: '.xlsx, .xls' },
   json: { icon: <FileJson className="h-6 w-6" />, label: 'JSON', extensions: '.json' },
 };
 
@@ -66,20 +114,23 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const [granularity, setGranularity] = useState<ImportGranularity>('monthly');
   const [distribution, setDistribution] = useState<DistributionStrategy>('even');
   const [targetMonths, setTargetMonths] = useState(12);
-  const [currencyResolution, setCurrencyResolution] = useState<CurrencyConflictResolution>('keep-numbers');
+  const [currencyResolution, setCurrencyResolution] =
+    useState<CurrencyConflictResolution>('keep-numbers');
   const [validationReport, setValidationReport] = useState<ValidationReport | null>(null);
 
-  const hasIssues = validationReport && (
-    validationReport.dirtyRows.length > 0 ||
-    validationReport.columnIssues.length > 0
-  );
+  const hasIssues =
+    validationReport &&
+    (validationReport.dirtyRows.length > 0 || validationReport.columnIssues.length > 0);
 
   const pendingIssues = validationReport
-    ? validationReport.dirtyRows.reduce((c, r) => c + r.issues.filter(i => !i.resolved).length, 0) +
-    validationReport.columnIssues.filter(i => !i.resolved).length
+    ? validationReport.dirtyRows.reduce(
+        (c, r) => c + r.issues.filter((i) => !i.resolved).length,
+        0
+      ) + validationReport.columnIssues.filter((i) => !i.resolved).length
     : 0;
 
-  const hasCurrencyConflict = detected &&
+  const hasCurrencyConflict =
+    detected &&
     detected.detectedCurrency &&
     detected.detectedCurrency !== appCurrency &&
     detected.currencyConfidence > 0.3;
@@ -97,57 +148,66 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     setValidationReport(null);
   }, []);
 
-  const handleFileSelect = useCallback(async (selectedFile: File) => {
-    setFile(selectedFile);
-    setStep('detecting');
-    setIsProcessing(true);
+  const handleFileSelect = useCallback(
+    async (selectedFile: File) => {
+      setFile(selectedFile);
+      setStep('detecting');
+      setIsProcessing(true);
 
-    try {
-      const { detected: det, result: res } = await importMediaPlan(selectedFile);
-      setDetected(det);
-      setResult(res);
-      setGranularity(det.granularity);
-      setValidationReport(det.validationReport);
-      setStep('analyze');
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.error('Import error:', error);
+      try {
+        const { detected: det, result: res } = await importMediaPlan(selectedFile);
+        setDetected(det);
+        setResult(res);
+        setGranularity(det.granularity);
+        setValidationReport(det.validationReport);
+        setStep('analyze');
+      } catch (error) {
+        if (import.meta.env.DEV) {
+          console.error('Import error:', error);
+        }
+        toast({
+          title: 'Import Failed',
+          description:
+            error instanceof Error
+              ? error.message
+              : 'Could not parse the file. Please check the format and try again.',
+          variant: 'destructive',
+        });
+        setStep('upload');
+      } finally {
+        setIsProcessing(false);
       }
-      toast({
-        title: 'Import Failed',
-        description: error instanceof Error ? error.message : 'Could not parse the file. Please check the format and try again.',
-        variant: 'destructive',
-      });
-      setStep('upload');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [toast]);
+    },
+    [toast]
+  );
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(false);
+  const handleDrop = useCallback(
+    (e: React.DragEvent) => {
+      e.preventDefault();
+      setDragOver(false);
 
-    const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile) {
-      handleFileSelect(droppedFile);
-    }
-  }, [handleFileSelect]);
+      const droppedFile = e.dataTransfer.files[0];
+      if (droppedFile) {
+        handleFileSelect(droppedFile);
+      }
+    },
+    [handleFileSelect]
+  );
 
   const handleHealData = useCallback(() => {
     if (!validationReport) return;
 
     // Auto-resolve all healable issues
-    const updatedDirtyRows = validationReport.dirtyRows.map(row => ({
+    const updatedDirtyRows = validationReport.dirtyRows.map((row) => ({
       ...row,
-      issues: row.issues.map(issue => ({
+      issues: row.issues.map((issue) => ({
         ...issue,
         resolved: true,
         resolvedValue: issue.suggestedValue ?? 0,
       })),
     }));
 
-    const updatedColumnIssues = validationReport.columnIssues.map(issue => ({
+    const updatedColumnIssues = validationReport.columnIssues.map((issue) => ({
       ...issue,
       resolved: true,
     }));
@@ -167,6 +227,21 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
   const handleConfirmImport = useCallback(() => {
     if (!result || !result.success) return;
 
+    const sourceCurrency = (detected?.detectedCurrency as CurrencyCode | undefined) ?? appCurrency;
+    const shouldConvert = hasCurrencyConflict && currencyResolution !== 'keep-numbers';
+    const conversionRate = shouldConvert
+      ? (FX_TO_USD[sourceCurrency] ?? 1) / (FX_TO_USD[appCurrency] ?? 1)
+      : 1;
+
+    const importedMonths = result.months.map((month) => ({
+      ...month,
+      budget: month.budget * conversionRate,
+      channels: month.channels.map((channel) => ({
+        ...channel,
+        cpm: channel.cpm * conversionRate,
+      })),
+    }));
+
     // Update store with imported data
     store.setIncludeSoftLaunch(result.includeSoftLaunch);
     store.setPlanningMonths(result.planningMonths);
@@ -181,12 +256,12 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     store.generateMonths();
 
     // Calclate total budget
-    const totalImportedBudget = result.months.reduce((sum, m) => sum + m.budget, 0);
+    const totalImportedBudget = importedMonths.reduce((sum, m) => sum + m.budget, 0);
 
     // Update each month with imported data
     setTimeout(() => {
       // 1. Update Multi-Month Store
-      result.months.forEach((month) => {
+      importedMonths.forEach((month) => {
         store.updateMonth(month.id, {
           budget: month.budget,
           budgetMultiplier: month.budgetMultiplier,
@@ -198,10 +273,20 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
       // 2. SYNC WITH QUICK VIEW (MediaPlanStore)
       if (totalImportedBudget > 0) {
         // Aggregate all channels from all months
-        const channelTotals: Record<string, { spend: number; name: string; category: any; cpm: number; ctr: number; roas: number }> = {};
+        const channelTotals: Record<
+          string,
+          {
+            spend: number;
+            name: string;
+            category: ChannelData['category'];
+            cpm: number;
+            ctr: number;
+            roas: number;
+          }
+        > = {};
 
-        result.months.forEach(month => {
-          month.channels.forEach(ch => {
+        importedMonths.forEach((month) => {
+          month.channels.forEach((ch) => {
             if (!channelTotals[ch.channelId]) {
               channelTotals[ch.channelId] = {
                 spend: 0,
@@ -209,7 +294,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 category: ch.category,
                 cpm: ch.cpm,
                 ctr: ch.ctr,
-                roas: ch.roas
+                roas: ch.roas,
               };
             }
             // Calculate monthly spend for this channel
@@ -240,12 +325,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               baselineMetrics: {
                 ctr: data.ctr,
                 conversionRate: 2.5,
-                aov: 150
+                aov: 150,
               },
-              secondaryPrice: 0 // Optional
+              secondaryPrice: 0, // Optional
             },
 
+            tier: buyingModel === 'RETAINER' || buyingModel === 'FLAT_FEE' ? 'fixed' : 'scalable',
+            maxSpendLimit: 0,
             locked: false,
+            isActive: true,
           };
         });
 
@@ -264,17 +352,28 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
 
       toast({
         title: 'Import Successful',
-        description: `Imported ${result.months.length} months of data`,
+        description: `Imported ${importedMonths.length} months of data`,
       });
     }, 100);
-  }, [result, store, toast]);
+  }, [
+    appCurrency,
+    currencyResolution,
+    detected?.detectedCurrency,
+    hasCurrencyConflict,
+    result,
+    setChannels,
+    setGlobalMultipliers,
+    setTotalBudget,
+    store,
+    toast,
+  ]);
 
   const handleClose = useCallback(() => {
     resetWizard();
     onOpenChange(false);
   }, [onOpenChange, resetWizard]);
 
-  const canProceedFromAnalyze = !hasCurrencyConflict || currencyResolution === 'keep-numbers';
+  const canProceedFromAnalyze = !hasCurrencyConflict || !!currencyResolution;
   const canProceedFromReconcile = pendingIssues === 0;
 
   const getNextStep = (current: WizardStep): WizardStep => {
@@ -288,7 +387,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     }
   };
 
-  const visibleSteps: WizardStep[] = ['upload', 'analyze', hasIssues ? 'reconcile' : null, 'preview', 'success'].filter(Boolean) as WizardStep[];
+  const visibleSteps: WizardStep[] = [
+    'upload',
+    'analyze',
+    hasIssues ? 'reconcile' : null,
+    'preview',
+    'success',
+  ].filter(Boolean) as WizardStep[];
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -307,27 +412,33 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
         <div className="flex items-center gap-2 px-2 py-3">
           {visibleSteps.map((s, idx) => (
             <div key={s} className="flex items-center gap-2 flex-1">
-              <div className={cn(
-                "flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-colors",
-                step === s
-                  ? "bg-primary text-primary-foreground"
-                  : step === 'success' || visibleSteps.indexOf(step) > idx
-                    ? "bg-primary/20 text-primary"
-                    : "bg-muted text-muted-foreground"
-              )}>
+              <div
+                className={cn(
+                  'flex items-center justify-center w-7 h-7 rounded-full text-xs font-medium transition-colors',
+                  step === s
+                    ? 'bg-primary text-primary-foreground'
+                    : step === 'success' || visibleSteps.indexOf(step) > idx
+                      ? 'bg-primary/20 text-primary'
+                      : 'bg-muted text-muted-foreground'
+                )}
+              >
                 {step === 'success' || visibleSteps.indexOf(step) > idx ? (
                   <CheckCircle2 className="h-4 w-4" />
                 ) : (
                   idx + 1
                 )}
               </div>
-              <span className={cn(
-                "text-xs hidden sm:inline",
-                step === s ? "text-foreground font-medium" : "text-muted-foreground"
-              )}>
+              <span
+                className={cn(
+                  'text-xs hidden sm:inline',
+                  step === s ? 'text-foreground font-medium' : 'text-muted-foreground'
+                )}
+              >
                 {STEP_LABELS[s]}
               </span>
-              {idx < visibleSteps.length - 1 && <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden sm:inline" />}
+              {idx < visibleSteps.length - 1 && (
+                <ChevronRight className="h-4 w-4 text-muted-foreground/50 hidden sm:inline" />
+              )}
             </div>
           ))}
         </div>
@@ -338,12 +449,15 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
             <div className="space-y-4">
               <div
                 className={cn(
-                  "border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer",
+                  'border-2 border-dashed rounded-lg p-8 text-center transition-colors cursor-pointer',
                   dragOver
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50 hover:bg-muted/30"
+                    ? 'border-primary bg-primary/5'
+                    : 'border-border hover:border-primary/50 hover:bg-muted/30'
                 )}
-                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
                 onDragLeave={() => setDragOver(false)}
                 onDrop={handleDrop}
                 onClick={() => document.getElementById('file-input')?.click()}
@@ -351,7 +465,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 <input
                   id="file-input"
                   type="file"
-                  accept=".csv,.xlsx,.xls,.json,.txt"
+                  accept=".csv,.json,.txt"
                   className="hidden"
                   onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                 />
@@ -359,24 +473,24 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 <p className="text-sm font-medium mb-1">
                   Drag & drop your file here, or click to browse
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Supports CSV, Excel (.xlsx), and JSON
-                </p>
+                <p className="text-xs text-muted-foreground">Supports CSV, TXT, and JSON</p>
               </div>
 
               <div className="grid grid-cols-3 gap-3">
-                {Object.entries(FORMAT_INFO).filter(([k]) => k !== 'txt').map(([key, info]) => (
-                  <div
-                    key={key}
-                    className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card/50"
-                  >
-                    <div className="text-primary">{info.icon}</div>
-                    <div>
-                      <p className="text-sm font-medium">{info.label}</p>
-                      <p className="text-xs text-muted-foreground">{info.extensions}</p>
+                {Object.entries(FORMAT_INFO)
+                  .filter(([k]) => k !== 'txt')
+                  .map(([key, info]) => (
+                    <div
+                      key={key}
+                      className="flex items-center gap-2 p-3 rounded-lg border border-border bg-card/50"
+                    >
+                      <div className="text-primary">{info.icon}</div>
+                      <div>
+                        <p className="text-sm font-medium">{info.label}</p>
+                        <p className="text-xs text-muted-foreground">{info.extensions}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             </div>
           )}
@@ -406,7 +520,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                 </div>
                 <div className="p-3 rounded-lg border border-border bg-card/50">
                   <p className="text-xs text-muted-foreground">Structure</p>
-                  <p className="text-sm font-medium capitalize">{detected.structure.replace('-', ' ')}</p>
+                  <p className="text-sm font-medium capitalize">
+                    {detected.structure.replace('-', ' ')}
+                  </p>
                 </div>
                 <div className="p-3 rounded-lg border border-border bg-card/50">
                   <p className="text-xs text-muted-foreground">Data Points</p>
@@ -421,11 +537,25 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               {/* Currency Conflict */}
               {hasCurrencyConflict && detected.detectedCurrency && (
                 <CurrencyConflictDialog
-                  fileCurrency={detected.detectedCurrency as any}
+                  fileCurrency={detected.detectedCurrency as CurrencyCode}
                   appCurrency={appCurrency}
                   samples={[]}
                   resolution={currencyResolution}
-                  onResolutionChange={setCurrencyResolution}
+                  onResolutionChange={(resolution) => {
+                    setCurrencyResolution(resolution);
+                    if (resolution === 'keep-numbers') {
+                      toast({
+                        title: 'Currency symbols aligned',
+                        description: 'Numeric values will stay unchanged during import.',
+                      });
+                      return;
+                    }
+
+                    toast({
+                      title: 'Currency auto-fix selected',
+                      description: 'Imported budget values will be converted to your app currency.',
+                    });
+                  }}
                 />
               )}
 
@@ -518,16 +648,19 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                     </TableHeader>
                     <TableBody>
                       {result.months.map((m, i) => {
-                        const topChannel = m.channels.reduce((top, ch) =>
-                          ch.allocationPct > (top?.allocationPct || 0) ? ch : top
-                          , m.channels[0]);
+                        const topChannel = m.channels.reduce(
+                          (top, ch) => (ch.allocationPct > (top?.allocationPct || 0) ? ch : top),
+                          m.channels[0]
+                        );
                         return (
                           <TableRow key={i}>
                             <TableCell className="text-xs">
                               <div className="flex items-center gap-1">
                                 {m.label}
                                 {m.isSoftLaunch && (
-                                  <Badge variant="outline" className="text-[10px] px-1">SL</Badge>
+                                  <Badge variant="outline" className="text-[10px] px-1">
+                                    SL
+                                  </Badge>
                                 )}
                               </div>
                             </TableCell>
@@ -535,7 +668,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
                               {formatCurrency(m.budget)}
                             </TableCell>
                             <TableCell className="text-xs text-right">
-                              {m.channels.filter(c => c.allocationPct > 0).length} active
+                              {m.channels.filter((c) => c.allocationPct > 0).length} active
                             </TableCell>
                             <TableCell className="text-xs text-right">
                               {topChannel?.name} ({Math.round(topChannel?.allocationPct || 0)}%)
@@ -628,10 +761,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               <Button variant="outline" onClick={() => setStep('analyze')}>
                 Back
               </Button>
-              <Button
-                onClick={() => setStep('preview')}
-                disabled={!canProceedFromReconcile}
-              >
+              <Button onClick={() => setStep('preview')} disabled={!canProceedFromReconcile}>
                 {pendingIssues > 0 ? `${pendingIssues} issues remaining` : 'Continue'}
                 <ChevronRight className="h-4 w-4 ml-2" />
               </Button>
@@ -640,7 +770,10 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
 
           {step === 'preview' && (
             <>
-              <Button variant="outline" onClick={() => setStep(hasIssues ? 'reconcile' : 'analyze')}>
+              <Button
+                variant="outline"
+                onClick={() => setStep(hasIssues ? 'reconcile' : 'analyze')}
+              >
                 Back
               </Button>
               <Button onClick={handleConfirmImport}>
@@ -650,11 +783,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
             </>
           )}
 
-          {step === 'success' && (
-            <Button onClick={handleClose}>
-              Done
-            </Button>
-          )}
+          {step === 'success' && <Button onClick={handleClose}>Done</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>

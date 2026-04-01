@@ -5,19 +5,19 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, FileText, Send, User, X, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText, CoreMessage } from 'ai';
+import { generateText, type ModelMessage } from 'ai';
 
 interface ImportAgentModalProps {
     open: boolean;
     onClose: () => void;
     fileContent: string | null;
     fileName: string;
-    onSuccess: (data: any[]) => void;
+    onSuccess: (data: Array<Record<string, unknown>>) => void;
 }
 
 export function ImportAgentModal({ open, onClose, fileContent, fileName, onSuccess }: ImportAgentModalProps) {
     // Manual State for Client-Side AI
-    const [messages, setMessages] = useState<CoreMessage[]>([]);
+    const [messages, setMessages] = useState<ModelMessage[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
@@ -117,17 +117,17 @@ export function ImportAgentModal({ open, onClose, fileContent, fileName, onSucce
                             onClose();
                         }, 2000);
                     }
-                } catch (e) {
+                } catch {
                     console.error("Failed to parse AI JSON extraction");
                 }
             }
 
             setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
 
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error("Import Agent Error:", error);
             let errorMessage = "Sorry, I encountered an error analyzing the file.";
-            if (error.message?.includes("Missing Google API Key")) {
+            if (error instanceof Error && error.message.includes("Missing Google API Key")) {
                 errorMessage = "Configuration Error: Missing API Key. I cannot analyze files without it.";
             }
             setMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);

@@ -1,7 +1,6 @@
 
-import { streamText, tool } from 'ai';
+import { streamText } from 'ai';
 import { openai } from '@ai-sdk/openai';
-import { z } from 'zod';
 
 export const maxDuration = 30;
 
@@ -27,20 +26,7 @@ export async function POST(req: Request) {
       3. Be concise and helpful.
       4. When the user confirms, use the 'extractAndClose' tool.
     `,
-        tools: {
-            extractAndClose: tool({
-                description: 'Call this when the user validates the structure to perform the final extraction.',
-                parameters: z.object({
-                    data: z.array(z.object({
-                        channel: z.string(),
-                        month: z.string(),
-                        budget: z.number(),
-                        spend: z.number().optional()
-                    }))
-                })
-            }),
-        },
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
 }

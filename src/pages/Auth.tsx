@@ -1,26 +1,8 @@
 
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { SignIn } from '@clerk/clerk-react';
 import { DollarSign, ShieldCheck } from "lucide-react";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 export default function Auth() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
-    const navigate = useNavigate();
-
-    const handleLogin = (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        // Simulate login
-        setTimeout(() => {
-            setIsLoading(false);
-            navigate("/");
-        }, 1000);
-    };
-
     return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
@@ -37,46 +19,15 @@ export default function Auth() {
                     </p>
                 </div>
 
-                {/* Form */}
+                {/* Clerk SignIn */}
                 <div className="p-8">
-                    <form onSubmit={handleLogin} className="space-y-4">
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Email Address</label>
-                            <Input
-                                type="email"
-                                placeholder="advisor@mediaplanner.pro"
-                                className="bg-[#0f172a] border-slate-700 text-white placeholder:text-slate-600 focus-visible:ring-blue-500"
-                                value={email}
-                                onChange={(e) => setEmail(e.target.value)}
-                                required
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium text-slate-300">Password</label>
-                            <Input
-                                type="password"
-                                placeholder="••••••••"
-                                className="bg-[#0f172a] border-slate-700 text-white placeholder:text-slate-600 focus-visible:ring-blue-500"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                                required
-                            />
-                        </div>
+                    <SignIn />
+                </div>
 
-                        <Button
-                            type="submit"
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold h-11"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Signing in..." : "Sign In"}
-                        </Button>
-                    </form>
-
-                    <div className="mt-6 text-center">
-                        <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
-                            <ShieldCheck className="h-3 w-3" />
-                            <span>Secure Professional Workspace</span>
-                        </div>
+                <div className="mt-6 text-center pb-8">
+                    <div className="flex items-center justify-center gap-2 text-xs text-slate-500">
+                        <ShieldCheck className="h-3 w-3" />
+                        <span>Secure Professional Workspace</span>
                     </div>
                 </div>
             </div>

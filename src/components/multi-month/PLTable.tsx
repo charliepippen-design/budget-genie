@@ -1,13 +1,5 @@
 import { useState, useMemo, useCallback } from 'react';
-import {
-  ChevronDown,
-  ChevronRight,
-  Copy,
-  RotateCcw,
-  ArrowDown,
-  Lock,
-  Unlock,
-} from 'lucide-react';
+import { ChevronDown, ChevronRight, Copy, RotateCcw, ArrowDown, Lock, Unlock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Slider } from '@/components/ui/slider';
@@ -20,21 +12,14 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from '@/components/ui/collapsible';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Card, CardContent } from '@/components/ui/card';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/mediaplan-data';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import {
-  useMultiMonthStore,
-  useMultiMonthMetrics,
-  MonthData,
-} from '@/hooks/use-multi-month-store';
+import { useMultiMonthStore, useMultiMonthMetrics, MonthData } from '@/hooks/use-multi-month-store';
+import { usePlGridNavigation } from '@/hooks/use-pl-grid-navigation';
 
 // Consistent Grid Definition for Header and Rows
 // 1. Month (Label + Toggle)
@@ -45,15 +30,24 @@ import {
 // 6. OpEx
 // 7. Net P/L
 // 8. Cumulative
-const GRID_COLS = "grid-cols-[1.5fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_1fr]";
+const GRID_COLS = 'grid-cols-[1.5fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_1fr]';
 
 function MonthRow({
   month,
+  monthOrder,
   isExpanded,
   onToggle,
   formatCurrency,
 }: {
-  month: MonthData & { totalSpend?: number; totalConversions?: number; revenue?: number; operatingCosts?: number; netProfit?: number; cumulativeProfit?: number };
+  month: MonthData & {
+    totalSpend?: number;
+    totalConversions?: number;
+    revenue?: number;
+    operatingCosts?: number;
+    netProfit?: number;
+    cumulativeProfit?: number;
+  };
+  monthOrder: number;
   isExpanded: boolean;
   onToggle: () => void;
   formatCurrency: (value: number, compact?: boolean) => string;
@@ -63,7 +57,7 @@ function MonthRow({
     updateMonthChannel,
     copyFromPreviousMonth,
     resetMonthToGlobal,
-    applyToRemainingMonths
+    applyToRemainingMonths,
   } = useMultiMonthStore();
 
   const profitClass = useMemo(() => {
@@ -83,20 +77,30 @@ function MonthRow({
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle} asChild>
       <>
-        <TableRow className={cn(
-          "grid items-center gap-4 hover:bg-muted/50 transition-colors py-2",
-          GRID_COLS,
-          month.isSoftLaunch && "bg-primary/5"
-        )}>
+        <TableRow
+          className={cn(
+            'grid items-center gap-4 hover:bg-muted/50 transition-colors py-2',
+            GRID_COLS,
+            month.isSoftLaunch && 'bg-primary/5'
+          )}
+        >
           <TableCell className="font-medium p-0 pl-2 flex items-center gap-2 overflow-hidden">
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="h-6 w-6 p-0 shrink-0">
-                {isExpanded ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                {isExpanded ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
               </Button>
             </CollapsibleTrigger>
-            <span className="text-sm truncate" title={month.label}>{month.label}</span>
+            <span className="text-sm truncate" title={month.label}>
+              {month.label}
+            </span>
             {month.isSoftLaunch && (
-              <Badge variant="secondary" className="text-[10px] px-1 h-5 hidden xl:inline-flex">Soft</Badge>
+              <Badge variant="secondary" className="text-[10px] px-1 h-5 hidden xl:inline-flex">
+                Soft
+              </Badge>
             )}
           </TableCell>
           <TableCell className="p-0">
@@ -106,6 +110,9 @@ function MonthRow({
                 value={month.budget}
                 onChange={(e) => updateMonth(month.id, { budget: parseFloat(e.target.value) || 0 })}
                 className="w-full min-w-[80px] h-7 text-xs"
+                data-pl-cell="true"
+                data-pl-row={monthOrder}
+                data-pl-col={0}
               />
               <Button
                 variant="ghost"
@@ -113,16 +120,34 @@ function MonthRow({
                 className="h-6 w-6 shrink-0"
                 onClick={() => updateMonth(month.id, { budgetLocked: !month.budgetLocked })}
               >
-                {month.budgetLocked ? <Lock className="h-3 w-3 text-warning" /> : <Unlock className="h-3 w-3 text-muted-foreground" />}
+                {month.budgetLocked ? (
+                  <Lock className="h-3 w-3 text-warning" />
+                ) : (
+                  <Unlock className="h-3 w-3 text-muted-foreground" />
+                )}
               </Button>
             </div>
           </TableCell>
-          <TableCell className="text-right font-mono text-sm p-0">{formatCurrency(month.totalSpend || 0, true)}</TableCell>
-          <TableCell className="text-right font-mono text-sm p-0">{formatNumber(month.totalConversions || 0)}</TableCell>
-          <TableCell className="text-right font-mono text-sm p-0">{formatCurrency(month.revenue || 0, true)}</TableCell>
-          <TableCell className="text-right font-mono text-sm text-muted-foreground p-0">{formatCurrency(month.operatingCosts || 0, true)}</TableCell>
-          <TableCell className={cn("text-right font-mono text-sm font-medium p-0", profitClass)}>{formatCurrency(month.netProfit || 0, true)}</TableCell>
-          <TableCell className={cn("text-right font-mono text-sm font-medium p-0 pr-2", cumulativeClass)}>{formatCurrency(month.cumulativeProfit || 0, true)}</TableCell>
+          <TableCell className="text-right font-mono text-sm p-0">
+            {formatCurrency(month.totalSpend || 0, true)}
+          </TableCell>
+          <TableCell className="text-right font-mono text-sm p-0">
+            {formatNumber(month.totalConversions || 0)}
+          </TableCell>
+          <TableCell className="text-right font-mono text-sm p-0">
+            {formatCurrency(month.revenue || 0, true)}
+          </TableCell>
+          <TableCell className="text-right font-mono text-sm text-muted-foreground p-0">
+            {formatCurrency(month.operatingCosts || 0, true)}
+          </TableCell>
+          <TableCell className={cn('text-right font-mono text-sm font-medium p-0', profitClass)}>
+            {formatCurrency(month.netProfit || 0, true)}
+          </TableCell>
+          <TableCell
+            className={cn('text-right font-mono text-sm font-medium p-0 pr-2', cumulativeClass)}
+          >
+            {formatCurrency(month.cumulativeProfit || 0, true)}
+          </TableCell>
         </TableRow>
 
         <CollapsibleContent asChild>
@@ -151,12 +176,17 @@ function MonthRow({
                       <Input
                         type="number"
                         value={month.spendMultiplier ?? ''}
-                        onChange={(e) => updateMonth(month.id, {
-                          spendMultiplier: e.target.value ? parseFloat(e.target.value) : null
-                        })}
+                        onChange={(e) =>
+                          updateMonth(month.id, {
+                            spendMultiplier: e.target.value ? parseFloat(e.target.value) : null,
+                          })
+                        }
                         placeholder="Global"
                         className="w-16 h-6 text-xs"
                         step={0.1}
+                        data-pl-cell="true"
+                        data-pl-row={monthOrder}
+                        data-pl-col={1}
                       />
                     </div>
                     <div className="flex items-center gap-2">
@@ -164,24 +194,44 @@ function MonthRow({
                       <Input
                         type="number"
                         value={month.ctrBump ?? ''}
-                        onChange={(e) => updateMonth(month.id, {
-                          ctrBump: e.target.value ? parseFloat(e.target.value) : null
-                        })}
+                        onChange={(e) =>
+                          updateMonth(month.id, {
+                            ctrBump: e.target.value ? parseFloat(e.target.value) : null,
+                          })
+                        }
                         placeholder="Global"
                         className="w-16 h-6 text-xs"
                         step={0.1}
+                        data-pl-cell="true"
+                        data-pl-row={monthOrder}
+                        data-pl-col={2}
                       />
                     </div>
                     <div className="flex gap-1 ml-auto">
                       {month.monthIndex > 0 && (
-                        <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => copyFromPreviousMonth(month.id)}>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-6 text-xs gap-1"
+                          onClick={() => copyFromPreviousMonth(month.id)}
+                        >
                           <Copy className="h-3 w-3" /> Copy Prev
                         </Button>
                       )}
-                      <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => resetMonthToGlobal(month.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => resetMonthToGlobal(month.id)}
+                      >
                         <RotateCcw className="h-3 w-3" /> Reset
                       </Button>
-                      <Button variant="outline" size="sm" className="h-6 text-xs gap-1" onClick={() => applyToRemainingMonths(month.id)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-6 text-xs gap-1"
+                        onClick={() => applyToRemainingMonths(month.id)}
+                      >
                         <ArrowDown className="h-3 w-3" /> Apply Below
                       </Button>
                     </div>
@@ -189,19 +239,27 @@ function MonthRow({
 
                   {/* Channel Allocations */}
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                    {month.channels.map((ch) => (
-                      <div key={ch.channelId} className="flex items-center gap-1 p-1.5 rounded bg-background/50 border border-border/50">
+                    {month.channels.map((ch, channelIndex) => (
+                      <div
+                        key={ch.channelId}
+                        className="flex items-center gap-1 p-1.5 rounded bg-background/50 border border-border/50"
+                      >
                         <span className="text-[10px] truncate flex-1" title={ch.name}>
                           {ch.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')}
                         </span>
                         <Input
                           type="number"
                           value={ch.allocationPct.toFixed(1)}
-                          onChange={(e) => updateMonthChannel(month.id, ch.channelId, {
-                            allocationPct: parseFloat(e.target.value) || 0
-                          })}
+                          onChange={(e) =>
+                            updateMonthChannel(month.id, ch.channelId, {
+                              allocationPct: parseFloat(e.target.value) || 0,
+                            })
+                          }
                           className="w-14 h-5 text-[10px] text-right"
                           step={0.5}
+                          data-pl-cell="true"
+                          data-pl-row={monthOrder}
+                          data-pl-col={3 + channelIndex}
                         />
                         <span className="text-[10px] text-muted-foreground">%</span>
                       </div>
@@ -221,6 +279,7 @@ export function PLTable() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const { months: planMetrics, totals } = useMultiMonthMetrics();
   const { format: formatCurrency } = useCurrency();
+  const { containerRef, handleGridKeyDownCapture } = usePlGridNavigation();
 
   const toggleMonth = useCallback((monthId: string) => {
     setExpandedMonths((prev) => {
@@ -235,62 +294,151 @@ export function PLTable() {
   }, []);
 
   return (
-    <Card className="border-border">
-      <ScrollArea className="w-full">
-        {/* Set min-width to prevent squashing on small screens */}
-        <div className="min-w-[800px]">
+    <div className="space-y-4">
+      <Card className="border-border">
+        <CardContent className="p-0">
           <Table>
             <TableHeader>
-              <TableRow className={cn("grid gap-4 bg-muted/50 py-3", GRID_COLS)}>
-                <TableHead className="pl-4 p-0">Month</TableHead>
-                <TableHead className="p-0">Budget</TableHead>
-                <TableHead className="text-right p-0">Spend</TableHead>
-                <TableHead className="text-right p-0">Conv.</TableHead>
-                <TableHead className="text-right p-0">Revenue</TableHead>
-                <TableHead className="text-right p-0">OpEx</TableHead>
-                <TableHead className="text-right p-0">Net P/L</TableHead>
-                <TableHead className="text-right pr-4 p-0">Cumulative</TableHead>
+              <TableRow>
+                <TableHead>Month</TableHead>
+                <TableHead className="text-right">Budget</TableHead>
+                <TableHead className="text-right">Spend</TableHead>
+                <TableHead className="text-right">Revenue</TableHead>
+                <TableHead className="text-right">Net P/L</TableHead>
+                <TableHead className="text-right">Cumulative</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {planMetrics.map((month) => (
-                <MonthRow
-                  key={month.id}
-                  month={month}
-                  isExpanded={expandedMonths.has(month.id)}
-                  onToggle={() => toggleMonth(month.id)}
-                  formatCurrency={formatCurrency}
-                />
+                <TableRow key={`summary-${month.id}`}>
+                  <TableCell>{month.label}</TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatCurrency(month.budget, true)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatCurrency(month.totalSpend || 0, true)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono">
+                    {formatCurrency(month.revenue || 0, true)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono',
+                      (month.netProfit || 0) > 0
+                        ? 'text-green-500'
+                        : (month.netProfit || 0) < 0
+                          ? 'text-destructive'
+                          : ''
+                    )}
+                  >
+                    {formatCurrency(month.netProfit || 0, true)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono',
+                      (month.cumulativeProfit || 0) > 0
+                        ? 'text-green-500'
+                        : (month.cumulativeProfit || 0) < 0
+                          ? 'text-destructive'
+                          : ''
+                    )}
+                  >
+                    {formatCurrency(month.cumulativeProfit || 0, true)}
+                  </TableCell>
+                </TableRow>
               ))}
-              {/* Summary Row */}
-              <TableRow className={cn(
-                "grid gap-4 bg-primary/10 font-bold border-t-2 border-primary py-3",
-                GRID_COLS
-              )}>
-                <TableCell className="pl-4 p-0">TOTALS</TableCell>
-                <TableCell className="font-mono text-xs p-0">{formatCurrency(totals.totalAllocatedBudget, true)}</TableCell>
-                <TableCell className="text-right font-mono p-0">{formatCurrency(totals.totalSpend, true)}</TableCell>
-                <TableCell className="text-right font-mono p-0">{formatNumber(totals.totalConversions)}</TableCell>
-                <TableCell className="text-right font-mono p-0">{formatCurrency(totals.totalRevenue, true)}</TableCell>
-                <TableCell className="text-right font-mono text-muted-foreground p-0">{formatCurrency(totals.operatingCosts, true)}</TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono p-0",
-                  totals.netProfit > 0 ? "text-green-500" : totals.netProfit < 0 ? "text-destructive" : ""
-                )}>
-                  {formatCurrency(totals.netProfit, true)}
-                </TableCell>
-                <TableCell className={cn(
-                  "text-right font-mono p-0 pr-4",
-                  totals.endingCumulativeProfit > 0 ? "text-green-500" : totals.endingCumulativeProfit < 0 ? "text-destructive" : ""
-                )}>
-                  {formatCurrency(totals.endingCumulativeProfit, true)}
-                </TableCell>
-              </TableRow>
             </TableBody>
           </Table>
-        </div>
-        <ScrollBar orientation="horizontal" />
-      </ScrollArea>
-    </Card>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border">
+        <ScrollArea className="w-full">
+          {/* Set min-width to prevent squashing on small screens */}
+          <div
+            ref={containerRef}
+            className="min-w-[800px]"
+            data-pl-grid="true"
+            onKeyDownCapture={handleGridKeyDownCapture}
+          >
+            <Table>
+              <TableHeader>
+                <TableRow className={cn('grid gap-4 bg-muted/50 py-3', GRID_COLS)}>
+                  <TableHead className="pl-4 p-0">Month</TableHead>
+                  <TableHead className="p-0">Budget</TableHead>
+                  <TableHead className="text-right p-0">Spend</TableHead>
+                  <TableHead className="text-right p-0">Conv.</TableHead>
+                  <TableHead className="text-right p-0">Revenue</TableHead>
+                  <TableHead className="text-right p-0">OpEx</TableHead>
+                  <TableHead className="text-right p-0">Net P/L</TableHead>
+                  <TableHead className="text-right pr-4 p-0">Cumulative</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {planMetrics.map((month, monthIndex) => (
+                  <MonthRow
+                    key={month.id}
+                    month={month}
+                    monthOrder={monthIndex}
+                    isExpanded={expandedMonths.has(month.id)}
+                    onToggle={() => toggleMonth(month.id)}
+                    formatCurrency={formatCurrency}
+                  />
+                ))}
+                {/* Summary Row */}
+                <TableRow
+                  className={cn(
+                    'grid gap-4 bg-primary/10 font-bold border-t-2 border-primary py-3',
+                    GRID_COLS
+                  )}
+                >
+                  <TableCell className="pl-4 p-0">TOTALS</TableCell>
+                  <TableCell className="font-mono text-xs p-0">
+                    {formatCurrency(totals.totalAllocatedBudget, true)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono p-0">
+                    {formatCurrency(totals.totalSpend, true)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono p-0">
+                    {formatNumber(totals.totalConversions)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono p-0">
+                    {formatCurrency(totals.totalRevenue, true)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono text-muted-foreground p-0">
+                    {formatCurrency(totals.operatingCosts, true)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono p-0',
+                      totals.netProfit > 0
+                        ? 'text-green-500'
+                        : totals.netProfit < 0
+                          ? 'text-destructive'
+                          : ''
+                    )}
+                  >
+                    {formatCurrency(totals.netProfit, true)}
+                  </TableCell>
+                  <TableCell
+                    className={cn(
+                      'text-right font-mono p-0 pr-4',
+                      totals.endingCumulativeProfit > 0
+                        ? 'text-green-500'
+                        : totals.endingCumulativeProfit < 0
+                          ? 'text-destructive'
+                          : ''
+                    )}
+                  >
+                    {formatCurrency(totals.endingCumulativeProfit, true)}
+                  </TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </div>
+          <ScrollBar orientation="horizontal" />
+        </ScrollArea>
+      </Card>
+    </div>
   );
 }
