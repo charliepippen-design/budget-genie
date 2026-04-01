@@ -1,0 +1,61 @@
+{
+  // Budget Genie (MediaPlanner Pro) — recommended VS Code extensions
+  // Install all at once: see .vscode/tasks.json → "Install Recommended Extensions"
+  "recommendations": [
+    // ──────────────────────────────────────────────
+    // React / TypeScript / Vite
+    // ──────────────────────────────────────────────
+    "dsznajder.es7-react-js-snippets", // ES7+ React/Redux/React-Native snippets
+    "formulahendry.auto-rename-tag", // Auto-rename paired HTML/JSX tags
+    "christian-kohler.path-intellisense", // Autocomplete file paths in imports
+    "pflannery.vscode-versionlens", // Shows latest package versions in package.json
+    "antfu.vite", // Vite integration (HMR status, config awareness)
+    "yoavbls.pretty-ts-errors", // Human-readable TypeScript errors
+
+    // ──────────────────────────────────────────────
+    // Tailwind CSS
+    // ──────────────────────────────────────────────
+    "bradlc.vscode-tailwindcss", // Tailwind IntelliSense (autocomplete, hover docs)
+
+    // ──────────────────────────────────────────────
+    // AI Assistants
+    // ──────────────────────────────────────────────
+    "github.copilot-chat", // GitHub Copilot Chat
+    "danielsanmedium.dscodegpt", // CodeGPT chat and agent workflows
+    "continue.continue", // Continue — open AI assistant; configure with Gemini
+
+    // ──────────────────────────────────────────────
+    // Supabase / PostgreSQL
+    // ──────────────────────────────────────────────
+    "supabase.supabase-vscode", // Supabase: type-gen, Edge Function support
+    "mtxr.sqltools", // SQLTools — run SQL queries from VS Code
+    "mtxr.sqltools-driver-pg", // SQLTools PostgreSQL driver for Supabase
+
+    // ──────────────────────────────────────────────
+    // Data files (CSV / Excel / PDF)
+    // ──────────────────────────────────────────────
+    "mechatroner.rainbow-csv", // Syntax highlight + query CSV/TSV files
+    "grapecity.gc-excelviewer", // Preview .xlsx / .csv files in VS Code
+    "tomoki1207.pdf", // PDF Preview inside VS Code
+
+    // ──────────────────────────────────────────────
+    // Code Quality / Formatting
+    // ──────────────────────────────────────────────
+    "esbenp.prettier-vscode", // Prettier — opinionated code formatter
+    "dbaeumer.vscode-eslint", // ESLint integration
+    "deque-systems.vscode-axe-linter", // Accessibility linting for React/HTML templates
+    "usernamehw.errorlens", // Inline error/warning display on problem lines
+    "streetsidesoftware.code-spell-checker", // Catch typos in code & comments
+    "wix.vscode-import-cost", // Show bundle cost of each import inline
+
+    // ──────────────────────────────────────────────
+    // Git / API testing
+    // ──────────────────────────────────────────────
+    "eamodio.gitlens", // GitLens — advanced git blame, history, compare
+    "orta.vscode-jest", // Jest test explorer, diagnostics, and run/debug
+    "rangav.vscode-thunder-client" // Thunder Client — REST/GraphQL API testing
+  ],
+
+  // Extensions that are noisy or conflict with this stack
+  "unwantedRecommendations": []
+}
