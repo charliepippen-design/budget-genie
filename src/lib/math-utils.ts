@@ -72,7 +72,7 @@ export function normalizeAllocations(channels: ChannelData[]): ChannelData[] {
     // 8. Residue Check (Largest Remainder Method for 100.00% precision)
     // Round all to 2 decimal places
     const precision = 100; // 2 decimal places
-    let rounded = processedActive.map(ch => ({
+    const rounded = processedActive.map(ch => ({
         ...ch,
         rawPct: ch.allocationPct,
         allocationPct: Math.floor(ch.allocationPct * precision) / precision
@@ -96,7 +96,7 @@ export function normalizeAllocations(channels: ChannelData[]): ChannelData[] {
         withDecimal.sort((a, b) => b.decimal - a.decimal);
 
         // How many 0.01s do we have to give out?
-        let steps = Math.round(remainder * precision); // e.g. 0.02 * 100 = 2 chunks
+        const steps = Math.round(remainder * precision); // e.g. 0.02 * 100 = 2 chunks
 
         for (let i = 0; i < steps; i++) {
             // Cycle through sorted list if steps > active count (unlikely but safe)

@@ -123,7 +123,7 @@ export function SummaryCards({
       icon: <TrendingUp className="h-5 w-5 text-warning" />,
       accentColor: 'hsl(var(--warning))',
     },
-  ], [totalBudget, blendedCpa, totalConversions, projectedRevenue, blendedRoas]);
+  ], [totalBudget, blendedCpa, totalConversions, projectedRevenue, blendedRoas, formatCurrency]);
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

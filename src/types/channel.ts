@@ -2,79 +2,78 @@
 // Polymorphic channel model for multi-model media planning
 
 export type ChannelFamily =
-  | 'paid_media'    // PPC, Display, Social
-  | 'affiliate'     // Networks, Partners
-  | 'influencer'    // Creators, Streamers
-  | 'seo_content'   // Organic Search, Blog
-  | 'pr_brand'      // Offline, Press, Sponsorships
-  | 'email_crm';    // Database marketing
+  | 'paid_media' // PPC, Display, Social
+  | 'affiliate' // Networks, Partners
+  | 'influencer' // Creators, Streamers
+  | 'seo_content' // Organic Search, Blog
+  | 'pr_brand' // Offline, Press, Sponsorships
+  | 'email_crm'; // Database marketing
 
-export type BuyingModel =
-  | 'CPM'
-  | 'CPC'
-  | 'CPA'
-  | 'REV_SHARE'
-  | 'HYBRID'
-  | 'FLAT_FEE'
-  | 'RETAINER';
+export type BuyingModel = 'CPM' | 'CPC' | 'CPA' | 'REV_SHARE' | 'HYBRID' | 'FLAT_FEE' | 'RETAINER';
 
 // ========== FAMILY METADATA ==========
 
-export const FAMILY_INFO: Record<ChannelFamily, {
-  name: string;
-  defaultModel: BuyingModel;
-  allowedModels: BuyingModel[];
-  icon: string;
-  color: string;
-}> = {
+export const FAMILY_INFO: Record<
+  ChannelFamily,
+  {
+    name: string;
+    defaultModel: BuyingModel;
+    allowedModels: BuyingModel[];
+    icon: string;
+    color: string;
+  }
+> = {
   paid_media: {
     name: 'Paid Media',
     defaultModel: 'CPM',
     allowedModels: ['CPM', 'CPC', 'CPA'],
     icon: 'Megaphone',
-    color: 'hsl(var(--chart-2))'
+    color: 'hsl(var(--chart-2))',
   },
   affiliate: {
     name: 'Affiliates',
     defaultModel: 'CPA',
     allowedModels: ['CPA', 'REV_SHARE', 'HYBRID', 'FLAT_FEE'],
     icon: 'Users',
-    color: 'hsl(var(--chart-3))'
+    color: 'hsl(var(--chart-3))',
   },
   influencer: {
     name: 'Influencers',
     defaultModel: 'FLAT_FEE',
     allowedModels: ['FLAT_FEE', 'REV_SHARE', 'HYBRID', 'CPM'],
     icon: 'Star',
-    color: 'hsl(var(--chart-4))'
+    color: 'hsl(var(--chart-4))',
   },
   seo_content: {
     name: 'SEO & Content',
     defaultModel: 'RETAINER',
     allowedModels: ['RETAINER', 'FLAT_FEE'],
     icon: 'Search',
-    color: 'hsl(var(--chart-1))'
+    color: 'hsl(var(--chart-1))',
   },
   pr_brand: {
     name: 'PR & Brand',
     defaultModel: 'FLAT_FEE',
     allowedModels: ['FLAT_FEE', 'RETAINER'],
     icon: 'Award',
-    color: 'hsl(var(--chart-5))'
+    color: 'hsl(var(--chart-5))',
   },
   email_crm: {
     name: 'Email & CRM',
     defaultModel: 'CPM',
     allowedModels: ['CPM', 'FLAT_FEE'],
     icon: 'Mail',
-    color: 'hsl(var(--chart-6))'
+    color: 'hsl(var(--chart-6))',
   },
 };
 
-export const BUYING_MODEL_INFO: Record<BuyingModel, {
-  name: string;
-  description: string;
-}> = {
+export const BUYING_MODEL_INFO: Record<
+  BuyingModel,
+  {
+    name: string;
+    description: string;
+  }
+> = {
   CPM: {
     name: 'CPM',
     description: 'Cost per 1,000 impressions',
@@ -88,7 +87,7 @@ export const BUYING_MODEL_INFO: Record<BuyingModel, {
     description: 'Cost per acquisition',
   },
   REV_SHARE: {
-    name: 'Revenue Share',
+    name: 'Rev Share',
     description: 'Percentage of revenue',
   },
   HYBRID: {
@@ -112,14 +111,14 @@ export interface ChannelTypeConfig {
   buyingModel: BuyingModel;
 
   // The DNA: Unifying all cost models into one flexible structure
-  price: number;              // Acts as CPM, CPC, CPA, Monthly Fee, or Base CPA
-  secondaryPrice?: number;    // Used as RevShare % for HYBRID/REV_SHARE (0-100)
+  price: number; // Acts as CPM, CPC, CPA, Monthly Fee, or Base CPA
+  secondaryPrice?: number; // Used as RevShare % for HYBRID/REV_SHARE (0-100)
 
   baselineMetrics: {
-    ctr?: number;             // % Click Through Rate
-    conversionRate?: number;  // % Conversion Rate (or Lead -> FTD)
-    aov?: number;             // Average Order Value / LTV / NGR per FTD
-    trafficPerUnit?: number;  // Est. Traffic for Flat Fee / Retainer
+    ctr?: number; // % Click Through Rate
+    conversionRate?: number; // % Conversion Rate (or Lead -> FTD)
+    aov?: number; // Average Order Value / LTV / NGR per FTD
+    trafficPerUnit?: number; // Est. Traffic for Flat Fee / Retainer
     saturationCeiling?: number; // Spend level where returns diminish significantly (Half-Efficiency point in Michaelis-Menten)
   };
 }
@@ -127,13 +126,13 @@ export interface ChannelTypeConfig {
 // ========== UNIFIED OUTPUT SCHEMA ==========
 
 export interface UnifiedMetrics {
-  spend: number;          // The final money out
-  ftds: number;           // The final conversions
-  revenue: number;        // FTDs * Player Value or Spend * ROAS
-  cpa: number | null;     // Spend / FTDs
-  roas: number;           // Revenue / Spend
-  impressions: number;    // For display channels
-  clicks: number;         // Calculated clicks
+  spend: number; // The final money out
+  ftds: number; // The final conversions
+  revenue: number; // FTDs * Player Value or Spend * ROAS
+  cpa: number | null; // Spend / FTDs
+  roas: number; // Revenue / Spend
+  impressions: number; // For display channels
+  clicks: number; // Calculated clicks
 }
 
 // ========== CALCULATION HELPER ==========
@@ -175,30 +174,30 @@ export function calculateUnifiedMetrics(
       // Math: Budget / CPA = Conv
       ftds = price > 0 ? spend / price : 0;
       // Reverse calculate impressions for reference
-      clicks = cr > 0 ? (ftds / (cr / 100)) : 0;
-      impressions = ctr > 0 ? (clicks / (ctr / 100)) : 0;
+      clicks = cr > 0 ? ftds / (cr / 100) : 0;
+      impressions = ctr > 0 ? clicks / (ctr / 100) : 0;
       break;
 
-    case 'REV_SHARE': // price = % (Wait, secondaryPrice is %) - Let's use price as dummy or 0? 
+    case 'REV_SHARE': // price = % (Wait, secondaryPrice is %) - Let's use price as dummy or 0?
       // The user spec said "secondaryPrice: number (Used ONLY for Hybrid RevShare %)".
-      // But for Pure RevShare, we need a percentage. 
-      // Let's assume price is the percentage if model is REV_SHARE? 
+      // But for Pure RevShare, we need a percentage.
+      // Let's assume price is the percentage if model is REV_SHARE?
       // Or maybe secondaryPrice is widely used for percentage.
       // User Spec: "Add secondaryPrice: number (Used ONLY for Hybrid RevShare %)."
       // Re-reading user Step 1: "Add price: number (Acts as the CPA, CPM, CPC, or Monthly Fee...)"
-      // For RevShare, usually there is no fixed price, just %. 
-      // Maybe price = 0? And secondaryPrice = %. 
+      // For RevShare, usually there is no fixed price, just %.
+      // Maybe price = 0? And secondaryPrice = %.
       // OR price = %. Let's use secondaryPrice for % as per spec for Hybrid.
       // PROPOSAL: For pure RevShare, stick to secondaryPrice for consistency or use price as the %.
       // Let's us price as % for purity if secondaryPrice is ONLY for hybrid.
       // Actually, let's use secondaryPrice for consistency of "Revenue Share %".
       // But wait, "price" is required.
-      // Let's set price = 0 for Rev Share? 
+      // Let's set price = 0 for Rev Share?
       // And use secondaryPrice for the %.
       // Calculation: Est Revenue -> Cost.
       // For RevShare, Spend depends on performance. It's usually output driven.
       // But here we likely input Budget = Estimated Spend.
-      // ftds = (Spend / (AOV * RevShare%)) ? 
+      // ftds = (Spend / (AOV * RevShare%)) ?
       // Spend = FTDs * AOV * RevShare%
       // ftds = Spend / (AOV * (secondaryPrice/100))
       {
@@ -214,17 +213,17 @@ export function calculateUnifiedMetrics(
         const baseCpa = price;
         const rs = (secondaryPrice || 0) / 100;
         const revenuePerFtd = aov;
-        const totalCostPerFtd = baseCpa + (revenuePerFtd * rs);
+        const totalCostPerFtd = baseCpa + revenuePerFtd * rs;
 
         ftds = totalCostPerFtd > 0 ? spend / totalCostPerFtd : 0;
       }
       break;
 
-    case 'FLAT_FEE': // price = Monthly Cost. 
-      // Budget is FIXED to this amount. 
+    case 'FLAT_FEE': // price = Monthly Cost.
+      // Budget is FIXED to this amount.
       // logic: spend = price.
-      // But here we take 'spend' as arg. 
-      // Usually the store will force spend = price. 
+      // But here we take 'spend' as arg.
+      // Usually the store will force spend = price.
       // So here we assume spend IS price.
       finalSpend = price;
       // Traffic ? baselineMetris.trafficPerUnit?
@@ -255,7 +254,7 @@ export function calculateUnifiedMetrics(
   const saturation = baselineMetrics.saturationCeiling;
 
   if (saturation && saturation > 0 && finalSpend > 0) {
-    const decayFactor = 1 / (1 + (finalSpend / saturation));
+    const decayFactor = 1 / (1 + finalSpend / saturation);
     revenue = revenue * decayFactor;
   }
 
@@ -279,9 +278,12 @@ export function calculateUnifiedMetrics(
 export function inferChannelFamily(name: string): ChannelFamily {
   const lower = name.toLowerCase();
 
-  if (lower.includes('seo') || lower.includes('content') || lower.includes('blog')) return 'seo_content';
-  if (lower.includes('affiliate') || lower.includes('partner') || lower.includes('cpa')) return 'affiliate';
-  if (lower.includes('influencer') || lower.includes('twitch') || lower.includes('tiktok')) return 'influencer';
+  if (lower.includes('seo') || lower.includes('content') || lower.includes('blog'))
+    return 'seo_content';
+  if (lower.includes('affiliate') || lower.includes('partner') || lower.includes('cpa'))
+    return 'affiliate';
+  if (lower.includes('influencer') || lower.includes('twitch') || lower.includes('tiktok'))
+    return 'influencer';
   if (lower.includes('pr') || lower.includes('brand')) return 'pr_brand';
   if (lower.includes('email') || lower.includes('crm')) return 'email_crm';
 
@@ -308,7 +310,12 @@ export function getLikelyModel(category: string): BuyingModel {
   const lower = category.toLowerCase();
 
   // Paid Search / Native / Listings: Default to CPC
-  if (lower.includes('paid') || lower.includes('search') || lower.includes('native') || lower.includes('programmatic')) {
+  if (
+    lower.includes('paid') ||
+    lower.includes('search') ||
+    lower.includes('native') ||
+    lower.includes('programmatic')
+  ) {
     // Broad check for PPC style
     return 'CPC'; // Or CPM depending on specific sub-channel, but generic default requested
   }

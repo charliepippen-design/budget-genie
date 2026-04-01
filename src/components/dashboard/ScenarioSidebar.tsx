@@ -1,7 +1,19 @@
 import React from 'react';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import type { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
 import { Button } from '@/components/ui/button';
-import { Zap, TrendingUp, Users, Rocket, Eye, Shield, FlaskConical, Scale, Target } from 'lucide-react';
+import { Tooltip as ReactTooltip } from 'react-tooltip';
+import {
+  Zap,
+  TrendingUp,
+  Users,
+  Rocket,
+  Eye,
+  Shield,
+  FlaskConical,
+  Scale,
+  Target,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import {
   calculateRoasBasedAllocation,
@@ -9,8 +21,9 @@ import {
   calculateConservativeAllocation,
   calculateExperimentalAllocation,
   calculateParetoAllocation,
-  calculateLowCpaAllocation
+  calculateLowCpaAllocation,
 } from '@/lib/distribution-logic';
+import { optimizeBudget } from '@/lib/optimization-logic';
 
 import { RotateCcw, SlidersHorizontal } from 'lucide-react';
 
@@ -27,25 +40,53 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
   channelAllocations,
   onLoadScenario,
   onReset,
-  onNormalize
+  onNormalize,
 }) => {
   // Use the modern store hooks
-  const { setAllocations, globalMultipliers, setGlobalMultipliers, rebalanceToTargets } = useMediaPlanStore();
+  const {
+    setAllocations,
+    globalMultipliers,
+    setGlobalMultipliers,
+    rebalanceToTargets,
+    channels,
+    setChannels,
+    savePreset,
+  } = useMediaPlanStore();
   const channelsWithMetrics = useChannelsWithMetrics();
 
-  const handlePresetClick = (strategyName: string, calculatorFn: (channels: any[]) => Record<string, number>) => {
+  const handlePresetClick = (
+    strategyName: string,
+    calculatorFn: (channels: ChannelWithMetrics[]) => Record<string, number>
+  ) => {
     try {
       const newAllocations = calculatorFn(channelsWithMetrics);
       setAllocations(newAllocations);
       toast.success(`Applied Strategy: ${strategyName}`, {
-        description: "Channel allocations have been recalculated based on live metrics."
+        description: 'Channel allocations have been recalculated based on live metrics.',
       });
-    } catch (error: any) {
-      console.error("Failed to apply strategy", error);
-      toast.error("Strategy Failed", {
-        description: error?.message || "Could not calculate allocations."
+    } catch (error: unknown) {
+      console.error('Failed to apply strategy', error);
+      toast.error('Strategy Failed', {
+        description: error instanceof Error ? error.message : 'Could not calculate allocations.',
       });
     }
+  };
+
+  const handleOptimizeScenario = () => {
+    const result = optimizeBudget(channels, totalBudget, globalMultipliers);
+    if (!result.changes.boosted.length && !result.changes.slashed.length) {
+      toast.info('No optimization opportunities found', {
+        description: 'Set CPA/ROAS targets to generate actionable reallocations.',
+      });
+      return;
+    }
+
+    setChannels(result.channels);
+    const scenarioName = `Optimized ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
+    savePreset(scenarioName);
+    toast.success('Optimized Scenario Generated', {
+      description: `Boosted ${result.changes.boosted.length}, reduced ${result.changes.slashed.length}, and saved as ${scenarioName}.`,
+    });
   };
 
   return (
@@ -58,7 +99,9 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
 
         {/* TARGET CONSTRAINTS (NEW) */}
         <div className="bg-slate-950/50 rounded-lg p-4 mb-4 border border-slate-700/50">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Target Constraints</div>
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+            Target Constraints
+          </div>
           <div className="space-y-4">
             {/* CPA TARGET */}
             <div>
@@ -113,7 +156,6 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
         </div>
 
         <div className="space-y-2">
-
           <Button
             variant="outline"
             className="w-full justify-start text-left h-auto py-3 border-slate-700 hover:bg-blue-900/20 hover:text-blue-400 hover:border-blue-500/50 transition-all group"
@@ -124,8 +166,12 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <Rocket className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-blue-400">Maximize ROAS</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">Prioritizes efficiency (&gt;1.0 ROAS)</div>
+                <div className="font-medium text-slate-200 group-hover:text-blue-400">
+                  Maximize ROAS
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  Prioritizes efficiency (&gt;1.0 ROAS)
+                </div>
               </div>
             </div>
           </Button>
@@ -140,8 +186,12 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <Eye className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-purple-400">Max Visibility</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">80% budget to lowest CPMs</div>
+                <div className="font-medium text-slate-200 group-hover:text-purple-400">
+                  Max Visibility
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  80% budget to lowest CPMs
+                </div>
               </div>
             </div>
           </Button>
@@ -156,8 +206,12 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <Shield className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-emerald-400">Secure / Safe</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">Protects Retainers & Fixed Fees</div>
+                <div className="font-medium text-slate-200 group-hover:text-emerald-400">
+                  Secure / Safe
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  Protects Retainers & Fixed Fees
+                </div>
               </div>
             </div>
           </Button>
@@ -172,8 +226,22 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <FlaskConical className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-amber-400">Sandbox Mode</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">Boosts zero-spend channels</div>
+                <div className="font-medium text-slate-200 group-hover:text-amber-400">
+                  Sandbox Mode
+                  <span
+                    className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 text-[10px] text-slate-300"
+                    role="note"
+                    tabIndex={0}
+                    aria-label="Explain Sandbox Mode"
+                    data-tooltip-id="strategy-tooltip"
+                    data-tooltip-content="Sandbox Mode safely tests bold allocation ideas without manually editing each channel."
+                  >
+                    ?
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  Boosts zero-spend channels
+                </div>
               </div>
             </div>
           </Button>
@@ -188,8 +256,22 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <Scale className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-pink-400">Pareto (80/20)</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">Focus on top converters</div>
+                <div className="font-medium text-slate-200 group-hover:text-pink-400">
+                  Pareto (80/20)
+                  <span
+                    className="ml-2 inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-600 text-[10px] text-slate-300"
+                    role="note"
+                    tabIndex={0}
+                    aria-label="Explain Pareto Strategy"
+                    data-tooltip-id="strategy-tooltip"
+                    data-tooltip-content="Pareto Strategy shifts most budget to the few channels driving most results."
+                  >
+                    ?
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  Focus on top converters
+                </div>
               </div>
             </div>
           </Button>
@@ -204,15 +286,17 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <Target className="w-4 h-4" />
               </div>
               <div>
-                <div className="font-medium text-slate-200 group-hover:text-cyan-400">Low CPA Hunter</div>
-                <div className="text-xs text-slate-500 mt-0.5 leading-tight">Aggressively targets efficiency</div>
+                <div className="font-medium text-slate-200 group-hover:text-cyan-400">
+                  Low CPA Hunter
+                </div>
+                <div className="text-xs text-slate-500 mt-0.5 leading-tight">
+                  Aggressively targets efficiency
+                </div>
               </div>
             </div>
           </Button>
-
         </div>
       </div>
-
 
       {/* SCENARIO ACTIONS (NEW) */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
@@ -221,6 +305,15 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
         </h3>
 
         <div className="space-y-2">
+          <Button
+            variant="outline"
+            className="w-full justify-start text-left h-auto py-3 border-slate-700 hover:bg-indigo-900/20 hover:text-indigo-300 hover:border-indigo-500/50 transition-all"
+            onClick={handleOptimizeScenario}
+          >
+            <TrendingUp className="w-4 h-4 mr-2" />
+            Optimize Scenario
+          </Button>
+
           <Button
             variant="outline"
             className="w-full justify-start text-left bg-slate-950/50 border-slate-700 hover:bg-slate-800 hover:text-white"
@@ -240,6 +333,11 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
         </div>
       </div>
 
-    </div >
+      <ReactTooltip
+        id="strategy-tooltip"
+        place="top"
+        className="z-50 max-w-64 rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-xs text-slate-100"
+      />
+    </div>
   );
 };

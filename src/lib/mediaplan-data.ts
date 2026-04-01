@@ -174,7 +174,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 0.8,
       'Display/Programmatic': 1.5,
       'Paid Search': 1.5,
-      'Affiliate': 1.2,
+      Affiliate: 1.2,
       'Paid Social': 0.8, // Influencer
     },
   },
@@ -185,7 +185,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 0.5,
       'Display/Programmatic': 2.0,
       'Paid Search': 2.0,
-      'Affiliate': 1.2,
+      Affiliate: 1.2,
       'Paid Social': 1.2,
     },
   },
@@ -196,7 +196,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 0.8,
       'Display/Programmatic': 0.5,
       'Paid Search': 0.5,
-      'Affiliate': 2.5,
+      Affiliate: 2.5,
       'Paid Social': 1.0,
     },
   },
@@ -207,7 +207,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 1.0,
       'Display/Programmatic': 1.0,
       'Paid Search': 1.0,
-      'Affiliate': 1.0,
+      Affiliate: 1.0,
       'Paid Social': 1.0,
     },
   },
@@ -218,7 +218,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 1.5,
       'Display/Programmatic': 0.6,
       'Paid Search': 0.6,
-      'Affiliate': 0.8,
+      Affiliate: 0.8,
       'Paid Social': 1.6,
     },
   },
@@ -229,7 +229,7 @@ export const BUDGET_PRESETS = {
       'SEO/Content': 1.0,
       'Display/Programmatic': 1.0,
       'Paid Search': 1.0,
-      'Affiliate': 1.0,
+      Affiliate: 1.0,
       'Paid Social': 1.0,
     },
   },
@@ -238,21 +238,27 @@ export const BUDGET_PRESETS = {
 export type BudgetPresetKey = keyof typeof BUDGET_PRESETS;
 
 // Category metadata
-export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: string; icon: string }> = {
-  'SEO/Content': { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
-  'Display/Programmatic': { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
-  'Affiliate': { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
-  'Paid Social': { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
-  'Paid Search': { name: 'Paid Search', color: 'hsl(var(--chart-5))', icon: 'Search' },
-  'Offline/TV': { name: 'Offline/TV', color: 'hsl(var(--muted-foreground))', icon: 'Tv' },
-  'Email/SMS': { name: 'Email/SMS', color: 'hsl(var(--primary))', icon: 'Mail' },
-  'Other': { name: 'Other', color: 'hsl(var(--secondary))', icon: 'HelpCircle' },
-};
+export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: string; icon: string }> =
+  {
+    'SEO/Content': { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
+    'Display/Programmatic': { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
+    Affiliate: { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
+    'Paid Social': { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
+    'Paid Search': { name: 'Paid Search', color: 'hsl(var(--chart-5))', icon: 'Search' },
+    'Offline/TV': { name: 'Offline/TV', color: 'hsl(var(--muted-foreground))', icon: 'Tv' },
+    'Email/SMS': { name: 'Email/SMS', color: 'hsl(var(--primary))', icon: 'Mail' },
+    Other: { name: 'Other', color: 'hsl(var(--secondary))', icon: 'HelpCircle' },
+  };
 
 // Utility functions
 export function formatCurrency(value: number, compact = false): string {
+  // Fallback function - should use context's format() instead
   // Default to EUR for legacy/fallback usage
-  const info = { symbol: '€', locale: 'de-DE', symbolPosition: 'after' };
+  const info: { symbol: string; locale: string; symbolPosition: 'before' | 'after' } = {
+    symbol: '€',
+    locale: 'de-DE',
+    symbolPosition: 'after',
+  };
 
   if (compact) {
     let formatted: string;
@@ -263,9 +269,7 @@ export function formatCurrency(value: number, compact = false): string {
     } else {
       formatted = value.toFixed(0);
     }
-    return info.symbolPosition === 'before'
-      ? `${info.symbol}${formatted}`
-      : `${formatted}${info.symbol}`;
+    return `${formatted}${info.symbol}`;
   }
 
   const formatter = new Intl.NumberFormat(info.locale, {
@@ -298,10 +302,7 @@ export function formatPercentage(value: number): string {
 }
 
 // Calculate metrics for a channel given spend
-export function calculateChannelMetrics(
-  channel: Channel,
-  spend: number
-): CalculatedMetrics {
+export function calculateChannelMetrics(channel: Channel, spend: number): CalculatedMetrics {
   const cpm = channel.cpm || 5;
   const ctr = channel.ctr || 1;
   const roas = channel.estimatedRoas || 2;
@@ -394,8 +395,5 @@ export function loadScenarios(): BudgetScenario[] {
 
 export function deleteScenario(id: string): void {
   const existing = loadScenarios();
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(existing.filter((s) => s.id !== id))
-  );
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(existing.filter((s) => s.id !== id)));
 }

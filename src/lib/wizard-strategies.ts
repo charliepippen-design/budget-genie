@@ -1,10 +1,11 @@
 import { Shield, Zap, TrendingUp, Target, Scale, Lock, DollarSign, Crosshair, Users, Globe, Smartphone, Mail, PieChart } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export interface StrategyDef {
     id: string;
     name: string;
     description: string;
-    icon?: any; // LucideIcon type
+    icon?: LucideIcon;
     distribution: Record<string, number>;
 }
 
