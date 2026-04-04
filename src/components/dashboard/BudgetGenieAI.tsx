@@ -22,14 +22,25 @@ import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { ChartSectionSkeleton, ScenarioListSkeleton } from '@/components/common/AppSkeletons';
 import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useTheme } from '@/hooks/use-theme';
 import { toast } from 'sonner';
-import { exportToCsv, exportToExcel, exportToPdf, exportToPng } from '@/lib/export-service';
+import { FTDVelocityEngine } from './FTDVelocityEngine';
+import { GlobalGeoArbitrageTokenMatrix } from './GlobalGeoArbitrageTokenMatrix';
+import {
+  exportToCsv,
+  exportToExcel,
+  exportToPdf,
+  exportToPng,
+  exportEnterpriseConfigJson,
+} from '@/lib/export-service';
 import { useSandboxStore } from '@/store/useSandboxStore';
+import { cn } from '@/lib/utils';
 import {
   buildScenarioEnvelope,
   getEfficiencyAlerts,
   getMetricIntegrityIssues,
 } from '@/lib/planning-insights';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 
 const BudgetWizard = lazy(() =>
   import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard }))
@@ -101,7 +112,10 @@ export const BudgetGenieAI = () => {
   const vm = useBudgetGenieViewModel();
   const channels = useChannelsWithMetrics();
   const { symbol, format } = useCurrency();
+  const { theme } = useTheme();
+  const { globalMultipliers, userStatus } = useMediaPlanStore();
   const sandboxSnapshot = useSandboxStore((state) => state.exportSnapshot);
+  const isDark = theme === 'dark' || theme === 'contrast';
 
   // 2. UI STATE (The Skin)
   // Purely presentational state
@@ -146,6 +160,13 @@ export const BudgetGenieAI = () => {
   const handleExport = useCallback(
     (formatType: 'pdf' | 'csv' | 'xlsx' | 'png') => {
       try {
+        if (userStatus === 'demo') {
+          toast.error(
+            'Deployment Blocked. Exporting optimized CPA and ROAS targets requires a Pro Acquisition License.'
+          );
+          return;
+        }
+
         const exportOptions = {
           currencySymbol: symbol,
           formatCurrency: format,
@@ -158,16 +179,16 @@ export const BudgetGenieAI = () => {
         }
 
         if (formatType === 'csv') {
-          exportToCsv(
+          exportEnterpriseConfigJson(
             channels,
             vm.totalBudget,
-            vm.blendedMetrics,
-            exportOptions,
-            scenarioOutputs,
-            efficiencyAlerts,
-            sandboxSnapshot
+            {
+              cpaTarget: globalMultipliers.cpaTarget,
+              roasTarget: globalMultipliers.roasTarget,
+            },
+            vm.projectName
           );
-          toast.success('CSV export complete');
+          toast.success('Enterprise JSON config export complete');
           return;
         }
 
@@ -195,17 +216,26 @@ export const BudgetGenieAI = () => {
       channels,
       efficiencyAlerts,
       format,
+      globalMultipliers.cpaTarget,
+      globalMultipliers.roasTarget,
       sandboxSnapshot,
       scenarioOutputs,
       symbol,
+      userStatus,
       vm.blendedMetrics,
+      vm.projectName,
       vm.totalBudget,
     ]
   );
 
   return (
     <ErrorBoundary>
-      <div className="flex h-screen bg-[#020617] text-white overflow-hidden font-inter selection:bg-indigo-500/30">
+      <div
+        className={cn(
+          'flex h-screen overflow-hidden font-inter selection:bg-indigo-500/30 transition-colors duration-300',
+          isDark ? 'bg-[#020617] text-white' : 'bg-slate-100 text-slate-900'
+        )}
+      >
         {/* WIZARD MODAL */}
         <Suspense fallback={null}>
           <BudgetWizard isOpen={isBudgetWizardOpen} onClose={() => setIsBudgetWizardOpen(false)} />
@@ -213,12 +243,12 @@ export const BudgetGenieAI = () => {
 
         {/* LEFT SIDEBAR (SETTINGS) */}
         <div
-          className={`
-                    fixed inset-y-0 left-0 z-50 w-80 bg-slate-950/95 backdrop-blur-xl border-r border-indigo-500/10 
-                    transform transition-transform duration-300 ease-in-out shadow-2xl
-                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                    lg:relative lg:translate-x-0
-                `}
+          className={cn(
+            'fixed inset-y-0 left-0 z-50 w-80 backdrop-blur-xl border-r transform transition-transform duration-300 ease-in-out shadow-2xl',
+            isDark ? 'bg-slate-950/95 border-indigo-500/10' : 'bg-white/95 border-slate-200',
+            isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
+            'lg:relative lg:translate-x-0'
+          )}
         >
           <div className="h-full overflow-y-auto custom-scrollbar">
             <SettingsConsole />
@@ -226,7 +256,13 @@ export const BudgetGenieAI = () => {
         </div>
 
         {/* MAIN CONTENT AREA */}
-        <div id="dashboard-main-capture" className="relative z-10 flex flex-col overflow-y-auto">
+        <div
+          id="dashboard-main-capture"
+          className={cn(
+            'relative z-10 flex flex-1 flex-col overflow-y-auto transition-colors duration-300',
+            isDark ? 'bg-[#020617]' : 'bg-slate-50'
+          )}
+        >
           <DashboardHeader
             budgetPreset={preset}
             onPresetChange={setPreset}
@@ -235,7 +271,7 @@ export const BudgetGenieAI = () => {
             onReset={() => vm.resetAll()}
           />
 
-          <main className="flex-1 overflow-y-auto">
+          <main className={cn('flex-1 overflow-y-auto', isDark ? 'bg-[#020617]' : 'bg-slate-50')}>
             {/* BUDGET HERO (Big Number) */}
             <div id="hero-charts-anchor">
               <BudgetHero />
@@ -247,18 +283,25 @@ export const BudgetGenieAI = () => {
                 <MonthConfigPanel />
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-4 gap-6 mb-6">
+              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_384px] gap-6 mb-6">
                 {/* CENTER COLUMN (Charts & Wizard) */}
-                <div className="xl:col-span-3 space-y-6">
+                <div className="min-w-0 space-y-6">
                   {/* PROJECT MANAGER (Top Bar) */}
                   <Suspense
                     fallback={
-                      <div className="rounded-xl border border-slate-800 p-3 text-xs text-slate-400">
+                      <div
+                        className={cn(
+                          'rounded-xl border p-3 text-xs',
+                          isDark
+                            ? 'border-slate-800 text-slate-400'
+                            : 'border-slate-200 text-slate-600 bg-white'
+                        )}
+                      >
                         Loading vault...
                       </div>
                     }
                   >
-                    <ProjectManager />
+                    <ProjectManager isDark={isDark} />
                   </Suspense>
 
                   {/* CHARTS (The Visuals) */}
@@ -271,7 +314,14 @@ export const BudgetGenieAI = () => {
 
                   <Suspense
                     fallback={
-                      <div className="rounded-xl border border-slate-800 p-4 text-xs text-slate-400">
+                      <div
+                        className={cn(
+                          'rounded-xl border p-4 text-xs',
+                          isDark
+                            ? 'border-slate-800 text-slate-400'
+                            : 'border-slate-200 text-slate-600 bg-white'
+                        )}
+                      >
                         Modeling LTV scenarios...
                       </div>
                     }
@@ -285,61 +335,100 @@ export const BudgetGenieAI = () => {
                     onLaunch={() => setIsBudgetWizardOpen(true)}
                   />
 
-                  {/* STRATEGIC WAR ROOM */}
-                  <Suspense
-                    fallback={
-                      <div className="rounded-xl border border-slate-800 p-4 text-xs text-slate-400">
-                        Loading insights...
-                      </div>
-                    }
-                  >
-                    <StrategicInsightsPanel />
-                  </Suspense>
-
                   {/* PROGRESSION PATTERN (Moved) */}
                   <ProgressionPatternSelector />
                 </div>
 
                 {/* RIGHT SIDEBAR (Scenarios) */}
-                <div className="xl:col-span-1">
-                  <Suspense fallback={<ScenarioListSkeleton />}>
-                    <ScenarioSidebar
-                      totalBudget={vm.totalBudget}
-                      channelAllocations={vm.currentAllocations}
-                      onLoadScenario={vm.handleLoadScenario}
-                      onReset={vm.resetAll}
-                      onNormalize={vm.normalizeAllocations}
-                    />
-                  </Suspense>
+                <div className="shrink-0 w-full xl:w-96 min-w-0">
+                  <div className="w-full xl:sticky xl:top-4 space-y-6">
+                    <Suspense fallback={<ScenarioListSkeleton />}>
+                      <ScenarioSidebar
+                        totalBudget={vm.totalBudget}
+                        channelAllocations={vm.currentAllocations}
+                        onLoadScenario={vm.handleLoadScenario}
+                        onReset={vm.resetAll}
+                        onNormalize={vm.normalizeAllocations}
+                      />
+                    </Suspense>
+
+                    <Suspense
+                      fallback={
+                        <div
+                          className={cn(
+                            'rounded-xl border p-4 text-xs',
+                            isDark
+                              ? 'border-slate-800 text-slate-400'
+                              : 'border-slate-200 text-slate-600 bg-white'
+                          )}
+                        >
+                          Loading insights...
+                        </div>
+                      }
+                    >
+                      <StrategicInsightsPanel />
+                    </Suspense>
+                  </div>
                 </div>
               </div>
 
+              {/* MACRO VELOCITY WIDGET */}
+              <GlobalGeoArbitrageTokenMatrix />
+
+              <FTDVelocityEngine />
+
               {/* DATA GRID (Tabs) */}
               <Tabs defaultValue="single" className="w-full mt-6">
-                <TabsList className="bg-slate-900 border border-slate-800 mb-4 h-10 p-1">
+                <TabsList
+                  className={cn(
+                    'mb-4 h-10 p-1 border',
+                    isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                  )}
+                >
                   <TabsTrigger
                     value="single"
-                    className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"
+                    className={cn(
+                      'transition-all',
+                      isDark
+                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                    )}
                   >
                     Global View
                   </TabsTrigger>
                   <TabsTrigger
                     value="multi"
-                    className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all"
+                    className={cn(
+                      'transition-all',
+                      isDark
+                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                    )}
                   >
                     Multi-Month Detailed View
                   </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="single" className="mt-0">
-                  <div className="bg-slate-900 rounded-xl border border-slate-800 shadow-sm overflow-hidden">
+                  <div
+                    className={cn(
+                      'rounded-xl border shadow-sm overflow-hidden',
+                      isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                    )}
+                  >
                     <ChannelTable />
                   </div>
                 </TabsContent>
 
                 <TabsContent value="multi" className="mt-0">
                   <Suspense
-                    fallback={<div className="p-4 text-sm text-slate-400">Loading table...</div>}
+                    fallback={
+                      <div
+                        className={cn('p-4 text-sm', isDark ? 'text-slate-400' : 'text-slate-600')}
+                      >
+                        Loading table...
+                      </div>
+                    }
                   >
                     <PLTable />
                   </Suspense>

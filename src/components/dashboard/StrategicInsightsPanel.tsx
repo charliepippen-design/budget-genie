@@ -8,12 +8,16 @@ import { useActionPulseStore } from '@/store/useActionPulseStore';
 import { useMemo } from 'react';
 import { getEfficiencyAlerts, getMetricIntegrityIssues } from '@/lib/planning-insights';
 import { AnimatePresence, motion } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
+import { cn } from '@/lib/utils';
 
 export const StrategicInsightsPanel = () => {
   const { toast } = useToast();
   const channels = useChannelsWithMetrics();
   const { setChannelAllocation, normalizeAllocations, toggleChannelLock } = useMediaPlanStore();
   const dispatchActionPulse = useActionPulseStore((state) => state.dispatchActionPulse);
+  const { theme } = useTheme();
+  const isDark = theme === 'dark' || theme === 'contrast';
 
   const efficiencyAlerts = useMemo(() => getEfficiencyAlerts(channels), [channels]);
   const integrityIssues = useMemo(() => getMetricIntegrityIssues(channels), [channels]);
@@ -145,9 +149,9 @@ export const StrategicInsightsPanel = () => {
   };
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <div className="w-full grid grid-cols-1 gap-6">
       {/* CARD 1: Efficiency Alert */}
-      <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700/50 p-5 flex flex-col justify-between relative overflow-hidden group hover:border-red-500/30 transition-all">
+      <Card className={cn("w-full backdrop-blur-sm p-5 flex flex-col justify-between relative overflow-hidden group hover:border-red-500/30 transition-all", isDark ? "bg-slate-800/50 border-slate-700/50" : "bg-white border-slate-200")}>
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-red-500/10 blur-xl rounded-full -mr-10 -mt-10" />
 
@@ -159,7 +163,7 @@ export const StrategicInsightsPanel = () => {
             <span className="text-sm font-semibold text-red-400">Efficiency Alert</span>
           </div>
 
-          <h4 className="text-slate-200 font-medium leading-snug mb-4">
+          <h4 className={cn("font-medium leading-snug mb-4", isDark ? "text-slate-200" : "text-slate-800")}>
             {integrityIssues[0]
               ? `${integrityIssues[0].channelName} has incomplete metrics that can skew optimization.`
               : 'Highest CPA channel is above target and needs spend containment.'}
@@ -203,7 +207,7 @@ export const StrategicInsightsPanel = () => {
       </Card>
 
       {/* CARD 2: Arbitrage Opportunity */}
-      <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700/50 p-5 flex flex-col justify-between relative overflow-hidden group hover:border-green-500/30 transition-all">
+      <Card className={cn("w-full backdrop-blur-sm p-5 flex flex-col justify-between relative overflow-hidden group hover:border-green-500/30 transition-all", isDark ? "bg-slate-800/50 border-slate-700/50" : "bg-white border-slate-200")}>
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-green-500/10 blur-xl rounded-full -mr-10 -mt-10" />
 
@@ -215,23 +219,23 @@ export const StrategicInsightsPanel = () => {
             <span className="text-sm font-semibold text-green-400">Arbitrage Opportunity</span>
           </div>
 
-          <h4 className="text-slate-200 font-medium leading-snug mb-4">
+          <h4 className={cn("font-medium leading-snug mb-4", isDark ? "text-slate-200" : "text-slate-800")}>
             SEO Content is under-funded. <span className="text-green-400 font-bold">+18% ROAS</span>{' '}
             potential.
           </h4>
 
           {/* Progress Visual */}
           <div className="space-y-2 mb-6 mt-2">
-            <div className="flex justify-between text-[10px] text-slate-500 uppercase tracking-wider">
+            <div className={cn("flex justify-between text-[10px] uppercase tracking-wider", isDark ? "text-slate-500" : "text-slate-400")}>
               <span>Current</span>
               <span>Potential Impact</span>
             </div>
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden flex">
+            <div className={cn("h-2 rounded-full overflow-hidden flex", isDark ? "bg-slate-700" : "bg-slate-200")}>
               <div className="h-full bg-slate-500 w-[60%]" />
               <div className="h-full bg-green-500 animate-pulse w-[30%]" />
             </div>
             <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400">€2k Spend</span>
+              <span className={cn(isDark ? "text-slate-400" : "text-slate-600")}>€2k Spend</span>
               <span className="text-green-400 font-mono">+€8.5k Rev</span>
             </div>
           </div>
@@ -249,7 +253,7 @@ export const StrategicInsightsPanel = () => {
       </Card>
 
       {/* CARD 3: Market Saturation */}
-      <Card className="bg-slate-800/50 backdrop-blur-sm border-slate-700/50 p-5 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/30 transition-all">
+      <Card className={cn("w-full backdrop-blur-sm p-5 flex flex-col justify-between relative overflow-hidden group hover:border-amber-500/30 transition-all", isDark ? "bg-slate-800/50 border-slate-700/50" : "bg-white border-slate-200")}>
         {/* Glow Effect */}
         <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/10 blur-xl rounded-full -mr-10 -mt-10" />
 
@@ -261,7 +265,7 @@ export const StrategicInsightsPanel = () => {
             <span className="text-sm font-semibold text-amber-400">Market Saturation</span>
           </div>
 
-          <h4 className="text-slate-200 font-medium leading-snug mb-4">
+          <h4 className={cn("font-medium leading-snug mb-4", isDark ? "text-slate-200" : "text-slate-800")}>
             {topDiminishingAlert
               ? `${topDiminishingAlert.channelName} is approaching diminishing returns.`
               : 'Top spend channel is showing saturation pressure.'}{' '}
