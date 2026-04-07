@@ -1202,7 +1202,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         onboardingVertical: state.onboardingVertical,
       }),
-      version: 7,
+      version: 8,
       migrate: (persistedState: unknown, version) => {
         const safeState = (persistedState ?? {}) as Partial<MediaPlanState> & {
           channels?: Array<Partial<ChannelData>>;
@@ -1263,6 +1263,12 @@ export const useMediaPlanStore = create<MediaPlanState>()(
               m3: null,
               m6: null,
             },
+          } as MediaPlanState;
+        }
+        if (version < 8) {
+          return {
+            ...safeState,
+            onboardingVertical: (safeState as Partial<MediaPlanState>).onboardingVertical ?? null,
           } as MediaPlanState;
         }
         return safeState as MediaPlanState;

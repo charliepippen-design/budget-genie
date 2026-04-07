@@ -141,10 +141,16 @@ const Output = () => {
       alertCount: alerts.length,
       vertical: vc.vertical,
       geos: activeGeos,
-    }).then((result) => {
-      setNarrative(result);
-      setNarrativeLoading(false);
-    });
+    })
+      .then((result) => {
+        setNarrative(result);
+        setNarrativeLoading(false);
+      })
+      .catch((error) => {
+        console.error('Failed to generate report narrative:', error);
+        setNarrative(null);
+        setNarrativeLoading(false);
+      });
     // Intentionally mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

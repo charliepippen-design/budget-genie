@@ -31,7 +31,10 @@ export async function generateReportNarrative(
   input: ReportNarratorInput
 ): Promise<ReportNarrative | null> {
   const apiKey = import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) return null;
+  if (!apiKey) {
+    console.warn('Report narrator: No Google API key found. Narrative will not be generated.');
+    return null;
+  }
 
   const $ = (n: number) =>
     new Intl.NumberFormat('en-US', {
@@ -76,7 +79,8 @@ customer acquisition cost.
       prompt,
     });
     return result.object;
-  } catch {
+  } catch (error) {
+    console.warn('Report narrator: Primary model (gemini-2.0-flash) failed. Trying fallback...', error);
     try {
       const result = await generateObject({
         model: google('gemini-1.5-flash-latest'),
@@ -84,7 +88,11 @@ customer acquisition cost.
         prompt,
       });
       return result.object;
-    } catch {
+    } catch (fallbackError) {
+      console.error('Report narrator: Both models failed. Narrative generation failed.', {
+        primaryError: error,
+        fallbackError,
+      });
       return null;
     }
   }
