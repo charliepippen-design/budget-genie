@@ -13,6 +13,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
     const root = document.documentElement;
 
+    // Force synchronize ALL theme classes immediately
     root.classList.remove(
       'light',
       'dark',
@@ -25,17 +26,21 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (theme === 'light') {
       root.classList.add('light', 'theme-light');
       root.style.colorScheme = 'light';
+      document.body.classList.remove('dark');
       return;
     }
 
     if (theme === 'contrast') {
       root.classList.add('dark', 'contrast', 'theme-contrast');
       root.style.colorScheme = 'dark';
+      document.body.classList.add('dark');
       return;
     }
 
+    // Dark theme
     root.classList.add('dark', 'theme-dark');
     root.style.colorScheme = 'dark';
+    document.body.classList.add('dark');
   }, [theme]);
 
   const value = useMemo(

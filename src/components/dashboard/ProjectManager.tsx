@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { z } from 'zod';
 import {
   Sheet,
   SheetContent,
@@ -14,6 +15,7 @@ import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { toast } from 'sonner';
 import { ScenarioListSkeleton } from '@/components/common/AppSkeletons';
+import { cn } from '@/lib/utils';
 
 interface Project {
   id: string;
@@ -26,7 +28,24 @@ interface Project {
 
 const STORAGE_KEY = 'igaming_projects';
 
-export function ProjectManager() {
+// Zod schema for validating Project data from localStorage
+const ProjectSchema = z.object({
+  id: z.string().uuid(),
+  name: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  mediaPlanState: z.unknown(),
+  multiMonthState: z.unknown(),
+});
+
+const ProjectListSchema = z.array(ProjectSchema);
+
+interface ProjectManagerProps {
+  isDark?: boolean;
+  triggerClassName?: string;
+}
+
+export function ProjectManager({ isDark = true, triggerClassName }: ProjectManagerProps) {
   const [open, setOpen] = useState(false);
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectName, setNewProjectName] = useState('');
@@ -38,9 +57,17 @@ export function ProjectManager() {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
         try {
-          setProjects(JSON.parse(stored));
+          const parsed = JSON.parse(stored);
+          const validated = ProjectListSchema.safeParse(parsed);
+          if (validated.success) {
+            setProjects(validated.data);
+          } else {
+            console.warn('Invalid projects schema in localStorage:', validated.error);
+            setProjects([]);
+          }
         } catch (e) {
-          console.error('Failed to parse projects', e);
+          console.error('Failed to parse projects from localStorage', e);
+          setProjects([]);
         }
       }
     }
@@ -104,9 +131,15 @@ export function ProjectManager() {
       <SheetTrigger asChild>
         <Button
           variant="outline"
-          className="gap-2 border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-200"
+          className={cn(
+            'gap-2',
+            isDark
+              ? 'border-slate-700 bg-slate-800/50 hover:bg-slate-800 text-slate-200'
+              : 'border-slate-300 bg-white hover:bg-slate-100 text-slate-900',
+            triggerClassName
+          )}
         >
-          <FolderOpen className="h-4 w-4 text-blue-400" />
+          <FolderOpen className={cn('h-4 w-4', isDark ? 'text-blue-400' : 'text-blue-600')} />
           My Projects
         </Button>
       </SheetTrigger>

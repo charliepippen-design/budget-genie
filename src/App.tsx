@@ -13,12 +13,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { useStoreSync } from './hooks/use-store-sync';
 import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
-import UnderConstruction from './pages/UnderConstruction';
 
 const Index = lazy(() => import('./pages/Index'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Settings = lazy(() => import('./pages/Settings'));
+const Onboard = lazy(() => import('./pages/Onboard'));
+const Report = lazy(() => import('./pages/Report'));
+const Output = lazy(() => import('./pages/Output'));
 
 const queryClient = new QueryClient();
 
@@ -28,19 +30,8 @@ const clerkEnabled = !!clerkPubKey;
 const AppShell = () => {
   const { theme } = useTheme();
 
-  // MAINTENANCE LOGIC: Domain Check
-  const currentDomain = window.location.hostname;
-  const isLocal = currentDomain === 'localhost' || currentDomain === '127.0.0.1';
-
-  // Also keep env check as a fallback or explicit override if needed, but primary request is domain check.
-  // User asked: "IF we are NOT local... STOP and show Maintenance Page."
-
   useStoreSync();
   useHistoryRecorder();
-
-  if (!isLocal) {
-    return <UnderConstruction />;
-  }
 
   // ... rest of app
 
@@ -66,6 +57,9 @@ const AppShell = () => {
                   <Route path="/" element={<Index />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/settings" element={<Settings />} />
+                  <Route path="/onboard" element={<Onboard />} />
+                  <Route path="/report" element={<Report />} />
+                  <Route path="/output" element={<Output />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>

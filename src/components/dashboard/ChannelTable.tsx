@@ -23,6 +23,7 @@ import {
   useMediaPlanStore,
   useChannelsWithMetrics,
   useBlendedMetrics,
+  calculateChannelMetrics,
 } from '@/hooks/use-media-plan-store';
 // import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -46,6 +47,7 @@ import { ChannelEditor } from './ChannelEditor';
 import { BUYING_MODEL_INFO } from '@/types/channel';
 import { useActionPulseStore } from '@/store/useActionPulseStore';
 import { useSortableTable } from '@/hooks/use-sortable-table';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
 
 const CATEGORY_ICONS: Partial<Record<ChannelCategory, LucideIcon>> = {
   'SEO/Content': Search,
@@ -167,8 +169,15 @@ function EditableCell({
 }
 
 export function ChannelTable() {
-  const { setChannelAllocation, normalizeAllocations, updateChannelConfigField, totalBudget } =
-    useMediaPlanStore();
+  const vc = useVerticalConfig();
+  const {
+    setChannelAllocation,
+    normalizeAllocations,
+    updateChannelConfigField,
+    totalBudget,
+    toggleChannelLock,
+    setGhostProjectedRevenue,
+  } = useMediaPlanStore();
   // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
   const blendedMetrics = useBlendedMetrics();
@@ -285,13 +294,25 @@ export function ChannelTable() {
   const handleSliderChange = useCallback(
     (channelId: string, values: number[]) => {
       setChannelAllocation(channelId, values[0]);
+
+      const {
+        channels: updatedChannels,
+        totalBudget: updatedBudget,
+        globalMultipliers,
+      } = useMediaPlanStore.getState();
+      const projectedRevenue = updatedChannels.reduce((sum, channel) => {
+        return sum + calculateChannelMetrics(channel, updatedBudget, globalMultipliers).revenue;
+      }, 0);
+
+      setGhostProjectedRevenue(projectedRevenue);
     },
-    [setChannelAllocation]
+    [setChannelAllocation, setGhostProjectedRevenue]
   );
 
   const handleSliderCommit = useCallback(() => {
     normalizeAllocations();
-  }, [normalizeAllocations]);
+    setGhostProjectedRevenue(null);
+  }, [normalizeAllocations, setGhostProjectedRevenue]);
 
   const triggerPriceHint = useCallback((channelId: string) => {
     setPriceHintChannelId(channelId);
@@ -397,14 +418,16 @@ export function ChannelTable() {
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-widest text-slate-500">
-                  Total Conversions
+                  Total {vc.terms.conversionPlural}
                 </p>
                 <p className="text-sm font-mono text-cyan-300">
                   {formatNumber(blendedMetrics.totalConversions)}
                 </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-slate-500">Blended CPA</p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                  Blended {vc.terms.costPerConversion}
+                </p>
                 <p className="text-sm font-mono text-cyan-300">
                   {blendedMetrics.blendedCpa ? formatCurrency(blendedMetrics.blendedCpa) : '--'}
                 </p>
@@ -441,8 +464,10 @@ export function ChannelTable() {
                 {renderSortHeader('Impressions', 'impressions')}
               </TableHead>
               <TableHead className="text-right">CTR %</TableHead>
-              <TableHead className="text-right">Conversions</TableHead>
-              <TableHead className="text-right">{renderSortHeader('CPA', 'cpa')}</TableHead>
+              <TableHead className="text-right">{vc.terms.conversionPlural}</TableHead>
+              <TableHead className="text-right">
+                {renderSortHeader(vc.terms.costPerConversion, 'cpa')}
+              </TableHead>
               <TableHead className="text-right">{renderSortHeader('ROAS', 'roas')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -514,6 +539,32 @@ export function ChannelTable() {
                             <span className={cn('text-sm', isWarning && 'text-destructive')}>
                               {channel.name}
                             </span>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 shrink-0 print-mode-hide"
+                              onClick={() => {
+                                if (!isAllocationFixedByModel) {
+                                  toggleChannelLock(channel.id);
+                                } else {
+                                  triggerPriceHint(channel.id);
+                                }
+                              }}
+                              aria-label={channel.locked ? 'Unlock channel' : 'Lock channel'}
+                              title={
+                                isAllocationFixedByModel
+                                  ? 'Fixed channels are price-driven. Edit price in Configure.'
+                                  : channel.locked
+                                    ? 'Unlock channel allocation'
+                                    : 'Lock channel allocation'
+                              }
+                            >
+                              {isAllocationFixedByModel || channel.locked ? (
+                                <Lock className="h-4 w-4 text-red-500" />
+                              ) : (
+                                <Unlock className="h-4 w-4 text-gray-400" />
+                              )}
+                            </Button>
                             <Badge variant="outline" className="text-xs px-2 py-0 h-5">
                               {(channel.buyingModel &&
                                 BUYING_MODEL_INFO[channel.buyingModel]?.name) ||
@@ -532,42 +583,6 @@ export function ChannelTable() {
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1">
-                            {isAllocationFixedByModel ? (
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 shrink-0 cursor-not-allowed opacity-50 print-mode-hide"
-                                    onClick={() => {
-                                      triggerPriceHint(channel.id);
-                                    }}
-                                    aria-disabled="true"
-                                  >
-                                    <Lock className="h-4 w-4 text-slate-500" />
-                                  </Button>
-                                </TooltipTrigger>
-                                <TooltipContent>
-                                  Fixed Cost Channel: Edit the Price or click Configure to modify
-                                  the spend allocation.
-                                </TooltipContent>
-                              </Tooltip>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 shrink-0 print-mode-hide"
-                                onClick={() => {
-                                  useMediaPlanStore.getState().toggleChannelLock(channel.id);
-                                }}
-                              >
-                                {channel.locked ? (
-                                  <Lock className="h-4 w-4 text-red-500" />
-                                ) : (
-                                  <Unlock className="h-4 w-4 text-gray-400" />
-                                )}
-                              </Button>
-                            )}
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <div
@@ -584,6 +599,15 @@ export function ChannelTable() {
                                   <Slider
                                     data-channel-id={channel.id}
                                     value={[channel.allocationPct]}
+                                    onPointerDown={() => {
+                                      setGhostProjectedRevenue(blendedMetrics.projectedRevenue);
+                                    }}
+                                    onPointerUp={() => {
+                                      setGhostProjectedRevenue(null);
+                                    }}
+                                    onPointerCancel={() => {
+                                      setGhostProjectedRevenue(null);
+                                    }}
                                     onValueChange={(values) =>
                                       handleSliderChange(channel.id, values)
                                     }
@@ -810,6 +834,25 @@ export function ChannelTable() {
                         >
                           {channel.name}
                         </span>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-7 w-7 shrink-0 print-mode-hide"
+                          onClick={() => {
+                            if (!isAllocationFixedByModel) {
+                              toggleChannelLock(channel.id);
+                            } else {
+                              triggerPriceHint(channel.id);
+                            }
+                          }}
+                          aria-label={channel.locked ? 'Unlock channel' : 'Lock channel'}
+                        >
+                          {isAllocationFixedByModel || channel.locked ? (
+                            <Lock className="h-4 w-4 text-red-500" />
+                          ) : (
+                            <Unlock className="h-4 w-4 text-gray-400" />
+                          )}
+                        </Button>
                       </div>
                       <Badge
                         variant="outline"
@@ -830,6 +873,15 @@ export function ChannelTable() {
                       <Slider
                         data-channel-id={channel.id}
                         value={[channel.allocationPct]}
+                        onPointerDown={() => {
+                          setGhostProjectedRevenue(blendedMetrics.projectedRevenue);
+                        }}
+                        onPointerUp={() => {
+                          setGhostProjectedRevenue(null);
+                        }}
+                        onPointerCancel={() => {
+                          setGhostProjectedRevenue(null);
+                        }}
                         onValueChange={(values) => handleSliderChange(channel.id, values)}
                         onValueCommit={handleSliderCommit}
                         min={0}
@@ -868,7 +920,7 @@ export function ChannelTable() {
                         </p>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">Conv.</span>
+                        <span className="text-muted-foreground">{vc.terms.conversion}</span>
                         <p className="font-mono font-medium">
                           {formatNumber(channel.metrics.conversions)}
                         </p>

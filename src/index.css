@@ -398,6 +398,86 @@
     color: #facc15 !important;
   }
 
+  /* ─── LIGHT MODE: bridge hardcoded slate-* classes to light tokens ─── */
+  .theme-light .bg-slate-950 { background-color: #f0f4f8 !important; }
+  .theme-light .bg-slate-900 { background-color: #ffffff !important; }
+  .theme-light .bg-slate-800 { background-color: #f1f5f9 !important; }
+  .theme-light .bg-slate-800\/50,
+  .theme-light .bg-slate-900\/50,
+  .theme-light .bg-slate-950\/50 { background-color: rgba(248, 250, 252, 0.85) !important; }
+
+  .theme-light .border-slate-800 { border-color: #e2e8f0 !important; }
+  .theme-light .border-slate-700 { border-color: #cbd5e1 !important; }
+  .theme-light .border-slate-700\/50 { border-color: rgba(148, 163, 184, 0.5) !important; }
+
+  .theme-light .text-slate-100,
+  .theme-light .text-slate-200 { color: #0f172a !important; }
+  .theme-light .text-slate-300 { color: #1e293b !important; }
+  .theme-light .text-slate-400 { color: #475569 !important; }
+  .theme-light .text-slate-500 { color: #64748b !important; }
+
+  .theme-light .hover\:bg-slate-800:hover { background-color: #f1f5f9 !important; }
+  .theme-light .hover\:bg-slate-700:hover { background-color: #e2e8f0 !important; }
+
+  /* Input + form elements in light mode */
+  .theme-light input[type="text"],
+  .theme-light input[type="number"],
+  .theme-light select,
+  .theme-light textarea {
+    background-color: #f8fafc !important;
+    border-color: #cbd5e1 !important;
+    color: #0f172a !important;
+  }
+  .theme-light input::placeholder { color: #94a3b8 !important; }
+
+  /* Recharts in light mode */
+  .theme-light .recharts-tooltip-wrapper .recharts-default-tooltip {
+    background-color: #ffffff !important;
+    border-color: #e2e8f0 !important;
+    color: #0f172a !important;
+  }
+
+  /* ─── HIGH CONTRAST: sharpen cards and accent borders ─── */
+  .theme-contrast .bg-slate-900,
+  .theme-contrast .bg-slate-950,
+  .theme-contrast .bg-slate-800 { background-color: #080808 !important; }
+  .theme-contrast .bg-slate-800\/50,
+  .theme-contrast .bg-slate-900\/50 { background-color: rgba(8,8,8,0.9) !important; }
+
+  .theme-contrast .border-slate-800,
+  .theme-contrast .border-slate-700 { border-color: rgba(250,204,21,0.45) !important; }
+  .theme-contrast .border-slate-700\/50 { border-color: rgba(250,204,21,0.25) !important; }
+
+  .theme-contrast .text-slate-100,
+  .theme-contrast .text-slate-200,
+  .theme-contrast .text-slate-300 { color: #ffffff !important; }
+  .theme-contrast .text-slate-400,
+  .theme-contrast .text-slate-500 { color: #d1d5db !important; }
+
+  .theme-contrast input[type="text"],
+  .theme-contrast input[type="number"],
+  .theme-contrast select,
+  .theme-contrast textarea {
+    background-color: #111111 !important;
+    border-color: rgba(250,204,21,0.6) !important;
+    color: #ffffff !important;
+  }
+
+  /* Focused interactive elements get a yellow ring in contrast mode */
+  .theme-contrast button:focus-visible,
+  .theme-contrast input:focus-visible,
+  .theme-contrast select:focus-visible {
+    outline-color: #facc15 !important;
+    box-shadow: 0 0 0 6px rgba(250, 204, 21, 0.22) !important;
+  }
+
+  /* Active/selected states in contrast mode */
+  .theme-contrast .bg-blue-500\/10,
+  .theme-contrast .bg-emerald-500\/10,
+  .theme-contrast .bg-indigo-500\/10,
+  .theme-contrast .bg-purple-500\/10,
+  .theme-contrast .bg-amber-500\/10 { background-color: rgba(250,204,21,0.12) !important; }
+
   .design-space {
     padding: var(--space-6);
     gap: var(--space-6);

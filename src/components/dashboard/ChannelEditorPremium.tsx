@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect, useRef, useId } from 'react';
+import { useState, useMemo, useEffect, useRef, useId } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
@@ -37,7 +37,6 @@ import {
 } from '@/types/channel';
 import { useMediaPlanStore, ChannelData } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
 interface ChannelEditorProps {
@@ -48,10 +47,7 @@ interface ChannelEditorProps {
 export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
   const { setChannelType, updateChannelConfigField, globalMultipliers } = useMediaPlanStore();
   const { format: formatCurrency, symbol } = useCurrency();
-  const { theme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
-
-  const isDark = theme === 'dark' || theme === 'contrast';
 
   const family = channel.family;
   const buyingModel = channel.buyingModel;
@@ -127,7 +123,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               icon={<DollarSign className="h-4 w-4" />}
               prefix="€"
               suffix="per 1K"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Click-Through Rate"
@@ -138,7 +133,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={0.05}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Conversion Rate"
@@ -149,7 +143,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={0.1}
               icon={<TrendingUp className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
           </motion.div>
         );
@@ -174,7 +167,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               icon={<DollarSign className="h-4 w-4" />}
               prefix="€"
               suffix="per click"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Conversion Rate"
@@ -185,7 +177,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={0.1}
               icon={<TrendingUp className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
           </motion.div>
         );
@@ -210,7 +201,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               icon={<Target className="h-4 w-4" />}
               prefix="€"
               suffix="per FTD"
-              isDark={isDark}
             />
           </motion.div>
         );
@@ -234,7 +224,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={1}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Avg Order Value"
@@ -245,7 +234,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
               prefix="€"
-              isDark={isDark}
             />
           </motion.div>
         );
@@ -269,7 +257,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={1}
               icon={<Target className="h-4 w-4" />}
               prefix="€"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Revenue Share %"
@@ -280,7 +267,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={1}
               icon={<Percent className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Avg Order Value"
@@ -291,7 +277,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
               prefix="€"
-              isDark={isDark}
             />
           </motion.div>
         );
@@ -316,7 +301,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={50}
               icon={<Wallet className="h-4 w-4" />}
               prefix="€"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Est. Traffic"
@@ -327,7 +311,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={100}
               icon={<Zap className="h-4 w-4" />}
               suffix="visits"
-              isDark={isDark}
             />
             <PremiumSlider
               label="Conversion Rate"
@@ -338,13 +321,8 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={0.1}
               icon={<TrendingUp className="h-4 w-4" />}
               suffix="%"
-              isDark={isDark}
             />
-            <SaturationToggle
-              enabled={saturationEnabled}
-              onToggle={handleSaturationToggle}
-              isDark={isDark}
-            />
+            <SaturationToggle enabled={saturationEnabled} onToggle={handleSaturationToggle} />
             {saturationEnabled ? (
               <PremiumSlider
                 label="Saturation Ceiling"
@@ -355,7 +333,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                 step={100}
                 icon={<Zap className="h-4 w-4" />}
                 prefix="€"
-                isDark={isDark}
               />
             ) : null}
           </motion.div>
@@ -373,24 +350,14 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
           <Button
             variant="ghost"
             size="sm"
-            className={cn(
-              'h-9 shrink-0 whitespace-nowrap px-3 gap-2 print-mode-hide transition-all duration-300',
-              isDark
-                ? 'bg-gradient-to-r from-cyan-500/10 to-transparent hover:from-cyan-500/20 text-cyan-300'
-                : 'bg-gradient-to-r from-blue-400/10 to-transparent hover:from-blue-400/20 text-blue-600'
-            )}
+            className="h-9 shrink-0 whitespace-nowrap px-3 gap-2 print-mode-hide bg-gradient-to-r from-cyan-500/10 to-transparent hover:from-cyan-500/20 text-cyan-300 transition-all duration-300"
           >
             <Settings2 className="h-3.5 w-3.5" />
             <span className="leading-none">Configure</span>
           </Button>
         )}
       </SheetTrigger>
-      <SheetContent
-        className={cn(
-          'w-full overflow-y-auto border-0 p-0 sm:max-w-lg',
-          isDark ? 'bg-transparent' : 'bg-transparent'
-        )}
-      >
+      <SheetContent className="w-full overflow-y-auto border-0 bg-transparent p-0 sm:max-w-lg">
         <AnimatePresence>
           <motion.div
             initial={{ x: 400, opacity: 0 }}
@@ -400,23 +367,9 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
             className="h-full"
           >
             {/* Glass-morphism container */}
-            <div
-              className={cn(
-                'min-h-full backdrop-blur-xl border-l shadow-2xl',
-                isDark
-                  ? 'bg-gradient-to-b from-slate-900/80 via-slate-900/70 to-slate-950/80 border-cyan-500/20'
-                  : 'bg-gradient-to-b from-white/80 via-slate-50/80 to-white/60 border-slate-200/60'
-              )}
-            >
+            <div className="min-h-full bg-gradient-to-b from-slate-900/80 via-slate-900/70 to-slate-950/80 backdrop-blur-xl border-l border-cyan-500/20 shadow-2xl">
               {/* Header */}
-              <div
-                className={cn(
-                  'sticky top-0 z-50 border-b bg-gradient-to-b backdrop-blur-lg px-6 py-5',
-                  isDark
-                    ? 'border-cyan-500/20 from-slate-900/95 to-slate-900/70'
-                    : 'border-slate-200 from-white/95 to-slate-50/80'
-                )}
-              >
+              <div className="sticky top-0 z-50 border-b border-cyan-500/20 bg-gradient-to-b from-slate-900/95 to-slate-900/70 backdrop-blur-lg px-6 py-5">
                 <motion.div
                   initial={{ opacity: 0, y: -10 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -424,35 +377,14 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                 >
                   <div className="flex items-center gap-3 mb-2">
                     <div className="relative">
-                      <div
-                        className={cn(
-                          'absolute inset-0 rounded-lg blur opacity-50 animate-pulse',
-                          isDark
-                            ? 'bg-gradient-to-r from-cyan-500 to-teal-500'
-                            : 'bg-gradient-to-r from-blue-400 to-cyan-400'
-                        )}
-                      />
-                      <Settings2
-                        className={cn(
-                          'h-5 w-5 relative',
-                          isDark ? 'text-cyan-300' : 'text-blue-500'
-                        )}
-                      />
+                      <div className="absolute inset-0 bg-gradient-to-r from-cyan-500 to-teal-500 rounded-lg blur opacity-50 animate-pulse" />
+                      <Settings2 className="h-5 w-5 text-cyan-300 relative" />
                     </div>
-                    <h2
-                      className={cn(
-                        'text-lg font-semibold bg-clip-text text-transparent',
-                        isDark
-                          ? 'bg-gradient-to-r from-cyan-300 via-slate-100 to-teal-200'
-                          : 'bg-gradient-to-r from-blue-600 via-slate-900 to-cyan-600'
-                      )}
-                    >
+                    <h2 className="text-lg font-semibold bg-gradient-to-r from-cyan-300 via-slate-100 to-teal-200 bg-clip-text text-transparent">
                       {channel.name}
                     </h2>
                   </div>
-                  <p className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}>
-                    Configure buying model and parameters
-                  </p>
+                  <p className="text-xs text-slate-400">Configure buying model and parameters</p>
                 </motion.div>
               </div>
 
@@ -464,11 +396,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.1 }}
                 >
-                  <SectionHeader
-                    title="Channel Setup"
-                    icon={<Layers3 className="h-4 w-4" />}
-                    isDark={isDark}
-                  />
+                  <SectionHeader title="Channel Setup" icon={<Layers3 className="h-4 w-4" />} />
                   <div className="space-y-4 mt-4">
                     <PremiumSelect
                       label="Channel Family"
@@ -479,7 +407,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                         label: info.name,
                       }))}
                       icon={<Layers3 className="h-4 w-4" />}
-                      isDark={isDark}
                     />
                     <PremiumSelect
                       label="Buying Model"
@@ -491,7 +418,6 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                       }))}
                       icon={<BadgeDollarSign className="h-4 w-4" />}
                       hint={modelInfo.description}
-                      isDark={isDark}
                     />
                   </div>
                 </motion.div>
@@ -505,16 +431,9 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                   <SectionHeader
                     title="Model Parameters"
                     icon={<TrendingUp className="h-4 w-4" />}
-                    isDark={isDark}
                   />
                   <div className="mt-4 space-y-4">
-                    <AnimatePresence mode="wait">
-                      {variableInputs &&
-                      typeof variableInputs === 'object' &&
-                      'props' in variableInputs
-                        ? variableInputs
-                        : variableInputs}
-                    </AnimatePresence>
+                    <AnimatePresence mode="wait">{variableInputs}</AnimatePresence>
                   </div>
                 </motion.div>
 
@@ -524,39 +443,31 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.2 }}
                 >
-                  <SectionHeader
-                    title="Projected Yield"
-                    icon={<BarChart3 className="h-4 w-4" />}
-                    isDark={isDark}
-                  />
+                  <SectionHeader title="Projected Yield" icon={<BarChart3 className="h-4 w-4" />} />
                   <div className="mt-4 grid grid-cols-2 gap-3">
                     <YieldMetricCard
                       label="Spend"
                       value={formatCurrency(previewMetrics.spend)}
                       icon={<Wallet className="h-4 w-4" />}
                       color="from-blue-500 to-cyan-500"
-                      isDark={isDark}
                     />
                     <YieldMetricCard
                       label="FTDs"
                       value={previewMetrics.ftds.toFixed(0)}
                       icon={<Users className="h-4 w-4" />}
                       color="from-violet-500 to-purple-500"
-                      isDark={isDark}
                     />
                     <YieldMetricCard
                       label="CPA"
                       value={previewMetrics.cpa ? formatCurrency(previewMetrics.cpa) : '—'}
                       icon={<Coins className="h-4 w-4" />}
                       color="from-amber-500 to-orange-500"
-                      isDark={isDark}
                     />
                     <YieldMetricCard
                       label="ROAS"
                       value={`${previewMetrics.roas.toFixed(2)}x`}
                       icon={<BarChart3 className="h-4 w-4" />}
                       color="from-emerald-500 to-teal-500"
-                      isDark={isDark}
                     />
                   </div>
                 </motion.div>
@@ -583,7 +494,6 @@ function PremiumSlider({
   icon,
   prefix,
   suffix,
-  isDark = true,
 }: {
   label: string;
   value: number;
@@ -594,7 +504,6 @@ function PremiumSlider({
   icon: React.ReactNode;
   prefix?: string;
   suffix?: string;
-  isDark?: boolean;
 }) {
   const id = useId();
   const [isDragging, setIsDragging] = useState(false);
@@ -619,7 +528,6 @@ function PremiumSlider({
 
     const clamped = clampValue(raw);
     const wasOutOfRange = raw < min || raw > max;
-
     onChange(clamped);
     setDraftValue(clamped.toString());
     setError(wasOutOfRange ? `Value must be between ${min} and ${max}.` : null);
@@ -638,33 +546,15 @@ function PremiumSlider({
       {/* Label with icon */}
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2.5">
-          <div
-            className={cn(
-              'transition-colors',
-              isDark
-                ? 'text-cyan-400/70 hover:text-cyan-300'
-                : 'text-blue-500/70 hover:text-blue-600'
-            )}
-          >
-            {icon}
-          </div>
-          <label
-            htmlFor={id}
-            className={cn('text-sm font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}
-          >
+          <div className="text-cyan-400/70 hover:text-cyan-300 transition-colors">{icon}</div>
+          <label htmlFor={id} className="text-sm font-medium text-slate-200">
             {label}
           </label>
         </div>
         <motion.div animate={{ scale: isDragging ? 1.05 : 1 }} className="text-right">
-          <div className={cn('text-xs mb-0.5', isDark ? 'text-slate-400' : 'text-slate-500')}>
-            {isDark ? 'Value' : 'Value'}
-          </div>
+          <div className="text-xs text-slate-400 mb-0.5">Value</div>
           <div className="flex items-center justify-end gap-1">
-            {prefix ? (
-              <span className={cn('text-xs', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                {prefix}
-              </span>
-            ) : null}
+            {prefix ? <span className="text-xs text-slate-300">{prefix}</span> : null}
             <input
               type="number"
               aria-label={`${label} value`}
@@ -678,18 +568,9 @@ function PremiumSlider({
                 if (error) setError(null);
               }}
               onBlur={(e) => applyWithValidation(parseFloat(e.target.value))}
-              className={cn(
-                'w-24 rounded border px-2 py-0.5 text-right text-xs font-semibold',
-                isDark
-                  ? 'border-slate-600 bg-slate-900/70 text-slate-100'
-                  : 'border-slate-300 bg-white text-slate-900'
-              )}
+              className="w-24 rounded border border-slate-600 bg-slate-900/70 px-2 py-0.5 text-right text-xs font-semibold text-slate-100"
             />
-            {suffix ? (
-              <span className={cn('text-xs', isDark ? 'text-slate-300' : 'text-slate-700')}>
-                {suffix}
-              </span>
-            ) : null}
+            {suffix ? <span className="text-xs text-slate-300">{suffix}</span> : null}
           </div>
         </motion.div>
       </div>
@@ -697,100 +578,19 @@ function PremiumSlider({
       {/* Slider track */}
       <div className="relative group">
         {/* Background track */}
-        <div
-          className={cn(
-            'absolute inset-y-0 left-0 right-0 h-1.5 top-1/2 -translate-y-1/2 rounded-full border',
-            isDark ? 'bg-slate-700/30 border-slate-600/30' : 'bg-slate-300/30 border-slate-400/30'
-          )}
-        />
+        <div className="absolute inset-y-0 left-0 right-0 h-1.5 top-1/2 -translate-y-1/2 rounded-full bg-slate-700/30 border border-slate-600/30" />
 
         {/* Filled track */}
         <motion.div
-          className={cn(
-            'absolute inset-y-0 left-0 h-1.5 top-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r shadow-lg',
-            isDark
-              ? 'from-cyan-500 to-teal-500 shadow-cyan-500/50'
-              : 'from-blue-500 to-cyan-500 shadow-blue-400/50'
-          )}
+          className="absolute inset-y-0 left-0 h-1.5 top-1/2 -translate-y-1/2 rounded-full bg-gradient-to-r from-cyan-500 to-teal-500 shadow-lg shadow-cyan-500/50"
           style={{ width: `${percentage}%` }}
           transition={{ type: 'spring', damping: 15, stiffness: 300 }}
         />
 
         {/* Slider input */}
-        <style>{`
-          #slider-${id}-dark::-webkit-slider-thumb {
-            appearance: none;
-            width: 1.25rem;
-            height: 1.25rem;
-            border-radius: 9999px;
-            background: linear-gradient(to bottom, #06b6d4, #14b8a6);
-            box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.7);
-            cursor: grab;
-            border: 1px solid #06d6d4;
-            transition: all 0.2s;
-          }
-          #slider-${id}-dark::-webkit-slider-thumb:active {
-            cursor: grabbing;
-          }
-          #slider-${id}-dark::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-          }
-          
-          #slider-${id}-dark::-moz-range-thumb {
-            width: 1.25rem;
-            height: 1.25rem;
-            border-radius: 9999px;
-            background: linear-gradient(to bottom, #06b6d4, #14b8a6);
-            box-shadow: 0 10px 15px -3px rgba(6, 182, 212, 0.7);
-            cursor: grab;
-            border: 1px solid #06d6d4;
-            transition: all 0.2s;
-          }
-          #slider-${id}-dark::-moz-range-thumb:active {
-            cursor: grabbing;
-          }
-          #slider-${id}-dark::-moz-range-thumb:hover {
-            transform: scale(1.1);
-          }
-
-          #slider-${id}-light::-webkit-slider-thumb {
-            appearance: none;
-            width: 1.25rem;
-            height: 1.25rem;
-            border-radius: 9999px;
-            background: linear-gradient(to bottom, #3b82f6, #06b6d4);
-            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.7);
-            cursor: grab;
-            border: 1px solid #0284c7;
-            transition: all 0.2s;
-          }
-          #slider-${id}-light::-webkit-slider-thumb:active {
-            cursor: grabbing;
-          }
-          #slider-${id}-light::-webkit-slider-thumb:hover {
-            transform: scale(1.1);
-          }
-          
-          #slider-${id}-light::-moz-range-thumb {
-            width: 1.25rem;
-            height: 1.25rem;
-            border-radius: 9999px;
-            background: linear-gradient(to bottom, #3b82f6, #06b6d4);
-            box-shadow: 0 10px 15px -3px rgba(59, 130, 246, 0.7);
-            cursor: grab;
-            border: 1px solid #0284c7;
-            transition: all 0.2s;
-          }
-          #slider-${id}-light::-moz-range-thumb:active {
-            cursor: grabbing;
-          }
-          #slider-${id}-light::-moz-range-thumb:hover {
-            transform: scale(1.1);
-          }
-        `}</style>
         <input
           ref={sliderRef}
-          id={`slider-${id}-${isDark ? 'dark' : 'light'}`}
+          id={id}
           type="range"
           min={min}
           max={max}
@@ -807,19 +607,45 @@ function PremiumSlider({
           onMouseUp={() => setIsDragging(false)}
           onTouchStart={() => setIsDragging(true)}
           onTouchEnd={() => setIsDragging(false)}
-          className="relative w-full h-1.5 rounded-full bg-transparent appearance-none cursor-pointer outline-none"
+          className="relative w-full h-1.5 rounded-full bg-transparent appearance-none cursor-pointer outline-none
+            [&::-webkit-slider-thumb]:appearance-none
+            [&::-webkit-slider-thumb]:w-5
+            [&::-webkit-slider-thumb]:h-5
+            [&::-webkit-slider-thumb]:rounded-full
+            [&::-webkit-slider-thumb]:bg-gradient-to-b
+            [&::-webkit-slider-thumb]:from-cyan-300
+            [&::-webkit-slider-thumb]:to-cyan-500
+            [&::-webkit-slider-thumb]:shadow-lg
+            [&::-webkit-slider-thumb]:shadow-cyan-500/70
+            [&::-webkit-slider-thumb]:cursor-grab
+            [&::-webkit-slider-thumb]:active:cursor-grabbing
+            [&::-webkit-slider-thumb]:border
+            [&::-webkit-slider-thumb]:border-cyan-400
+            [&::-webkit-slider-thumb]:transition-all
+            [&::-webkit-slider-thumb]:hover:scale-110
+            [&::-webkit-slider-thumb]:hover:shadow-cyan-500/100
+            [&::-moz-range-thumb]:w-5
+            [&::-moz-range-thumb]:h-5
+            [&::-moz-range-thumb]:rounded-full
+            [&::-moz-range-thumb]:bg-gradient-to-b
+            [&::-moz-range-thumb]:from-cyan-300
+            [&::-moz-range-thumb]:to-cyan-500
+            [&::-moz-range-thumb]:shadow-lg
+            [&::-moz-range-thumb]:shadow-cyan-500/70
+            [&::-moz-range-thumb]:cursor-grab
+            [&::-moz-range-thumb]:active:cursor-grabbing
+            [&::-moz-range-thumb]:border
+            [&::-moz-range-thumb]:border-cyan-400
+            [&::-moz-range-thumb]:transition-all
+            [&::-moz-range-thumb]:hover:scale-110
+          "
         />
       </div>
 
       {error ? <p className="text-xs text-red-400">{error}</p> : null}
 
       {/* Min/Max labels */}
-      <div
-        className={cn(
-          'flex justify-between text-xs px-1',
-          isDark ? 'text-slate-500' : 'text-slate-600'
-        )}
-      >
+      <div className="flex justify-between text-xs text-slate-500 px-1">
         <span>
           {prefix}
           {min}
@@ -846,7 +672,6 @@ function PremiumSelect({
   options,
   icon,
   hint,
-  isDark = true,
 }: {
   label: string;
   value: string;
@@ -854,7 +679,6 @@ function PremiumSelect({
   options: { value: string; label: string }[];
   icon: React.ReactNode;
   hint?: string;
-  isDark?: boolean;
 }) {
   return (
     <motion.div
@@ -865,44 +689,22 @@ function PremiumSelect({
       className="space-y-2"
     >
       <div className="flex items-center gap-2.5">
-        <div className={cn(isDark ? 'text-cyan-400/70' : 'text-blue-500/70')}>{icon}</div>
-        <label className={cn('text-sm font-medium', isDark ? 'text-slate-200' : 'text-slate-800')}>
-          {label}
-        </label>
+        <div className="text-cyan-400/70">{icon}</div>
+        <label className="text-sm font-medium text-slate-200">{label}</label>
       </div>
       <Select value={value} onValueChange={onChange}>
-        <SelectTrigger
-          className={cn(
-            'h-10 rounded-lg border backdrop-blur transition-all duration-200 focus:ring-2',
-            isDark
-              ? 'border-cyan-500/30 bg-slate-900/50 text-slate-100 focus:ring-cyan-500/50 focus:border-cyan-500/50 hover:border-cyan-500/50'
-              : 'border-blue-400/30 bg-slate-100/50 text-slate-900 focus:ring-blue-500/50 focus:border-blue-500/50 hover:border-blue-400/50'
-          )}
-        >
+        <SelectTrigger className="h-10 rounded-lg border border-cyan-500/30 bg-slate-900/50 backdrop-blur text-slate-100 focus:ring-2 focus:ring-cyan-500/50 focus:border-cyan-500/50 hover:border-cyan-500/50 transition-all duration-200">
           <SelectValue />
         </SelectTrigger>
-        <SelectContent
-          className={cn(
-            'backdrop-blur',
-            isDark
-              ? 'border-cyan-500/30 bg-slate-900/95 text-slate-100'
-              : 'border-blue-400/30 bg-slate-100/95 text-slate-900'
-          )}
-        >
+        <SelectContent className="border-cyan-500/30 bg-slate-900/95 backdrop-blur text-slate-100">
           {options.map((opt) => (
-            <SelectItem
-              key={opt.value}
-              value={opt.value}
-              className={cn(isDark ? 'focus:bg-cyan-500/20' : 'focus:bg-blue-500/20')}
-            >
+            <SelectItem key={opt.value} value={opt.value} className="focus:bg-cyan-500/20">
               {opt.label}
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
-      {hint && (
-        <p className={cn('text-xs ml-7', isDark ? 'text-slate-400' : 'text-slate-600')}>{hint}</p>
-      )}
+      {hint && <p className="text-xs text-slate-400 ml-7">{hint}</p>}
     </motion.div>
   );
 }
@@ -914,41 +716,29 @@ function PremiumSelect({
 function SaturationToggle({
   enabled,
   onToggle,
-  isDark = true,
 }: {
   enabled: boolean;
   onToggle: (checked: boolean) => void;
-  isDark?: boolean;
 }) {
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 6 }}
+      initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ type: 'spring', damping: 22, stiffness: 280 }}
-      className={cn(
-        'flex items-center justify-between rounded-xl border px-4 py-3',
-        isDark ? 'border-slate-700/50 bg-slate-900/40' : 'border-slate-200/50 bg-slate-50/40'
-      )}
+      transition={{ type: 'spring', damping: 20, stiffness: 300 }}
+      className="rounded-lg border border-cyan-500/20 bg-gradient-to-r from-slate-900/50 to-slate-800/30 backdrop-blur p-4 flex items-center justify-between group hover:border-cyan-500/40 transition-all duration-300"
     >
-      <div className="flex items-center gap-3">
-        <div className={isDark ? 'text-cyan-400/70' : 'text-blue-500/70'}>
-          <Zap className="w-4 h-4" />
-        </div>
-        <div>
-          <p className={cn('text-sm font-medium', isDark ? 'text-slate-200' : 'text-slate-900')}>
-            Enable Saturation Decay
-          </p>
-          <p className={cn('text-xs mt-0.5', isDark ? 'text-slate-500' : 'text-slate-600')}>
-            Diminishing returns as spend approaches ceiling
-          </p>
-        </div>
+      <div className="space-y-1">
+        <p className="text-sm font-medium text-slate-100">Enable Saturation Decay</p>
+        <p className="text-xs text-slate-400">Model diminishing returns as budgets scale</p>
       </div>
-      <Switch
-        checked={enabled}
-        onCheckedChange={onToggle}
-        className={isDark ? 'data-[state=checked]:bg-cyan-500' : 'data-[state=checked]:bg-blue-500'}
-      />
+      <motion.div whileTap={{ scale: 0.95 }}>
+        <Switch
+          checked={enabled}
+          onCheckedChange={onToggle}
+          className="h-6 w-11 data-[state=checked]:bg-gradient-to-r data-[state=checked]:from-cyan-500 data-[state=checked]:to-teal-500"
+        />
+      </motion.div>
     </motion.div>
   );
 }
@@ -957,37 +747,12 @@ function SaturationToggle({
 // SECTION HEADER
 // ============================================================================
 
-function SectionHeader({
-  title,
-  icon,
-  isDark = true,
-}: {
-  title: string;
-  icon: React.ReactNode;
-  isDark?: boolean;
-}) {
+function SectionHeader({ title, icon }: { title: string; icon: React.ReactNode }) {
   return (
-    <div
-      className={cn(
-        'flex items-center gap-2.5 pb-3 border-b',
-        isDark ? 'border-cyan-500/20' : 'border-blue-400/20'
-      )}
-    >
-      <div className={cn(isDark ? 'text-cyan-400/70' : 'text-blue-500/70')}>{icon}</div>
-      <h3
-        className={cn(
-          'text-sm font-semibold uppercase tracking-wider',
-          isDark ? 'text-slate-200' : 'text-slate-800'
-        )}
-      >
-        {title}
-      </h3>
-      <div
-        className={cn(
-          'ml-auto h-px flex-1 bg-gradient-to-r',
-          isDark ? 'from-cyan-500/20 to-transparent' : 'from-blue-400/20 to-transparent'
-        )}
-      />
+    <div className="flex items-center gap-2.5 pb-3 border-b border-cyan-500/20">
+      <div className="text-cyan-400/70">{icon}</div>
+      <h3 className="text-sm font-semibold text-slate-200 uppercase tracking-wider">{title}</h3>
+      <div className="ml-auto h-px flex-1 bg-gradient-to-r from-cyan-500/20 to-transparent" />
     </div>
   );
 }
@@ -1001,22 +766,18 @@ function YieldMetricCard({
   value,
   icon,
   color,
-  isDark = true,
 }: {
   label: string;
   value: string;
   icon: React.ReactNode;
   color: string;
-  isDark?: boolean;
 }) {
   return (
     <motion.div
       whileHover={{ scale: 1.02, y: -2 }}
       className={cn(
-        'relative overflow-hidden rounded-lg border bg-gradient-to-br backdrop-blur p-3 group transition-all duration-300',
-        isDark
-          ? 'border-cyan-500/20 from-slate-900/60 to-slate-800/30 hover:border-cyan-500/40'
-          : 'border-blue-400/20 from-slate-100/60 to-slate-50/30 hover:border-blue-400/40'
+        'relative overflow-hidden rounded-lg border border-cyan-500/20 bg-gradient-to-br from-slate-900/60 to-slate-800/30 backdrop-blur p-3 group',
+        'hover:border-cyan-500/40 transition-all duration-300'
       )}
     >
       {/* Gradient background */}
@@ -1040,18 +801,13 @@ function YieldMetricCard({
         <div className={cn('h-5 w-5 rounded-lg bg-gradient-to-br p-1 mb-2', color)}>
           <div className="h-full w-full flex items-center justify-center text-white">{icon}</div>
         </div>
-        <div className={cn('text-xs mb-1', isDark ? 'text-slate-400' : 'text-slate-600')}>
-          {label}
-        </div>
+        <div className="text-xs text-slate-400 mb-1">{label}</div>
         <motion.div
           layout
           key={value}
           initial={{ opacity: 0, y: 4 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn(
-            'font-mono text-sm font-bold',
-            isDark ? 'text-slate-100' : 'text-slate-900'
-          )}
+          className="font-mono text-sm font-bold text-slate-100"
         >
           {value}
         </motion.div>

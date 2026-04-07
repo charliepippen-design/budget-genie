@@ -97,10 +97,95 @@ const CHANNEL_GROUPS: ChannelGroup[] = ['organic', 'paid', 'affiliate', 'influen
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 
+type ObservedLtvPoints = {
+  m1: number | null;
+  m3: number | null;
+  m6: number | null;
+};
+
+function toAnchors(observed: ObservedLtvPoints): Array<{ month: number; value: number }> {
+  const candidates = [
+    { month: 1, value: observed.m1 },
+    { month: 3, value: observed.m3 },
+    { month: 6, value: observed.m6 },
+  ];
+
+  return candidates
+    .filter((entry): entry is { month: number; value: number } => {
+      return entry.value !== null && Number.isFinite(entry.value) && entry.value > 0;
+    })
+    .sort((a, b) => a.month - b.month);
+}
+
+function applyObservedCalibration(
+  baselineCumulative: number[],
+  observed: ObservedLtvPoints
+): { cumulative: number[]; multiplier: number; isCalibrated: boolean } {
+  const anchors = toAnchors(observed);
+  if (anchors.length === 0 || baselineCumulative.length === 0) {
+    return {
+      cumulative: baselineCumulative,
+      multiplier: 1,
+      isCalibrated: false,
+    };
+  }
+
+  const lastAnchor = anchors[anchors.length - 1];
+  const baselineAtLastAnchor = baselineCumulative[lastAnchor.month - 1] || 1;
+  const scaleAtLastAnchor = lastAnchor.value / Math.max(1, baselineAtLastAnchor);
+  const projectedMonth12 = Math.max(
+    lastAnchor.value,
+    baselineCumulative[11] * clamp(scaleAtLastAnchor, 0.25, 4)
+  );
+
+  const segmentAnchors = [{ month: 0, value: 0 }, ...anchors];
+  if (segmentAnchors[segmentAnchors.length - 1].month < 12) {
+    segmentAnchors.push({ month: 12, value: projectedMonth12 });
+  }
+
+  const calibrated = [...baselineCumulative];
+  for (let month = 1; month <= 12; month += 1) {
+    const right = segmentAnchors.find((anchor) => anchor.month >= month);
+    const left = [...segmentAnchors].reverse().find((anchor) => anchor.month <= month);
+
+    if (!left || !right) {
+      calibrated[month - 1] = baselineCumulative[month - 1];
+      continue;
+    }
+
+    if (left.month === right.month) {
+      calibrated[month - 1] = left.value;
+      continue;
+    }
+
+    const progress = (month - left.month) / (right.month - left.month);
+    const interpolated = left.value + (right.value - left.value) * progress;
+    calibrated[month - 1] = Math.max(0, interpolated);
+  }
+
+  for (let idx = 1; idx < calibrated.length; idx += 1) {
+    if (calibrated[idx] < calibrated[idx - 1]) {
+      calibrated[idx] = calibrated[idx - 1];
+    }
+  }
+
+  const baselineTerminal = Math.max(0.01, baselineCumulative[11]);
+  const multiplier = calibrated[11] / baselineTerminal;
+
+  return {
+    cumulative: calibrated,
+    multiplier: clamp(multiplier, 0.25, 4),
+    isCalibrated: true,
+  };
+}
+
 export function LtvForecastPanel() {
   const blended = useBlendedMetrics();
   const channels = useChannelsWithMetrics();
   const playerValue = useMediaPlanStore((state) => state.globalMultipliers.playerValue);
+  const observedLtv = useMediaPlanStore((state) => state.observedLtv);
+  const setObservedLtv = useMediaPlanStore((state) => state.setObservedLtv);
+  const clearObservedLtv = useMediaPlanStore((state) => state.clearObservedLtv);
   const userStatus = useMediaPlanStore((state) => state.userStatus);
   const { format: formatCurrency, symbol } = useCurrency();
   const { theme } = useTheme();
@@ -110,7 +195,7 @@ export function LtvForecastPanel() {
   const [churnRatePct, setChurnRatePct] = useState(4.2);
   const [cpaShockPct, setCpaShockPct] = useState(0);
   const [roasLiftPct, setRoasLiftPct] = useState(0);
-  const [isExpanded, setIsExpanded] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
   const [decayCurve, setDecayCurve] = useState<DecayCurveArchitecture>('standard-linear');
   const [activeSlider, setActiveSlider] = useState<'churn' | 'cpa' | 'roas' | null>(null);
   const sandboxEnabled = useSandboxStore((state) => state.sandboxEnabled);
@@ -269,27 +354,99 @@ export function LtvForecastPanel() {
     [churnRatePct, cpaShockPct, roasLiftPct, sandboxEnabled, weightedSandboxChurnDeltaPct]
   );
 
+  const scenarioCalibration = useMemo(() => {
+    const roasLift = 1 + roasLiftPct / 100;
+
+    const computeBaselineCumulative = (blendedRoas: number) => {
+      const monthlyChurnRate = assumptions.churnRate;
+      const baseExpansion = clamp(
+        0.008 + Math.max(0, blendedRoas * roasLift - 1) * 0.004,
+        0.008,
+        0.05
+      );
+      const monthlyExpansionRate =
+        decayCurve === 'front-loaded-dropoff'
+          ? clamp(baseExpansion * 0.85, 0.006, 0.05)
+          : decayCurve === 'stable-long-term-retention'
+            ? clamp(baseExpansion * 1.1, 0.008, 0.055)
+            : baseExpansion;
+
+      const initialMonetization = playerValue * 0.15 * roasLift;
+      let rollingRetention = 1;
+      let cumulative = 0;
+
+      return Array.from({ length: 12 }, (_, idx) => {
+        const month = idx + 1;
+        const dynamicChurnRate =
+          decayCurve === 'front-loaded-dropoff'
+            ? month <= 3
+              ? monthlyChurnRate * 1.7
+              : monthlyChurnRate * 0.72
+            : decayCurve === 'stable-long-term-retention'
+              ? month <= 3
+                ? monthlyChurnRate * 0.72
+                : monthlyChurnRate * 0.85
+              : monthlyChurnRate;
+
+        rollingRetention *= 1 - clamp(dynamicChurnRate, 0.003, 0.35);
+        const retention = rollingRetention;
+        const expansion = 1 + monthlyExpansionRate * idx;
+        const monthlyLtvPerUser = initialMonetization * retention * expansion;
+        cumulative += monthlyLtvPerUser;
+        return cumulative;
+      });
+    };
+
+    const baselineCal = applyObservedCalibration(
+      computeBaselineCumulative(Math.max(0, baselineMetrics.blendedRoas)),
+      observedLtv
+    );
+    const activeCal = applyObservedCalibration(
+      computeBaselineCumulative(Math.max(0, activeMetrics.blendedRoas)),
+      observedLtv
+    );
+
+    return {
+      baselineMultiplier: baselineCal.multiplier,
+      activeMultiplier: activeCal.multiplier,
+      isCalibrated: baselineCal.isCalibrated,
+    };
+  }, [
+    activeMetrics.blendedRoas,
+    assumptions.churnRate,
+    baselineMetrics.blendedRoas,
+    decayCurve,
+    observedLtv,
+    playerValue,
+    roasLiftPct,
+  ]);
+
   const baselineScenarioData = useMemo(
     () =>
       buildScenarioEnvelope({
         baseLtvPerUser:
-          (baselineMetrics.blendedCpa ?? 0) * Math.max(0, baselineMetrics.blendedRoas),
+          (baselineMetrics.blendedCpa ?? 0) *
+          Math.max(0, baselineMetrics.blendedRoas) *
+          scenarioCalibration.baselineMultiplier,
         conversions: baselineMetrics.totalConversions,
         cpa: baselineMetrics.blendedCpa ?? 0,
         assumptions,
       }) as ScenarioPoint[],
-    [assumptions, baselineMetrics]
+    [assumptions, baselineMetrics, scenarioCalibration.baselineMultiplier]
   );
 
   const scenarioData = useMemo(
     () =>
       buildScenarioEnvelope({
-        baseLtvPerUser: (activeMetrics.blendedCpa ?? 0) * Math.max(0, activeMetrics.blendedRoas),
+        baseLtvPerUser:
+          (activeMetrics.blendedCpa ?? 0) *
+          Math.max(0, activeMetrics.blendedRoas) *
+          scenarioCalibration.activeMultiplier,
         conversions: activeMetrics.totalConversions,
         cpa: activeMetrics.blendedCpa ?? 0,
         assumptions,
       }) as ScenarioPoint[],
-    [activeMetrics, assumptions]
+    [activeMetrics, assumptions, scenarioCalibration.activeMultiplier]
   );
 
   const baselineScenarioLookup = useMemo(
@@ -479,7 +636,10 @@ export function LtvForecastPanel() {
     let cumulativeLtvPerUser = 0;
     let rollingRetention = 1;
 
-    const points: LtvCurvePoint[] = Array.from({ length: 12 }, (_, idx) => {
+    const baselineCumulative: number[] = [];
+    const baselineMonthly: number[] = [];
+
+    Array.from({ length: 12 }, (_, idx) => {
       const month = idx + 1;
       const dynamicChurnRate =
         decayCurve === 'front-loaded-dropoff'
@@ -498,14 +658,30 @@ export function LtvForecastPanel() {
 
       cumulativeLtvPerUser += monthlyLtvPerUser;
 
-      const cohortValue = cumulativeLtvPerUser * safeConversions;
+      baselineMonthly.push(monthlyLtvPerUser);
+      baselineCumulative.push(cumulativeLtvPerUser);
+    });
+
+    const calibratedCurve = applyObservedCalibration(baselineCumulative, observedLtv);
+
+    const points: LtvCurvePoint[] = Array.from({ length: 12 }, (_, idx) => {
+      const month = idx + 1;
+      const calibratedCumulative = calibratedCurve.cumulative[idx] ?? baselineCumulative[idx] ?? 0;
+      const previousCumulative =
+        idx === 0 ? 0 : (calibratedCurve.cumulative[idx - 1] ?? baselineCumulative[idx - 1] ?? 0);
+      const monthlyLtvPerUser = Math.max(
+        0,
+        calibratedCumulative - previousCumulative || baselineMonthly[idx] || 0
+      );
+
+      const cohortValue = calibratedCumulative * safeConversions;
       const netCohortValue = cohortValue - activeMetrics.totalSpend;
-      const ltvToCac = safeCpa > 0 ? cumulativeLtvPerUser / safeCpa : 0;
+      const ltvToCac = safeCpa > 0 ? calibratedCumulative / safeCpa : 0;
 
       return {
         month,
         label: `M${month}`,
-        cumulativeLtvPerUser,
+        cumulativeLtvPerUser: calibratedCumulative,
         monthlyLtvPerUser,
         cohortValue,
         netCohortValue,
@@ -522,7 +698,15 @@ export function LtvForecastPanel() {
       monthlyExpansion: monthlyExpansionRate,
       paybackMonth: payback,
     };
-  }, [activeMetrics, assumptions.churnRate, cpaShockPct, decayCurve, playerValue, roasLiftPct]);
+  }, [
+    activeMetrics,
+    assumptions.churnRate,
+    cpaShockPct,
+    decayCurve,
+    observedLtv,
+    playerValue,
+    roasLiftPct,
+  ]);
 
   const terminalPoint = curveData[curveData.length - 1];
 
@@ -599,10 +783,17 @@ export function LtvForecastPanel() {
 
   if (!terminalPoint || activeMetrics.totalConversions <= 0) {
     return (
-      <Card className={cn("relative overflow-hidden backdrop-blur-md shadow-[0_10px_35px_rgba(15,23,42,0.45)]", isDark ? "border border-slate-700/60 bg-slate-900/55" : "border border-slate-200 bg-white")}>
+      <Card
+        className={cn(
+          'relative overflow-hidden backdrop-blur-md shadow-[0_10px_35px_rgba(15,23,42,0.45)]',
+          isDark ? 'border border-slate-700/60 bg-slate-900/55' : 'border border-slate-200 bg-white'
+        )}
+      >
         <CardHeader className="pb-2">
-          <CardTitle className={cn("text-base", isDark ? "text-white" : "text-slate-900")}>LTV Forecast Lab</CardTitle>
-          <p className={cn("text-xs", isDark ? "text-slate-400" : "text-slate-600")}>
+          <CardTitle className={cn('text-base', isDark ? 'text-white' : 'text-slate-900')}>
+            LTV Forecast Lab
+          </CardTitle>
+          <p className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}>
             Waiting for conversion volume to project cohort lifetime value.
           </p>
         </CardHeader>
@@ -611,13 +802,20 @@ export function LtvForecastPanel() {
   }
 
   return (
-    <Card className={cn("relative overflow-hidden backdrop-blur-md shadow-[0_12px_35px_rgba(15,23,42,0.45)]", isDark ? "border border-slate-700/60 bg-slate-900/55" : "border border-slate-200 bg-white")}>
+    <Card
+      className={cn(
+        'relative overflow-hidden backdrop-blur-md shadow-[0_12px_35px_rgba(15,23,42,0.45)]',
+        isDark ? 'border border-slate-700/60 bg-slate-900/55' : 'border border-slate-200 bg-white'
+      )}
+    >
       <div>
         <CardHeader className="pb-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className={cn("text-lg", isDark ? "text-white" : "text-slate-900")}>LTV Forecast Lab</CardTitle>
-              <p className={cn("text-xs", isDark ? "text-slate-400" : "text-slate-600")}>
+              <CardTitle className={cn('text-lg', isDark ? 'text-white' : 'text-slate-900')}>
+                LTV Forecast Lab
+              </CardTitle>
+              <p className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}>
                 Cohort-based value modeling with retention and expansion drift over 12 months.
               </p>
             </div>
@@ -635,6 +833,11 @@ export function LtvForecastPanel() {
                 })}{' '}
                 users
               </span>
+              {scenarioCalibration.isCalibrated ? (
+                <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">
+                  Calibrated from M1/M3/M6
+                </span>
+              ) : null}
               <Button
                 type="button"
                 size="sm"
@@ -740,6 +943,75 @@ export function LtvForecastPanel() {
                   <option value="front-loaded-dropoff">Front-Loaded Dropoff</option>
                   <option value="stable-long-term-retention">Stable Long-Term Retention</option>
                 </select>
+              </div>
+
+              <div className="rounded-lg border border-slate-700/60 bg-slate-900/35 p-3">
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wider text-slate-400">
+                      Calibrate from Observed Data
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      Optional anchors for cumulative LTV per user at Month 1, 3, and 6.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 px-2 text-xs text-slate-300"
+                    onClick={clearObservedLtv}
+                  >
+                    Clear
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <label className="text-xs text-slate-400">
+                    Month 1
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={observedLtv.m1 ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setObservedLtv('m1', value === '' ? null : Math.max(0, Number(value)));
+                      }}
+                      className="mt-1 h-9 border-slate-700 bg-slate-900/80 text-slate-100"
+                      aria-label="Observed LTV at month 1"
+                    />
+                  </label>
+                  <label className="text-xs text-slate-400">
+                    Month 3
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={observedLtv.m3 ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setObservedLtv('m3', value === '' ? null : Math.max(0, Number(value)));
+                      }}
+                      className="mt-1 h-9 border-slate-700 bg-slate-900/80 text-slate-100"
+                      aria-label="Observed LTV at month 3"
+                    />
+                  </label>
+                  <label className="text-xs text-slate-400">
+                    Month 6
+                    <Input
+                      type="number"
+                      min={0}
+                      step={1}
+                      value={observedLtv.m6 ?? ''}
+                      onChange={(event) => {
+                        const value = event.target.value;
+                        setObservedLtv('m6', value === '' ? null : Math.max(0, Number(value)));
+                      }}
+                      className="mt-1 h-9 border-slate-700 bg-slate-900/80 text-slate-100"
+                      aria-label="Observed LTV at month 6"
+                    />
+                  </label>
+                </div>
               </div>
 
               <p className="sr-only" aria-live="polite">

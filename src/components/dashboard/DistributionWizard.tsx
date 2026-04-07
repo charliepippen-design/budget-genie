@@ -30,6 +30,7 @@ import {
 } from '@/lib/distribution-logic';
 import { ChannelData } from '@/hooks/use-media-plan-store';
 import { formatPercentage } from '@/lib/mediaplan-data';
+import { toast } from 'sonner';
 
 interface DistributionWizardProps {
   channels: ChannelData[];
@@ -116,6 +117,31 @@ export function DistributionWizard({
     }));
 
     const newAllocations = calculateDistribution(logicChannels, selectedStrategy);
+
+    const significant = channels
+      .map((ch) => {
+        const before = ch.allocationPct ?? 0;
+        const after = newAllocations[ch.id] ?? before;
+        const delta = after - before;
+        return { name: ch.name, delta };
+      })
+      .filter((item) => Math.abs(item.delta) > 1)
+      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+
+    const top = significant.slice(0, 3);
+    const summary =
+      top.length > 0
+        ? top
+            .map(
+              (item) =>
+                `${item.name} ${item.delta > 0 ? '↑' : '↓'} ${Math.abs(item.delta).toFixed(0)}%`
+            )
+            .join(' · ')
+        : 'Strategy applied. No major allocation shifts (>1%).';
+
+    const remaining = significant.length - top.length;
+    toast.info(remaining > 0 ? `${summary} + ${remaining} more` : summary, { duration: 4000 });
+
     onApply(newAllocations);
     if (setOpen) setOpen(false);
   };

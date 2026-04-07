@@ -1,7 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
-import { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
+import { ChannelWithMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
 import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
 import {
   buildScenarioEnvelope,
@@ -399,12 +399,12 @@ export function exportToExcel(
       Channel: channel.name,
       Family: safeFamilyName(channel.family),
       BuyingModel: safeBuyingModelName(channel.buyingModel),
-      AllocationPct: Number(channel.allocationPct.toFixed(4)),
+      AllocationPct: Number(safeNumber(channel.allocationPct).toFixed(4)),
       Spend: Number(safeNumber(channel.metrics.spend).toFixed(4)),
       Impressions: Number(safeNumber(channel.metrics.impressions).toFixed(0)),
       Clicks: Number(safeNumber(channel.metrics.clicks).toFixed(0)),
       FTDs: Number(safeNumber(channel.metrics.conversions).toFixed(2)),
-      CPA: Number(safeNumber(channel.metrics.cpa).toFixed(4)),
+      CPA: channel.metrics.cpa != null ? Number(channel.metrics.cpa.toFixed(4)) : 'N/A',
       Revenue: Number(safeNumber(channel.metrics.revenue).toFixed(4)),
       ROAS: Number(safeNumber(channel.metrics.roas).toFixed(4)),
     }));
@@ -535,7 +535,68 @@ export function exportToExcel(
 // ========== PNG EXPORT ==========
 
 export async function exportToPng(): Promise<void> {
-  // PNG export requires html2canvas which captures the DOM
-  // For now, prompt user to use browser print
-  throw new Error('PNG export requires manual capture. Use Ctrl/Cmd + Shift + S to save as image.');
+  // PNG export is intentionally disabled because DOM capture is not implemented safely
+  // across browsers in the current build. UI entry points are removed.
+  throw new Error('PNG export is currently unavailable in web builds.');
+}
+
+// ========== ENTERPRISE CONFIG EXPORT ==========
+
+interface EnterpriseExportPayload {
+  event_name: string;
+  generated_at: string;
+  plan_name: string;
+  total_budget: number;
+  target_cpa: number | null;
+  target_roas: number | null;
+  campaign_allocation: Array<{
+    channel_id: string;
+    channel_name: string;
+    category: string;
+    buying_model: string;
+    allocation_pct: number;
+    planned_budget: number;
+    projected_revenue: number;
+    projected_roas: number;
+    locked: boolean;
+  }>;
+}
+
+export function exportEnterpriseConfigJson(
+  channels: ChannelWithMetrics[],
+  totalBudget: number,
+  globalMultipliers: Pick<GlobalMultipliers, 'cpaTarget' | 'roasTarget'>,
+  planName = 'MediaPlanner Pro Plan'
+): void {
+  const payload: EnterpriseExportPayload = {
+    event_name: 'media_plan_configuration_ready',
+    generated_at: new Date().toISOString(),
+    plan_name: planName,
+    total_budget: Number(totalBudget.toFixed(2)),
+    target_cpa: globalMultipliers.cpaTarget ?? null,
+    target_roas: globalMultipliers.roasTarget ?? null,
+    campaign_allocation: channels.map((channel) => ({
+      channel_id: channel.id,
+      channel_name: channel.name,
+      category: channel.category,
+      buying_model: safeBuyingModelName(channel.buyingModel),
+      allocation_pct: Number(channel.allocationPct.toFixed(4)),
+      planned_budget: Number(channel.metrics.spend.toFixed(2)),
+      projected_revenue: Number(channel.metrics.revenue.toFixed(2)),
+      projected_roas: Number(channel.metrics.roas.toFixed(4)),
+      locked: channel.locked,
+    })),
+  };
+
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: 'application/json;charset=utf-8',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = `mediaplanner-export-config-${new Date().toISOString().split('T')[0]}.json`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
 }

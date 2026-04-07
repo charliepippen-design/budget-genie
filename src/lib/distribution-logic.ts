@@ -110,23 +110,36 @@ export function calculateDistribution(
     // 1. Assign weights
     let totalWeight = 0;
 
+    // Build a lowercase key map so weight lookups are case-insensitive.
+    // The DISTRIBUTION_CONFIG uses mixed case (e.g. 'Affiliate', 'Paid Social') for
+    // category-level keys and lowercase for keyword-level keys (e.g. 'cpa', 'display').
+    // Channel category and family strings may not match the exact casing used in the config.
+    const weightsLower: Record<string, number> = {};
+    Object.entries(config.weights).forEach(([k, v]) => {
+        weightsLower[k.toLowerCase()] = v;
+    });
+
     channels.forEach(ch => {
         let weight = 1; // Default
 
-        // Check by Category (broad)
-        if (config.weights[ch.category]) {
-            weight = config.weights[ch.category];
+        // Check by Category (broad) — case-insensitive
+        const catKey = ch.category.toLowerCase();
+        if (weightsLower[catKey] !== undefined) {
+            weight = weightsLower[catKey];
         }
 
-        // Check by Family (if available)
-        if (ch.family && config.weights[ch.family]) {
-            weight = Math.max(weight, config.weights[ch.family]);
+        // Check by Family (if available) — case-insensitive
+        if (ch.family) {
+            const famKey = ch.family.toLowerCase();
+            if (weightsLower[famKey] !== undefined) {
+                weight = Math.max(weight, weightsLower[famKey]);
+            }
         }
 
-        // Check by Name/ID keywords (specific)
-        Object.keys(config.weights).forEach(key => {
-            if (ch.id.includes(key) || ch.name.toLowerCase().includes(key)) {
-                weight = Math.max(weight, config.weights[key]);
+        // Check by Name/ID keywords (specific) — already lowercase-normalised via ch.name.toLowerCase()
+        Object.entries(config.weights).forEach(([key, keyWeight]) => {
+            if (ch.id.includes(key) || ch.name.toLowerCase().includes(key.toLowerCase())) {
+                weight = Math.max(weight, keyWeight);
             }
         });
 

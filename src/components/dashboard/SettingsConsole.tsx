@@ -43,7 +43,8 @@ import {
 import { CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeChannelName } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
 import { ChannelEditor } from './ChannelEditor';
 import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
@@ -70,14 +71,18 @@ const GlobalMultipliers: React.FC = () => {
   } = useProjectStore();
   const { symbol, format } = useCurrency();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark' || theme === 'contrast';
 
   return (
     <div className="space-y-4">
       {/* Spend Multiplier */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs">
-          <Label className="text-slate-400">Spend Multiplier</Label>
-          <span className="font-mono text-slate-200">
+          <Label className={cn(isDark ? 'text-slate-400' : 'text-slate-600')}>
+            Spend Multiplier
+          </Label>
+          <span className={cn('font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>
             {globalMultipliers.spendMultiplier.toFixed(2)}x
           </span>
         </div>
@@ -101,9 +106,23 @@ const GlobalMultipliers: React.FC = () => {
       {/* Targets */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
-          <Label className="text-xs text-slate-500 uppercase tracking-wider">CPA Target</Label>
+          <Label
+            className={cn(
+              'text-xs uppercase tracking-wider',
+              isDark ? 'text-slate-500' : 'text-slate-600'
+            )}
+          >
+            CPA Target
+          </Label>
           <div className="relative">
-            <span className="absolute left-2 top-2.5 text-sm text-slate-500">{symbol}</span>
+            <span
+              className={cn(
+                'absolute left-2 top-2.5 text-sm',
+                isDark ? 'text-slate-500' : 'text-slate-600'
+              )}
+            >
+              {symbol}
+            </span>
             <Input
               type="number"
               value={globalMultipliers.cpaTarget || ''}
@@ -113,14 +132,33 @@ const GlobalMultipliers: React.FC = () => {
                 })
               }
               placeholder="None"
-              className="h-10 pl-7 text-sm bg-[#020617] border-slate-700 text-slate-200"
+              className={cn(
+                'h-10 pl-7 text-sm',
+                isDark
+                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  : 'bg-white border-slate-300 text-slate-900'
+              )}
             />
           </div>
         </div>
         <div className="space-y-1">
-          <Label className="text-xs text-slate-500 uppercase tracking-wider">ROAS Target</Label>
+          <Label
+            className={cn(
+              'text-xs uppercase tracking-wider',
+              isDark ? 'text-slate-500' : 'text-slate-600'
+            )}
+          >
+            ROAS Target
+          </Label>
           <div className="relative">
-            <span className="absolute left-2 top-2.5 text-sm text-slate-500">x</span>
+            <span
+              className={cn(
+                'absolute left-2 top-2.5 text-sm',
+                isDark ? 'text-slate-500' : 'text-slate-600'
+              )}
+            >
+              x
+            </span>
             <Input
               type="number"
               value={globalMultipliers.roasTarget || ''}
@@ -130,7 +168,12 @@ const GlobalMultipliers: React.FC = () => {
                 })
               }
               placeholder="None"
-              className="h-10 pl-7 text-sm bg-[#020617] border-slate-700 text-slate-200"
+              className={cn(
+                'h-10 pl-7 text-sm',
+                isDark
+                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  : 'bg-white border-slate-300 text-slate-900'
+              )}
             />
           </div>
         </div>
@@ -145,6 +188,8 @@ const GlobalMultipliers: React.FC = () => {
 const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => {
   const { deleteChannel } = useProjectStore();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark' || theme === 'contrast';
 
   const categoryDotClass: Record<ChannelCategory, string> = {
     'SEO/Content': 'bg-[hsl(var(--chart-1))]',
@@ -167,7 +212,10 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
   return (
     <div
       className={cn(
-        'group flex items-center justify-between p-3 rounded-lg border border-slate-800 bg-slate-900/50 hover:border-slate-600 transition-all mb-2',
+        'group flex items-center justify-between p-3 rounded-lg border transition-all mb-2',
+        isDark
+          ? 'border-slate-800 bg-slate-900/50 hover:border-slate-600'
+          : 'border-slate-200 bg-white hover:border-slate-300',
         isWarning && 'border-red-900/50 bg-red-900/10'
       )}
     >
@@ -185,16 +233,26 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
           <span
             className={cn(
               'text-sm font-medium truncate',
-              isWarning ? 'text-red-400' : 'text-slate-200'
+              isWarning ? 'text-red-500' : isDark ? 'text-slate-200' : 'text-slate-900'
             )}
           >
             {channel.name}
           </span>
-          <div className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="uppercase tracking-wider font-bold text-[10px] bg-slate-800 px-1.5 rounded">
+          <div
+            className={cn(
+              'flex items-center gap-2 text-xs',
+              isDark ? 'text-slate-500' : 'text-slate-600'
+            )}
+          >
+            <span
+              className={cn(
+                'uppercase tracking-wider font-bold text-[10px] px-1.5 rounded',
+                isDark ? 'bg-slate-800' : 'bg-slate-100'
+              )}
+            >
               {channel.buyingModel}
             </span>
-            <span className="truncate text-slate-400">
+            <span className={cn('truncate', isDark ? 'text-slate-400' : 'text-slate-600')}>
               {channel.allocationPct.toFixed(1)}% Alloc
             </span>
           </div>
@@ -207,7 +265,12 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
           channel={channel}
           trigger={
             <button
-              className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-700 rounded-md transition-colors"
+              className={cn(
+                'p-1.5 rounded-md transition-colors',
+                isDark
+                  ? 'text-slate-400 hover:text-white hover:bg-slate-700'
+                  : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
+              )}
               title="Configure"
               onClick={(e) => e.stopPropagation()}
             >
@@ -238,6 +301,8 @@ export const SettingsConsole: React.FC = () => {
   const { channels, addChannel, resetAll, totalBudget, globalMultipliers } = useProjectStore();
   const channelsWithMetrics = useChannelsWithMetrics();
   const { toast } = useToast();
+  const { theme } = useTheme();
+  const isDark = theme === 'dark' || theme === 'contrast';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newName, setNewName] = useState('');
@@ -267,11 +332,20 @@ export const SettingsConsole: React.FC = () => {
   }, [newCat]);
 
   const handleCreateChannel = useCallback(() => {
-    // (Keep existing logic)
-    if (!newName.trim()) return;
-    const family = inferChannelFamily(newName);
+    // Sanitize channel name to prevent XSS and enforce constraints
+    const sanitizedName = sanitizeChannelName(newName);
+    if (!sanitizedName) {
+      toast({
+        title: 'Invalid Name',
+        description: 'Channel name is invalid or empty (after sanitization)',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const family = inferChannelFamily(sanitizedName);
     addChannel({
-      name: newName,
+      name: sanitizedName,
       category: newCat,
       family,
       buyingModel: newModel,
@@ -284,7 +358,10 @@ export const SettingsConsole: React.FC = () => {
     });
     setNewName('');
     setIsAddOpen(false);
-    toast({ title: 'Channel Added', description: `${newName} created successfully.` });
+    toast({
+      title: 'Channel Added',
+      description: `Channel created: ${sanitizedName}`,
+    });
   }, [addChannel, newCat, newModel, newName, newPrice, toast]);
 
   const channelItems = useMemo(
@@ -294,13 +371,30 @@ export const SettingsConsole: React.FC = () => {
 
   return (
     // ROOT CONTAINER: Deep Blue Background
-    <div className="h-full w-full bg-[#020617] text-slate-100 flex flex-col overflow-hidden">
+    <div
+      className={cn(
+        'h-full w-full flex flex-col overflow-hidden transition-colors duration-300',
+        isDark ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'
+      )}
+    >
       {/* <div className="text-yellow-500 font-mono">DEBUG MODE: Settings Console</div> */}
-      <div className="p-4 border-b border-slate-800 space-y-4 flex-shrink-0 bg-[#020617] z-10">
+      <div
+        className={cn(
+          'p-4 border-b space-y-4 flex-shrink-0 z-10 transition-colors duration-300',
+          isDark ? 'border-slate-800 bg-[#020617]' : 'border-slate-200 bg-white'
+        )}
+      >
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Settings className="w-5 h-5 text-indigo-500" />
-            <h2 className="font-bold text-base tracking-tight text-white">MediaPlan Pro</h2>
+            <Settings className={cn('w-5 h-5', isDark ? 'text-indigo-500' : 'text-indigo-600')} />
+            <h2
+              className={cn(
+                'font-bold text-base tracking-tight',
+                isDark ? 'text-white' : 'text-slate-900'
+              )}
+            >
+              MediaPlan Pro
+            </h2>
           </div>
 
           <div className="flex items-center gap-1">
@@ -334,7 +428,12 @@ export const SettingsConsole: React.FC = () => {
                   });
                 }
               }}
-              className="text-sm text-slate-500 hover:text-white h-9 px-3"
+              className={cn(
+                'text-sm h-9 px-3',
+                isDark
+                  ? 'text-slate-500 hover:text-white'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              )}
             >
               <RotateCcw className="w-4 h-4 mr-1.5" /> Reset
             </Button>
@@ -342,7 +441,12 @@ export const SettingsConsole: React.FC = () => {
         </div>
 
         {/* Render Global Multipliers safely in a Card */}
-        <div className="bg-[#0f172a] p-4 rounded-xl border border-slate-800 shadow-sm mb-2">
+        <div
+          className={cn(
+            'p-4 rounded-xl border shadow-sm mb-2 transition-colors duration-300',
+            isDark ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200'
+          )}
+        >
           <GlobalMultipliers />
           <div className="mt-3">
             <OptimizationControls />
@@ -353,8 +457,13 @@ export const SettingsConsole: React.FC = () => {
       <div className="flex-1 overflow-y-auto p-4 space-y-3 custom-scrollbar">
         <div className="flex items-center justify-between mb-2 px-1">
           <div className="flex items-center gap-2">
-            <Layers className="w-3.5 h-3.5 text-slate-500" />
-            <span className="text-xs font-semibold uppercase text-slate-500 tracking-wider">
+            <Layers className={cn('w-3.5 h-3.5', isDark ? 'text-slate-500' : 'text-slate-600')} />
+            <span
+              className={cn(
+                'text-xs font-semibold uppercase tracking-wider',
+                isDark ? 'text-slate-500' : 'text-slate-600'
+              )}
+            >
               Active Channels
             </span>
           </div>
@@ -372,7 +481,12 @@ export const SettingsConsole: React.FC = () => {
           <DialogTrigger asChild>
             <Button
               variant="outline"
-              className="w-full border-2 border-dashed border-slate-800 bg-transparent text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 hover:bg-indigo-500/5 h-12 rounded-xl transition-all"
+              className={cn(
+                'w-full border-2 border-dashed bg-transparent h-12 rounded-xl transition-all',
+                isDark
+                  ? 'border-slate-800 text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 hover:bg-indigo-500/5'
+                  : 'border-slate-300 text-slate-600 hover:text-indigo-600 hover:border-indigo-400/70 hover:bg-indigo-500/5'
+              )}
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Channel

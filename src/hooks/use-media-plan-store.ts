@@ -14,6 +14,9 @@ import {
 } from '@/types/channel';
 import { normalizeAllocations as normalizeAllocationsUtil } from '@/lib/math-utils';
 import { calculateScoredAllocation } from '@/lib/distribution-logic';
+import { GeoTierKey, TOP_IGAMING_GEOS, TIER_DEFAULTS } from '@/lib/geo-market-data';
+import { sanitizeChannelName } from '@/lib/utils';
+import { Vertical } from '@/lib/vertical-presets';
 
 export type { ChannelCategory };
 
@@ -24,6 +27,8 @@ const MIN_BUDGET_CAP = 5000; // $5k min for stability
 // ========== DATA MODEL ==========
 
 export type ImpressionMode = 'CPM' | 'FIXED';
+export type SubscriptionTier = 'free' | 'pro' | 'enterprise';
+export type UserStatus = 'demo' | 'active';
 
 export interface ChannelData {
   id: string;
@@ -85,17 +90,54 @@ export interface BlendedMetrics {
   blendedRoas: number;
 }
 
+export interface FtdVelocityMetrics {
+  totalImpressions: number;
+  qualityClicks: number;
+  registrations: number;
+  ftds: number;
+  ngr: number;
+  impressionToClickRate: number;
+  clickToRegistrationRate: number;
+  registrationToFtdRate: number;
+  ngrPerFtd: number;
+}
+
+export interface GeoAllocationState {
+  tier1: number;
+  tier2: number;
+  tier3: number;
+}
+
+export interface GeoMarketProfile {
+  mode: 'tiers' | 'geos';
+  blendedCpa: number;
+  blendedLtv: number;
+}
+
+export interface GeoMarketOverride {
+  cpa?: number;
+  ltv?: number;
+}
+
+export interface ObservedLtvInputs {
+  m1: number | null;
+  m3: number | null;
+  m6: number | null;
+}
+
 export interface Preset {
   name: string;
   totalBudget: number;
   channels: ChannelData[];
   globalMultipliers: GlobalMultipliers;
+  activeTiers?: GeoAllocationState;
+  activeGeos?: string[];
 }
 
 // ========== DEFAULT DATA ==========
 
 const BASE_CHANNELS_DATA = [
-  // SEO & Content
+  // SEO & Content (RETAINER — fixed monthly spend, traffic × CR = FTDs)
   {
     id: 'seo-tech',
     name: 'SEO - Tech Audit & On-Page',
@@ -103,6 +145,7 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 500,
     cpm: 2.5,
     ctr: 0.8,
+    conversionRate: 0.8, // Organic: lower intent, slower funnel
     roas: 3.2,
   },
   {
@@ -112,6 +155,7 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 1500,
     cpm: 1.8,
     ctr: 1.2,
+    conversionRate: 1.0, // Content-driven organic converts slightly better
     roas: 4.5,
   },
   {
@@ -121,16 +165,19 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 1000,
     cpm: 3.5,
     ctr: 0.5,
+    conversionRate: 0.8,
     roas: 2.8,
   },
-  // Paid Media
+  // Paid Media (CPM — impressions → clicks → FTDs)
   {
     id: 'paid-native',
-    name: 'Paid - Native Ads (Adult/Crypto)',
+    name: 'Paid - Native Ads',
     category: 'Display/Programmatic' as ChannelCategory,
     baseSpend: 2500,
+    // CPM $4.2, CTR 0.35%, CR 1.2% → linear ROAS ≈ 1.5x (cold display, moderate intent)
     cpm: 4.2,
     ctr: 0.35,
+    conversionRate: 1.2,
     roas: 1.8,
   },
   {
@@ -138,8 +185,12 @@ const BASE_CHANNELS_DATA = [
     name: 'Paid - Push Notifications',
     category: 'Display/Programmatic' as ChannelCategory,
     baseSpend: 1500,
-    cpm: 1.2,
+    // CPM raised $1.2 → $5.0; CR cut 1.2% → 0.3%
+    // Push clickers are low-intent: high CTR but poor click-to-deposit rate.
+    // Linear ROAS: (1000/5) × 0.025 × 0.003 × 150 ≈ 2.25x ✓
+    cpm: 5.0,
     ctr: 2.5,
+    conversionRate: 0.3,
     roas: 2.2,
   },
   {
@@ -147,8 +198,12 @@ const BASE_CHANNELS_DATA = [
     name: 'Paid - Programmatic / Display',
     category: 'Display/Programmatic' as ChannelCategory,
     baseSpend: 1000,
+    // CTR raised 0.15% → 0.25%; CR raised 0.8% → 2.5%
+    // Previous values gave 0.33x ROAS — unprofitable out of the box.
+    // Linear ROAS: (1000/5.5) × 0.0025 × 0.025 × 150 ≈ 1.7x ✓
     cpm: 5.5,
-    ctr: 0.15,
+    ctr: 0.25,
+    conversionRate: 2.5,
     roas: 1.5,
   },
   {
@@ -156,8 +211,11 @@ const BASE_CHANNELS_DATA = [
     name: 'Paid - Retargeting (Pixel)',
     category: 'Display/Programmatic' as ChannelCategory,
     baseSpend: 500,
-    cpm: 8.0,
+    // CPM raised $8 → $25 — retargeting premium inventory in iGaming is expensive.
+    // Linear ROAS: (1000/25) × 0.018 × 0.045 × 150 ≈ 4.86x ✓ (warm audience deserves premium)
+    cpm: 25.0,
     ctr: 1.8,
+    conversionRate: 4.5,
     roas: 4.2,
   },
   // Affiliates
@@ -168,6 +226,7 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 1000,
     cpm: 15.0,
     ctr: 3.5,
+    conversionRate: 3.0, // Affiliate referral traffic is pre-qualified
     roas: 2.0,
   },
   {
@@ -177,9 +236,10 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 8500,
     cpm: 25.0,
     ctr: 4.2,
+    conversionRate: 15.0, // CPA model: FTD = spend/CPA; CR only used for click back-calc
     roas: 3.5,
   },
-  // Influencers
+  // Influencers (RETAINER / FLAT_FEE — fixed spend, estimated traffic × CR)
   {
     id: 'influencer-retainers',
     name: 'Influencer - Monthly Retainers',
@@ -187,15 +247,17 @@ const BASE_CHANNELS_DATA = [
     baseSpend: 2000,
     cpm: 12.0,
     ctr: 1.5,
+    conversionRate: 2.0, // Engaged community, medium conversion
     roas: 2.5,
   },
   {
     id: 'influencer-funds',
-    name: 'Influencer - Play Funds (Bal)',
+    name: 'Influencer - Play Funds (Balance)',
     category: 'Paid Social' as ChannelCategory,
     baseSpend: 1500,
     cpm: 10.0,
     ctr: 2.0,
+    conversionRate: 2.5, // Bonus-incentivised traffic converts well
     roas: 3.0,
   },
 ];
@@ -245,10 +307,14 @@ function createTypeConfigFromLegacy(ch: (typeof BASE_CHANNELS_DATA)[0]): Channel
     secondaryPrice,
     baselineMetrics: {
       ctr: ch.ctr,
-      conversionRate: 2.5,
+      // Use channel-specific conversion rate so each channel type produces
+      // credible metrics on first load rather than a uniform 2.5% across the board.
+      conversionRate: ch.conversionRate ?? 2.5,
       aov: 150,
       trafficPerUnit: 1000,
-      saturationCeiling: ch.baseSpend * 3, // Default saturation at 3x base spend
+      // Saturation ceiling at 3× base spend is a reasonable starting point.
+      // Retargeting and affiliate CPA have naturally lower ceilings (tighter audiences).
+      saturationCeiling: ch.baseSpend * 3,
     },
   };
 }
@@ -291,7 +357,16 @@ function createInitialChannels(): ChannelData[] {
 export function calculateChannelMetrics(
   channel: ChannelData,
   totalBudget: number,
-  multipliers: GlobalMultipliers
+  multipliers: GlobalMultipliers,
+  /**
+   * Optional pre-computed spend for this channel. When supplied (e.g. from pool-aware
+   * selectors that account for fixed-fee channels), it takes precedence over the default
+   * allocationPct × totalBudget × spendMultiplier formula.
+   * This is the single source of truth for spend; callers should not overwrite
+   * `metrics.spend` after calling this function.
+   */
+  spendOverride?: number,
+  geoProfile?: GeoMarketProfile
 ): CalculatedChannelMetrics {
   // Ghost Math: If inactive, return zeroed metrics
   if (channel.isActive === false) {
@@ -309,8 +384,13 @@ export function calculateChannelMetrics(
     };
   }
 
-  // Spend = allocation × budget × spend multiplier
-  const spend = (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
+  // Spend: use the pool-aware override when provided; otherwise fall back to the simple formula.
+  // The spendMultiplier is only applied to the fallback path — pool-aware callers already
+  // factor the multiplier into the variable pool calculation.
+  const spend =
+    spendOverride !== undefined
+      ? spendOverride
+      : (channel.allocationPct / 100) * totalBudget * multipliers.spendMultiplier;
 
   // Apply Multipliers to Config
   // 1. CTR Bump
@@ -328,6 +408,14 @@ export function calculateChannelMetrics(
     effectivePrice = multipliers.defaultCpmOverride;
   }
 
+  const resolvedGeoProfile =
+    geoProfile ??
+    getGeoMarketProfile(
+      useMediaPlanStore.getState().activeTiers,
+      useMediaPlanStore.getState().activeGeos,
+      useMediaPlanStore.getState().geoOverrides
+    );
+
   // Construct effective config
   const effectiveConfig: ChannelTypeConfig = {
     ...channel.typeConfig,
@@ -338,7 +426,30 @@ export function calculateChannelMetrics(
     },
   };
 
-  const unified = calculateUnifiedMetrics(effectiveConfig, spend, multipliers.playerValue);
+  const geoPlayerValue = resolvedGeoProfile?.blendedLtv ?? multipliers.playerValue;
+  const baseUnified = calculateUnifiedMetrics(effectiveConfig, spend, geoPlayerValue);
+
+  const targetGeoCpa = resolvedGeoProfile?.blendedCpa ?? null;
+  const adjustedConversionRate =
+    targetGeoCpa && baseUnified.cpa && baseUnified.cpa > 0
+      ? Math.max(
+          0.1,
+          Math.min(
+            45,
+            (effectiveConfig.baselineMetrics.conversionRate || 1) * (baseUnified.cpa / targetGeoCpa)
+          )
+        )
+      : effectiveConfig.baselineMetrics.conversionRate || 0;
+
+  const geoAdjustedConfig: ChannelTypeConfig = {
+    ...effectiveConfig,
+    baselineMetrics: {
+      ...effectiveConfig.baselineMetrics,
+      conversionRate: adjustedConversionRate,
+    },
+  };
+
+  const unified = calculateUnifiedMetrics(geoAdjustedConfig, spend, geoPlayerValue);
 
   return {
     spend: unified.spend,
@@ -354,6 +465,68 @@ export function calculateChannelMetrics(
   };
 }
 
+export function getGeoMarketProfile(
+  activeTiers: GeoAllocationState,
+  activeGeos: string[],
+  geoOverrides: Record<string, GeoMarketOverride> = {}
+): GeoMarketProfile {
+  const resolveGeoBaseline = (geo: (typeof TOP_IGAMING_GEOS)[number]) => {
+    const override = geoOverrides[geo.name];
+    return {
+      cpa: override?.cpa ?? geo.baselineCpa,
+      ltv: override?.ltv ?? geo.baselineLtv,
+    };
+  };
+
+  if (activeGeos.length > 0) {
+    const selected = TOP_IGAMING_GEOS.filter((geo) => activeGeos.includes(geo.name));
+
+    if (selected.length > 0) {
+      return {
+        mode: 'geos',
+        blendedCpa:
+          selected.reduce((sum, geo) => sum + resolveGeoBaseline(geo).cpa, 0) / selected.length,
+        blendedLtv:
+          selected.reduce((sum, geo) => sum + resolveGeoBaseline(geo).ltv, 0) / selected.length,
+      };
+    }
+  }
+
+  const averageTier = (tier: GeoTierKey) => {
+    const markets = TOP_IGAMING_GEOS.filter((geo) => geo.tier === tier);
+    if (markets.length === 0) {
+      return { cpa: 0, ltv: 0 };
+    }
+
+    return {
+      cpa: markets.reduce((sum, geo) => sum + resolveGeoBaseline(geo).cpa, 0) / markets.length,
+      ltv: markets.reduce((sum, geo) => sum + resolveGeoBaseline(geo).ltv, 0) / markets.length,
+    };
+  };
+
+  const tierProfiles = {
+    tier1: averageTier('tier1'),
+    tier2: averageTier('tier2'),
+    tier3: averageTier('tier3'),
+  } as const;
+
+  const totalWeight = Math.max(1, activeTiers.tier1 + activeTiers.tier2 + activeTiers.tier3);
+
+  return {
+    mode: 'tiers',
+    blendedCpa:
+      (activeTiers.tier1 * tierProfiles.tier1.cpa +
+        activeTiers.tier2 * tierProfiles.tier2.cpa +
+        activeTiers.tier3 * tierProfiles.tier3.cpa) /
+      totalWeight,
+    blendedLtv:
+      (activeTiers.tier1 * tierProfiles.tier1.ltv +
+        activeTiers.tier2 * tierProfiles.tier2.ltv +
+        activeTiers.tier3 * tierProfiles.tier3.ltv) /
+      totalWeight,
+  };
+}
+
 // ========== STORE DEFINITION ==========
 
 export interface MediaPlanState {
@@ -363,10 +536,39 @@ export interface MediaPlanState {
   globalMultipliers: GlobalMultipliers;
   presets: Preset[];
   projectName: string;
+  isBudgetDragging: boolean;
+  budgetDragBaselineRevenue: number | null;
+  budgetDragBaselineRoas: number | null;
+  ghostProjectedRevenue: number | null;
+  activeTiers: GeoAllocationState;
+  activeGeos: string[];
+  geoOverrides: Record<string, GeoMarketOverride>;
+  observedLtv: ObservedLtvInputs;
+  subscriptionTier: SubscriptionTier;
+  userStatus: UserStatus;
+  isGenieOpen: boolean;
+  hasCompletedOnboarding: boolean;
+  onboardingVertical: Vertical | null;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
   setProjectName: (name: string) => void;
+  beginBudgetDrag: (baselineRevenue: number, baselineRoas: number) => void;
+  endBudgetDrag: () => void;
+  setGhostProjectedRevenue: (value: number | null) => void;
+  setTierAllocation: (tier: GeoTierKey, nextValue: number) => void;
+  addActiveGeo: (geoName: string) => void;
+  removeActiveGeo: (geoName: string) => void;
+  clearActiveGeos: () => void;
+  setGeoOverride: (geoName: string, override: GeoMarketOverride) => void;
+  clearGeoOverride: (geoName: string) => void;
+  setObservedLtv: (month: keyof ObservedLtvInputs, value: number | null) => void;
+  clearObservedLtv: () => void;
+  setSubscriptionTier: (tier: SubscriptionTier) => void;
+  setUserStatus: (status: UserStatus) => void;
+  setIsGenieOpen: (open: boolean) => void;
+  setHasCompletedOnboarding: (value: boolean) => void;
+  setOnboardingVertical: (v: Vertical | null) => void;
 
   // Actions - Channels
   setChannelAllocation: (channelId: string, percentage: number) => void;
@@ -421,11 +623,125 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       globalMultipliers: { ...DEFAULT_MULTIPLIERS },
       presets: [],
       projectName: 'My Media Plan',
+      isBudgetDragging: false,
+      budgetDragBaselineRevenue: null,
+      budgetDragBaselineRoas: null,
+      ghostProjectedRevenue: null,
+      activeTiers: { ...TIER_DEFAULTS },
+      activeGeos: [],
+      geoOverrides: {},
+      observedLtv: {
+        m1: null,
+        m3: null,
+        m6: null,
+      },
+      subscriptionTier: 'free',
+      userStatus: 'demo',
+      isGenieOpen: false,
+      hasCompletedOnboarding: false,
+      onboardingVertical: null,
 
       // Budget
       setTotalBudget: (value) =>
         set({ totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, value)) }),
       setProjectName: (name) => set({ projectName: name }),
+      beginBudgetDrag: (baselineRevenue, baselineRoas) =>
+        set({
+          isBudgetDragging: true,
+          budgetDragBaselineRevenue: baselineRevenue,
+          budgetDragBaselineRoas: baselineRoas,
+        }),
+      endBudgetDrag: () =>
+        set({
+          isBudgetDragging: false,
+          budgetDragBaselineRevenue: null,
+          budgetDragBaselineRoas: null,
+        }),
+      setGhostProjectedRevenue: (value) => set({ ghostProjectedRevenue: value }),
+      setTierAllocation: (tier, nextValue) => {
+        set((state) => {
+          const clamped = Math.max(0, Math.min(100, nextValue));
+          const otherTiers = (Object.keys(state.activeTiers) as GeoTierKey[]).filter(
+            (key) => key !== tier
+          );
+          const remaining = Math.max(0, 100 - clamped);
+          const currentOtherTotal = otherTiers.reduce(
+            (sum, key) => sum + state.activeTiers[key],
+            0
+          );
+
+          const nextTiers = { ...state.activeTiers, [tier]: clamped };
+
+          if (currentOtherTotal === 0) {
+            const equalShare = remaining / otherTiers.length;
+            otherTiers.forEach((key) => {
+              nextTiers[key] = Number(equalShare.toFixed(2));
+            });
+          } else {
+            otherTiers.forEach((key) => {
+              nextTiers[key] = Number(
+                ((state.activeTiers[key] / currentOtherTotal) * remaining).toFixed(2)
+              );
+            });
+          }
+
+          const sum = Object.values(nextTiers).reduce((acc, value) => acc + value, 0);
+          const drift = Number((100 - sum).toFixed(2));
+          if (Math.abs(drift) > 0) {
+            const repairKey = otherTiers[0] ?? tier;
+            nextTiers[repairKey] = Number((nextTiers[repairKey] + drift).toFixed(2));
+          }
+
+          return { activeTiers: nextTiers };
+        });
+      },
+      addActiveGeo: (geoName) =>
+        set((state) => ({
+          activeGeos: state.activeGeos.includes(geoName)
+            ? state.activeGeos
+            : [...state.activeGeos, geoName],
+        })),
+      removeActiveGeo: (geoName) =>
+        set((state) => ({
+          activeGeos: state.activeGeos.filter((item) => item !== geoName),
+        })),
+      clearActiveGeos: () => set({ activeGeos: [] }),
+      setGeoOverride: (geoName, override) =>
+        set((state) => ({
+          geoOverrides: {
+            ...state.geoOverrides,
+            [geoName]: {
+              ...(state.geoOverrides[geoName] ?? {}),
+              ...override,
+            },
+          },
+        })),
+      clearGeoOverride: (geoName) =>
+        set((state) => {
+          const nextOverrides = { ...state.geoOverrides };
+          delete nextOverrides[geoName];
+          return { geoOverrides: nextOverrides };
+        }),
+      setObservedLtv: (month, value) =>
+        set((state) => ({
+          observedLtv: {
+            ...state.observedLtv,
+            [month]: value,
+          },
+        })),
+      clearObservedLtv: () =>
+        set({
+          observedLtv: {
+            m1: null,
+            m3: null,
+            m6: null,
+          },
+        }),
+      setSubscriptionTier: (tier) => set({ subscriptionTier: tier }),
+      setUserStatus: (status) => set({ userStatus: status }),
+      setIsGenieOpen: (open) => set({ isGenieOpen: open }),
+      setHasCompletedOnboarding: (value) => set({ hasCompletedOnboarding: value }),
+      setOnboardingVertical: (v) => set({ onboardingVertical: v }),
 
       // Channel allocation
       setChannelAllocation: (channelId, percentage) => {
@@ -567,15 +883,17 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       addChannel: (channelData) => {
         set((state) => {
-          const id = `channel-${Date.now()}`;
-          const family = channelData.family ?? inferChannelFamily(channelData.name);
+          const id = crypto.randomUUID();
+          // Defensively sanitize channel name to prevent XSS
+          const sanitizedName = sanitizeChannelName(channelData.name) ?? 'Unnamed Channel';
+          const family = channelData.family ?? inferChannelFamily(sanitizedName);
           // Auto-sensing defaults
           const likelyModel = getLikelyModel(channelData.category);
           const buyingModel = channelData.buyingModel ?? likelyModel;
 
           const newChannel: ChannelData = {
             id,
-            name: channelData.name,
+            name: sanitizedName,
             category: channelData.category,
             allocationPct: 5,
             family,
@@ -651,12 +969,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         if (!cpaTarget && !roasTarget) return;
 
         // Calculate metrics for each channel
-        const channelsWithMetrics = state.channels.map((ch) => ({
-          ...ch,
-          metrics: calculateChannelMetrics(ch, state.totalBudget, state.globalMultipliers),
-          aboveCpaTarget: false, // Not needed for calculation but fitting the type
-          belowRoasTarget: false,
-        })) as ChannelWithMetrics[]; // Casting mainly because we don't need the boolean flags for the calc
+        const channelsWithMetrics = state.channels
+          .filter((ch) => ch.isActive !== false)
+          .map((ch) => ({
+            ...ch,
+            metrics: calculateChannelMetrics(ch, state.totalBudget, state.globalMultipliers),
+            aboveCpaTarget: false, // Not needed for calculation but fitting the type
+            belowRoasTarget: false,
+          })) as ChannelWithMetrics[]; // Casting mainly because we don't need the boolean flags for the calc
+
+        if (channelsWithMetrics.length === 0) return;
 
         // Calculate new allocations based on weighted scoring
         const newAllocations = calculateScoredAllocation(
@@ -666,18 +988,18 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         );
 
         set({
-          channels: state.channels.map((ch) => {
-            if (ch.locked) return ch;
-            // Apply new allocation if calculated
-            if (newAllocations[ch.id] !== undefined) {
-              return { ...ch, allocationPct: newAllocations[ch.id] };
-            }
-            return ch;
-          }),
+          channels: normalizeAllocationsUtil(
+            state.channels.map((ch) => {
+              // Preserve locked and ghost channels exactly as-is.
+              if (ch.locked || ch.isActive === false) return ch;
+              // Apply new allocation if calculated.
+              if (newAllocations[ch.id] !== undefined) {
+                return { ...ch, allocationPct: newAllocations[ch.id] };
+              }
+              return ch;
+            })
+          ),
         });
-
-        // Ensure normalization maintains 100% total
-        get().normalizeAllocations();
       },
 
       // Presets
@@ -688,6 +1010,8 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             totalBudget: state.totalBudget,
             channels: JSON.parse(JSON.stringify(state.channels)),
             globalMultipliers: { ...state.globalMultipliers },
+            activeTiers: { ...state.activeTiers },
+            activeGeos: [...state.activeGeos],
           };
 
           const existing = state.presets.filter((p) => p.name !== name);
@@ -704,6 +1028,8 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             totalBudget: preset.totalBudget,
             channels: JSON.parse(JSON.stringify(preset.channels)),
             globalMultipliers: { ...preset.globalMultipliers },
+            activeTiers: { ...TIER_DEFAULTS, ...(preset.activeTiers ?? {}) },
+            activeGeos: [...(preset.activeGeos ?? [])],
           };
         });
       },
@@ -813,6 +1139,14 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             cpaTarget: null,
             roasTarget: null,
           },
+          activeTiers: { ...TIER_DEFAULTS },
+          activeGeos: [],
+          geoOverrides: {},
+          observedLtv: {
+            m1: null,
+            m3: null,
+            m6: null,
+          },
         });
       },
 
@@ -859,8 +1193,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         channels: state.channels,
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
+        activeTiers: state.activeTiers,
+        activeGeos: state.activeGeos,
+        geoOverrides: state.geoOverrides,
+        observedLtv: state.observedLtv,
+        subscriptionTier: state.subscriptionTier,
+        userStatus: state.userStatus,
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
+        onboardingVertical: state.onboardingVertical,
       }),
-      version: 3, // Increment version to force migration/reset
+      version: 7,
       migrate: (persistedState: unknown, version) => {
         const safeState = (persistedState ?? {}) as Partial<MediaPlanState> & {
           channels?: Array<Partial<ChannelData>>;
@@ -883,6 +1225,44 @@ export const useMediaPlanStore = create<MediaPlanState>()(
               ...ch,
               isActive: ch.isActive ?? true,
             })),
+            activeTiers: { ...TIER_DEFAULTS },
+            activeGeos: [],
+          } as MediaPlanState;
+        }
+        if (version < 4) {
+          return {
+            ...safeState,
+            activeTiers: {
+              ...TIER_DEFAULTS,
+              ...(safeState as Partial<MediaPlanState>).activeTiers,
+            },
+            activeGeos: (safeState as Partial<MediaPlanState>).activeGeos ?? [],
+            subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
+            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
+          } as MediaPlanState;
+        }
+        if (version < 5) {
+          return {
+            ...safeState,
+            subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
+            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
+          } as MediaPlanState;
+        }
+        if (version < 6) {
+          return {
+            ...safeState,
+            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
+          } as MediaPlanState;
+        }
+        if (version < 7) {
+          return {
+            ...safeState,
+            geoOverrides: (safeState as Partial<MediaPlanState>).geoOverrides ?? {},
+            observedLtv: (safeState as Partial<MediaPlanState>).observedLtv ?? {
+              m1: null,
+              m3: null,
+              m6: null,
+            },
           } as MediaPlanState;
         }
         return safeState as MediaPlanState;
@@ -893,50 +1273,104 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
 // ========== SELECTOR HOOKS ==========
 
+/**
+ * Determines whether a channel uses a fixed-cost buying model whose spend is set
+ * by `typeConfig.price` rather than by the percentage allocation pool.
+ */
+function isFixedCostChannel(channel: ChannelData): boolean {
+  return (
+    channel.buyingModel === 'FLAT_FEE' ||
+    channel.buyingModel === 'RETAINER' ||
+    channel.tier === 'fixed'
+  );
+}
+
+/**
+ * Single source of truth for channel spend. Fixed-cost channels consume their
+ * `typeConfig.price` directly; variable channels draw from the pool that remains
+ * after all fixed costs are subtracted from the total budget.
+ *
+ * Variable channel allocationPcts are normalised within the variable cohort so
+ * that the full variable pool is always consumed (no silent budget leakage when
+ * fixed channels hold a portion of the 0–100% allocation space).
+ *
+ * The spendMultiplier is applied to variable channels only (fixed costs are
+ * contractually fixed and should not be scaled by a global multiplier).
+ *
+ * @param variableAllocTotal  Sum of allocationPct across ALL active variable
+ *   channels in the plan. Used to normalise this channel's share of the pool.
+ *   Pass 0 to fall back to raw allocationPct / 100 (gives 0 spend if all
+ *   variable channels are at 0%).
+ */
+export function computePoolAwareSpend(
+  channel: ChannelData,
+  variablePool: number,
+  variableAllocTotal: number,
+  multipliers: Pick<GlobalMultipliers, 'spendMultiplier'>
+): number {
+  if (channel.isActive === false) return 0;
+  if (isFixedCostChannel(channel)) {
+    return channel.typeConfig?.price || 0;
+  }
+  const safeAlloc = channel.allocationPct || 0;
+  // Normalise within the variable cohort so 100% of the pool is always deployed.
+  const normalisedShare = variableAllocTotal > 0 ? safeAlloc / variableAllocTotal : 0;
+  return variablePool * normalisedShare * multipliers.spendMultiplier;
+}
+
+const DEFAULT_MULTIPLIERS_FALLBACK: GlobalMultipliers = {
+  spendMultiplier: 1,
+  defaultCpmOverride: null,
+  ctrBump: 0,
+  cpaTarget: null,
+  roasTarget: null,
+  playerValue: 150,
+};
+
 export function useChannelsWithMetrics(): ChannelWithMetrics[] {
   const totalBudget = useMediaPlanStore((state) => state.totalBudget);
   const channels = useMediaPlanStore((state) => state.channels);
   const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
+  const activeTiers = useMediaPlanStore((state) => state.activeTiers);
+  const activeGeos = useMediaPlanStore((state) => state.activeGeos);
+  const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
 
   return useMemo(() => {
-    const { cpaTarget, roasTarget } = globalMultipliers || {}; // Safety check
+    const mults = globalMultipliers || DEFAULT_MULTIPLIERS_FALLBACK;
+    const { cpaTarget, roasTarget } = mults;
+    const geoProfile = getGeoMarketProfile(activeTiers, activeGeos, geoOverrides);
 
     if (!Array.isArray(channels)) return [];
 
-    // --- SUBTRACTIVE LOGIC applied to Store Selector ---
-    const fixedChannels = channels.filter(
-      (ch) => ch.buyingModel === 'FLAT_FEE' || ch.buyingModel === 'RETAINER' || ch.tier === 'fixed'
-    );
-    const totalFixedSpend = fixedChannels.reduce((sum, ch) => sum + (ch.typeConfig?.price || 0), 0);
+    // Build the variable pool once: total budget minus all fixed-cost channel prices.
+    const totalFixedSpend = channels
+      .filter(isFixedCostChannel)
+      .reduce((sum, ch) => sum + (ch.typeConfig?.price || 0), 0);
     const variablePool = Math.max(0, totalBudget - totalFixedSpend);
 
-    return channels.map((channel) => {
-      let spend = 0;
-      const isFixed =
-        channel.buyingModel === 'FLAT_FEE' ||
-        channel.buyingModel === 'RETAINER' ||
-        channel.tier === 'fixed';
+    // Sum of allocationPcts across active variable channels only — used to
+    // normalise each channel's share so the full variable pool is deployed.
+    const variableAllocTotal = channels
+      .filter((ch) => ch.isActive !== false && !isFixedCostChannel(ch))
+      .reduce((sum, ch) => sum + (ch.allocationPct || 0), 0);
 
-      if (isFixed) {
-        spend = channel.typeConfig?.price || 0;
-      } else {
-        const safeAlloc = channel.allocationPct || 0;
-        spend = (variablePool * safeAlloc) / 100;
-      }
+    return channels.map((channel) => {
+      // Pool-aware spend is the single source of truth — passed directly into
+      // calculateChannelMetrics so no post-hoc overwrite is needed.
+      const poolAwareSpend = computePoolAwareSpend(
+        channel,
+        variablePool,
+        variableAllocTotal,
+        mults
+      );
 
       const metrics = calculateChannelMetrics(
         channel,
         totalBudget,
-        globalMultipliers || {
-          spendMultiplier: 1,
-          defaultCpmOverride: null,
-          ctrBump: 0,
-          cpaTarget: null,
-          roasTarget: null,
-          playerValue: 150,
-        }
+        mults,
+        poolAwareSpend,
+        geoProfile
       );
-      metrics.spend = spend;
 
       const aboveCpaTarget = !!(cpaTarget && metrics.cpa && metrics.cpa > cpaTarget);
       const belowRoasTarget = !!(roasTarget && metrics.roas < roasTarget);
@@ -948,13 +1382,16 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
         belowRoasTarget,
       };
     });
-  }, [channels, globalMultipliers, totalBudget]);
+  }, [activeGeos, activeTiers, channels, geoOverrides, globalMultipliers, totalBudget]);
 }
 
 export function useBlendedMetrics(): BlendedMetrics {
   const totalBudget = useMediaPlanStore((state) => state.totalBudget);
   const channels = useMediaPlanStore((state) => state.channels);
   const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
+  const activeTiers = useMediaPlanStore((state) => state.activeTiers);
+  const activeGeos = useMediaPlanStore((state) => state.activeGeos);
+  const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
 
   return useMemo(() => {
     if (totalBudget === 0) {
@@ -969,14 +1406,40 @@ export function useBlendedMetrics(): BlendedMetrics {
       };
     }
 
+    const mults = globalMultipliers || DEFAULT_MULTIPLIERS_FALLBACK;
+    const geoProfile = getGeoMarketProfile(activeTiers, activeGeos, geoOverrides);
+
+    // Mirror the same pool-aware spend logic used in useChannelsWithMetrics so that
+    // blended totals are always consistent with per-channel display values.
+    const safeChannels = channels || [];
+    const totalFixedSpend = safeChannels
+      .filter(isFixedCostChannel)
+      .reduce((sum, ch) => sum + (ch.typeConfig?.price || 0), 0);
+    const variablePool = Math.max(0, totalBudget - totalFixedSpend);
+    const variableAllocTotal = safeChannels
+      .filter((ch) => ch.isActive !== false && !isFixedCostChannel(ch))
+      .reduce((sum, ch) => sum + (ch.allocationPct || 0), 0);
+
     let totalSpend = 0;
     let totalImpressions = 0;
     let totalClicks = 0;
     let totalConversions = 0;
     let totalRevenue = 0;
 
-    channels.forEach((channel) => {
-      const metrics = calculateChannelMetrics(channel, totalBudget, globalMultipliers);
+    safeChannels.forEach((channel) => {
+      const poolAwareSpend = computePoolAwareSpend(
+        channel,
+        variablePool,
+        variableAllocTotal,
+        mults
+      );
+      const metrics = calculateChannelMetrics(
+        channel,
+        totalBudget,
+        mults,
+        poolAwareSpend,
+        geoProfile
+      );
       totalSpend += metrics.spend;
       totalImpressions += metrics.impressions;
       totalClicks += metrics.clicks;
@@ -993,7 +1456,18 @@ export function useBlendedMetrics(): BlendedMetrics {
       projectedRevenue: totalRevenue,
       blendedRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
     };
-  }, [channels, globalMultipliers, totalBudget]);
+  }, [activeGeos, activeTiers, channels, geoOverrides, globalMultipliers, totalBudget]);
+}
+
+export function useGeoMarketProfile(): GeoMarketProfile {
+  const activeTiers = useMediaPlanStore((state) => state.activeTiers);
+  const activeGeos = useMediaPlanStore((state) => state.activeGeos);
+  const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
+
+  return useMemo(
+    () => getGeoMarketProfile(activeTiers, activeGeos, geoOverrides),
+    [activeGeos, activeTiers, geoOverrides]
+  );
 }
 
 export function useCategoryTotals(): Record<string, { spend: number; percentage: number }> {
@@ -1012,6 +1486,46 @@ export function useCategoryTotals(): Record<string, { spend: number; percentage:
     });
 
     return totals;
+  }, [channelsWithMetrics]);
+}
+
+export function useFtdVelocityMetrics(): FtdVelocityMetrics {
+  const channelsWithMetrics = useChannelsWithMetrics();
+
+  return useMemo(() => {
+    const unlocked = channelsWithMetrics.filter((channel) => !channel.locked && channel.isActive);
+
+    const totalImpressions = unlocked.reduce(
+      (sum, channel) => sum + channel.metrics.impressions,
+      0
+    );
+    const rawClicks = unlocked.reduce((sum, channel) => sum + channel.metrics.clicks, 0);
+    const qualityClicks = rawClicks * 0.9;
+    const ftds = unlocked.reduce((sum, channel) => sum + channel.metrics.conversions, 0);
+
+    // Operational funnel assumption for iGaming: ~42% registration-to-FTD conversion.
+    const registrationToFtdRate = 0.42;
+    const registrations = ftds > 0 ? ftds / registrationToFtdRate : 0;
+
+    const projectedRevenue = unlocked.reduce((sum, channel) => sum + channel.metrics.revenue, 0);
+    // Approximate NGR after bonus, tax and platform costs.
+    const ngr = projectedRevenue * 0.78;
+
+    const impressionToClickRate = totalImpressions > 0 ? qualityClicks / totalImpressions : 0;
+    const clickToRegistrationRate = qualityClicks > 0 ? registrations / qualityClicks : 0;
+    const ngrPerFtd = ftds > 0 ? ngr / ftds : 0;
+
+    return {
+      totalImpressions,
+      qualityClicks,
+      registrations,
+      ftds,
+      ngr,
+      impressionToClickRate,
+      clickToRegistrationRate,
+      registrationToFtdRate,
+      ngrPerFtd,
+    };
   }, [channelsWithMetrics]);
 }
 

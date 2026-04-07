@@ -49,12 +49,28 @@ export function normalizeAllocations(channels: ChannelData[]): ChannelData[] {
     // 5. Calculate Scalar for Unlocked
     const currentUnlockedTotal = unlockedChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);
 
-    // Guard: If current unlocked total is 0, we can't scale 0 to match the pool.
-    // Unless the pool is also 0.
-    // If pool > 0 and total is 0, we might need to seed them? 
-    // Or just leave them at 0 and have < 100% total (user error).
-    // But strict normalization requests 100%.
-    // We'll proceed with scalar logic.
+    // 5a. Edge case: all unlocked channels are at 0% but the pool is non-zero.
+    //    This happens when a user locks all channels at a combined <100% and the
+    //    remaining unlocked channels have been zeroed out.
+    //    Rather than leaving them at 0 (which produces a sum < 100%), distribute
+    //    the remaining pool equally among the unlocked channels.
+    if (currentUnlockedTotal === 0 && remainingPool > 0 && unlockedChannels.length > 0) {
+        const equalShare = remainingPool / unlockedChannels.length;
+        const seeded = unlockedChannels.map(ch => ({
+            ...ch,
+            allocationPct: equalShare,
+        }));
+        // Rebuild active set with seeded values, then re-enter normalization below.
+        // We assign back and let the Largest Remainder Method handle precision.
+        return normalizeAllocations(
+            channels.map(original => {
+                if (!isActive(original)) return original;
+                if (original.locked) return original;
+                return seeded.find(s => s.id === original.id) || original;
+            })
+        );
+    }
+
     let scalar = 0;
     if (currentUnlockedTotal > 0) {
         scalar = remainingPool / currentUnlockedTotal;

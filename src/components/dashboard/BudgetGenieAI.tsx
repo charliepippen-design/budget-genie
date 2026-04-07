@@ -11,6 +11,7 @@ import {
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
 import { SettingsConsole } from './SettingsConsole';
 import { DashboardHeader } from './DashboardHeader';
+import { EfficiencyAlertBanner } from './EfficiencyAlertBanner';
 import { BudgetHero } from './BudgetHero';
 import { ChannelTable } from './ChannelTable';
 import { ProjectManager } from './ProjectManager';
@@ -30,7 +31,6 @@ import {
   exportToCsv,
   exportToExcel,
   exportToPdf,
-  exportToPng,
   exportEnterpriseConfigJson,
 } from '@/lib/export-service';
 import { useSandboxStore } from '@/store/useSandboxStore';
@@ -158,7 +158,7 @@ export const BudgetGenieAI = () => {
   }, [channels]);
 
   const handleExport = useCallback(
-    (formatType: 'pdf' | 'csv' | 'xlsx' | 'png') => {
+    (formatType: 'pdf' | 'csv' | 'xlsx') => {
       try {
         if (userStatus === 'demo') {
           toast.error(
@@ -204,10 +204,6 @@ export const BudgetGenieAI = () => {
           toast.success('Excel export complete');
           return;
         }
-
-        exportToPng().catch((error) => {
-          toast.error(error.message || 'PNG export failed');
-        });
       } catch (error) {
         toast.error(error instanceof Error ? error.message : 'Export failed');
       }
@@ -269,7 +265,12 @@ export const BudgetGenieAI = () => {
             onExport={handleExport}
             onImport={() => setIsImportOpen(true)}
             onReset={() => vm.resetAll()}
+            onLaunchMasterWizard={() => setIsBudgetWizardOpen(true)}
           />
+
+          <div className="max-w-[1600px] mx-auto w-full px-6 pt-3">
+            <EfficiencyAlertBanner />
+          </div>
 
           <main className={cn('flex-1 overflow-y-auto', isDark ? 'bg-[#020617]' : 'bg-slate-50')}>
             {/* BUDGET HERO (Big Number) */}

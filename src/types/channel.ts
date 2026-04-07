@@ -120,6 +120,12 @@ export interface ChannelTypeConfig {
     aov?: number; // Average Order Value / LTV / NGR per FTD
     trafficPerUnit?: number; // Est. Traffic for Flat Fee / Retainer
     saturationCeiling?: number; // Spend level where returns diminish significantly (Half-Efficiency point in Michaelis-Menten)
+    /**
+     * CPC channels only. Ratio of impressions per click for this channel.
+     * If omitted, impressions are back-calculated from CTR (clicks / (ctr / 100)).
+     * Explicit ratio overrides the back-calculation. Example: 50 means 1 click per 50 impressions.
+     */
+    cpcImpressionRatio?: number;
   };
 }
 
@@ -144,10 +150,12 @@ export function calculateUnifiedMetrics(
 ): UnifiedMetrics {
   const { buyingModel, price, secondaryPrice, baselineMetrics } = config;
 
-  // Defaults
-  const ctr = baselineMetrics.ctr || 1;
-  const cr = baselineMetrics.conversionRate || 2.5;
-  const aov = baselineMetrics.aov || playerValue;
+  // Defaults — use nullish coalescing (??) so an explicitly-set 0 is honoured
+  // rather than being silently replaced by the fallback value (a || b behaviour
+  // would incorrectly treat 0 the same as undefined/null).
+  const ctr = baselineMetrics.ctr ?? 1;
+  const cr = baselineMetrics.conversionRate ?? 2.5;
+  const aov = baselineMetrics.aov ?? playerValue;
 
   let ftds = 0;
   let impressions = 0;
@@ -167,7 +175,13 @@ export function calculateUnifiedMetrics(
       // Math: Budget -> Clicks -> Conv
       clicks = price > 0 ? spend / price : 0;
       ftds = clicks * (cr / 100);
-      impressions = clicks * 100; // Estimate
+      // Impressions: use explicit ratio if provided, otherwise back-calculate from CTR.
+      // Back-calculation: impressions = clicks / (ctr / 100). Guard against ctr = 0.
+      if (baselineMetrics.cpcImpressionRatio && baselineMetrics.cpcImpressionRatio > 0) {
+        impressions = clicks * baselineMetrics.cpcImpressionRatio;
+      } else {
+        impressions = ctr > 0 ? clicks / (ctr / 100) : 0;
+      }
       break;
 
     case 'CPA': // price = Target CPA
@@ -178,43 +192,31 @@ export function calculateUnifiedMetrics(
       impressions = ctr > 0 ? clicks / (ctr / 100) : 0;
       break;
 
-    case 'REV_SHARE': // price = % (Wait, secondaryPrice is %) - Let's use price as dummy or 0?
-      // The user spec said "secondaryPrice: number (Used ONLY for Hybrid RevShare %)".
-      // But for Pure RevShare, we need a percentage.
-      // Let's assume price is the percentage if model is REV_SHARE?
-      // Or maybe secondaryPrice is widely used for percentage.
-      // User Spec: "Add secondaryPrice: number (Used ONLY for Hybrid RevShare %)."
-      // Re-reading user Step 1: "Add price: number (Acts as the CPA, CPM, CPC, or Monthly Fee...)"
-      // For RevShare, usually there is no fixed price, just %.
-      // Maybe price = 0? And secondaryPrice = %.
-      // OR price = %. Let's use secondaryPrice for % as per spec for Hybrid.
-      // PROPOSAL: For pure RevShare, stick to secondaryPrice for consistency or use price as the %.
-      // Let's us price as % for purity if secondaryPrice is ONLY for hybrid.
-      // Actually, let's use secondaryPrice for consistency of "Revenue Share %".
-      // But wait, "price" is required.
-      // Let's set price = 0 for Rev Share?
-      // And use secondaryPrice for the %.
-      // Calculation: Est Revenue -> Cost.
-      // For RevShare, Spend depends on performance. It's usually output driven.
-      // But here we likely input Budget = Estimated Spend.
-      // ftds = (Spend / (AOV * RevShare%)) ?
-      // Spend = FTDs * AOV * RevShare%
-      // ftds = Spend / (AOV * (secondaryPrice/100))
+    case 'REV_SHARE':
+      // Revenue share model: the advertiser pays a % of revenue generated per FTD.
+      // secondaryPrice holds the rev-share percentage (0–100).
+      // Formula: costPerFtd = aov × (revSharePct / 100)
+      //          ftds        = spend / costPerFtd
+      // If secondaryPrice is missing or 0, the cost per FTD is indeterminate — return 0
+      // rather than producing a division-by-zero or an infinite FTD count.
       {
-        const rs = (secondaryPrice || 0) / 100;
-        const revenuePerFtd = aov;
-        const costPerFtd = revenuePerFtd * rs;
-        ftds = costPerFtd > 0 ? spend / costPerFtd : 0;
+        const revSharePct = secondaryPrice ?? 0; // intentional: 0 means unconfigured
+        if (revSharePct <= 0) {
+          // Channel is misconfigured or intentionally zero-rate — no conversions can be modelled.
+          ftds = 0;
+        } else {
+          const costPerFtd = aov * (revSharePct / 100);
+          ftds = costPerFtd > 0 ? spend / costPerFtd : 0;
+        }
       }
       break;
 
-    case 'HYBRID': // price = Base CPA, secondaryPrice = RevShare %
+    case 'HYBRID': // price = Base CPA, secondaryPrice = RevShare % (0 is valid — means no revshare component)
       {
         const baseCpa = price;
-        const rs = (secondaryPrice || 0) / 100;
-        const revenuePerFtd = aov;
-        const totalCostPerFtd = baseCpa + revenuePerFtd * rs;
-
+        const revSharePct = secondaryPrice ?? 0;
+        const totalCostPerFtd = baseCpa + aov * (revSharePct / 100);
+        // Guard: if both components are 0 the model is unconfigured.
         ftds = totalCostPerFtd > 0 ? spend / totalCostPerFtd : 0;
       }
       break;
@@ -228,7 +230,7 @@ export function calculateUnifiedMetrics(
       finalSpend = price;
       // Traffic ? baselineMetris.trafficPerUnit?
       {
-        const traffic = baselineMetrics.trafficPerUnit || 1000;
+        const traffic = baselineMetrics.trafficPerUnit ?? 0;
         clicks = traffic; // Visits
         ftds = clicks * (cr / 100);
       }
@@ -238,7 +240,7 @@ export function calculateUnifiedMetrics(
       // Same as Flat Fee
       finalSpend = price;
       {
-        const traffic = baselineMetrics.trafficPerUnit || 1000;
+        const traffic = baselineMetrics.trafficPerUnit ?? 0;
         clicks = traffic;
         ftds = clicks * (cr / 100);
       }
@@ -248,9 +250,11 @@ export function calculateUnifiedMetrics(
   // 1. Calculate Linear Revenue (Pre-Saturation)
   let revenue = ftds * playerValue;
 
-  // 2. Apply Diminishing Returns (Saturation)
-  // Formula: Revenue = LinearRevenue * (1 / (1 + (Spend / Saturation)))
-  // Ideally, SaturationCeiling is the point where efficiency is halved.
+  // 2. Apply Diminishing Returns (Saturation — Michaelis-Menten decay)
+  // Formula: Revenue = LinearRevenue × (1 / (1 + Spend / SaturationCeiling))
+  // SaturationCeiling is the spend level where efficiency is exactly halved.
+  // NOTE: If saturationCeiling is 0 or undefined, the decay is intentionally skipped.
+  // Set a meaningful saturationCeiling on each channel to model real-world diminishing returns.
   const saturation = baselineMetrics.saturationCeiling;
 
   if (saturation && saturation > 0 && finalSpend > 0) {
