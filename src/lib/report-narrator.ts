@@ -80,7 +80,10 @@ customer acquisition cost.
     });
     return result.object;
   } catch (error) {
-    console.warn('Report narrator: Primary model (gemini-2.0-flash) failed. Trying fallback...', error);
+    console.warn(
+      'Report narrator: Primary model (gemini-2.0-flash) failed. Trying fallback...',
+      error
+    );
     try {
       const result = await generateObject({
         model: google('gemini-1.5-flash-latest'),

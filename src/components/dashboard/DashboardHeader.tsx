@@ -108,7 +108,7 @@ export function DashboardHeader({
               acquisition stack is licensed.
             </div>
             <Button
-              className="h-14 w-full animate-pulse bg-gradient-to-r from-cyan-500 to-blue-600 text-lg font-black text-white hover:from-cyan-600 hover:to-blue-700"
+              className="h-14 w-full animate-pulse-slow bg-gradient-to-r from-cyan-500 to-blue-600 text-lg font-black text-white hover:from-cyan-600 hover:to-blue-700"
               onClick={() => (window.location.href = '/settings')}
             >
               Upgrade Now
