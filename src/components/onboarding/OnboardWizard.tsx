@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Users, TrendingUp, FlaskConical, Shield, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
@@ -143,6 +143,10 @@ export const OnboardWizard = () => {
   });
   const [selectedBudgetTierKey, setSelectedBudgetTierKey] = useState<string | null>(null);
   const [statusIndex, setStatusIndex] = useState(0);
+  const [isContinueAttentionActive, setIsContinueAttentionActive] = useState(false);
+  const [showContinueLetsGo, setShowContinueLetsGo] = useState(false);
+  const continuePulseTimerRef = useRef<number | null>(null);
+  const continueLabelTimerRef = useRef<number | null>(null);
 
   const selectedBudgetTier = useMemo(
     () => BUDGET_TIERS.find((tier) => tier.key === selectedBudgetTierKey) ?? null,
@@ -165,6 +169,26 @@ export const OnboardWizard = () => {
     if (!selectedBudgetTierKey || !isBudgetValid) return;
     goToStep(2);
   }, [goToStep, isBudgetValid, selectedBudgetTierKey]);
+
+  const triggerStepOneContinueAttention = useCallback(() => {
+    if (continuePulseTimerRef.current) {
+      window.clearTimeout(continuePulseTimerRef.current);
+    }
+    if (continueLabelTimerRef.current) {
+      window.clearTimeout(continueLabelTimerRef.current);
+    }
+
+    setIsContinueAttentionActive(true);
+    setShowContinueLetsGo(true);
+
+    continuePulseTimerRef.current = window.setTimeout(() => {
+      setIsContinueAttentionActive(false);
+    }, 600);
+
+    continueLabelTimerRef.current = window.setTimeout(() => {
+      setShowContinueLetsGo(false);
+    }, 1000);
+  }, []);
 
   const selectVertical = useCallback(
     (vertical: Vertical) => {
@@ -334,6 +358,17 @@ export const OnboardWizard = () => {
   }, [state.step]);
 
   useEffect(() => {
+    return () => {
+      if (continuePulseTimerRef.current) {
+        window.clearTimeout(continuePulseTimerRef.current);
+      }
+      if (continueLabelTimerRef.current) {
+        window.clearTimeout(continueLabelTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -401,12 +436,18 @@ export const OnboardWizard = () => {
                         : 'border-slate-700 bg-slate-900 hover:border-slate-500 hover:bg-slate-800/60'
                     }`}
                     onClick={() => {
+                      if (!selectedBudgetTierKey) {
+                        triggerStepOneContinueAttention();
+                      }
                       setSelectedBudgetTierKey(tier.key);
                       setState((prev) => ({ ...prev, budget: tier.midpoint }));
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
                         event.preventDefault();
+                        if (!selectedBudgetTierKey) {
+                          triggerStepOneContinueAttention();
+                        }
                         setSelectedBudgetTierKey(tier.key);
                         setState((prev) => ({ ...prev, budget: tier.midpoint }));
                       }
@@ -461,11 +502,13 @@ export const OnboardWizard = () => {
 
             <div className="mt-12 flex justify-end">
               <Button
-                className="bg-indigo-600 px-7 text-base hover:bg-indigo-500"
+                className={`bg-indigo-600 px-7 text-base hover:bg-indigo-500 ${
+                  isContinueAttentionActive ? 'animate-pulse' : ''
+                }`}
                 disabled={!selectedBudgetTierKey}
                 onClick={continueFromBudget}
               >
-                Continue -&gt;
+                {showContinueLetsGo ? "Continue → Let's go" : 'Continue →'}
               </Button>
             </div>
           </section>
@@ -507,6 +550,17 @@ export const OnboardWizard = () => {
                   </Card>
                 );
               })}
+            </div>
+
+            <div className="mt-10 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:bg-slate-900 hover:text-white"
+                onClick={() => goToStep(1)}
+              >
+                ← Back
+              </Button>
+              <p className="text-sm text-slate-500">Select a vertical to continue</p>
             </div>
           </section>
         )}
@@ -553,6 +607,17 @@ export const OnboardWizard = () => {
                   </Card>
                 );
               })}
+            </div>
+
+            <div className="mt-10 flex items-center justify-between">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:bg-slate-900 hover:text-white"
+                onClick={() => goToStep(2)}
+              >
+                ← Back
+              </Button>
+              <p className="text-sm text-slate-500">Select a goal to continue</p>
             </div>
           </section>
         )}
@@ -602,20 +667,29 @@ export const OnboardWizard = () => {
             <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
               <Button
                 variant="ghost"
-                className="text-slate-300 hover:bg-slate-900 hover:text-white"
-                onClick={() => {
-                  setState((prev) => ({ ...prev, geos: [] }));
-                  goToStep(5);
-                }}
+                className="text-muted-foreground hover:bg-slate-900 hover:text-white"
+                onClick={() => goToStep(3)}
               >
-                Skip - use global defaults
+                ← Back
               </Button>
-              <Button
-                className="bg-indigo-600 px-7 hover:bg-indigo-500"
-                onClick={() => goToStep(5)}
-              >
-                Continue -&gt;
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  variant="ghost"
+                  className="text-slate-300 hover:bg-slate-900 hover:text-white"
+                  onClick={() => {
+                    setState((prev) => ({ ...prev, geos: [] }));
+                    goToStep(5);
+                  }}
+                >
+                  Skip - use global defaults
+                </Button>
+                <Button
+                  className="bg-indigo-600 px-7 hover:bg-indigo-500"
+                  onClick={() => goToStep(5)}
+                >
+                  Continue -&gt;
+                </Button>
+              </div>
             </div>
           </section>
         )}
@@ -687,17 +761,26 @@ export const OnboardWizard = () => {
             <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
               <Button
                 variant="ghost"
-                className="text-slate-300 hover:bg-slate-900 hover:text-white"
-                onClick={() => void applyPlan(false)}
+                className="text-muted-foreground hover:bg-slate-900 hover:text-white"
+                onClick={() => goToStep(4)}
               >
-                Skip - use defaults
+                ← Back
               </Button>
-              <Button
-                className="h-12 bg-indigo-600 px-8 text-base hover:bg-indigo-500"
-                onClick={() => void applyPlan(true)}
-              >
-                Build my plan -&gt;
-              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  variant="ghost"
+                  className="text-slate-300 hover:bg-slate-900 hover:text-white"
+                  onClick={() => void applyPlan(false)}
+                >
+                  Skip - use defaults
+                </Button>
+                <Button
+                  className="h-12 bg-indigo-600 px-8 text-base hover:bg-indigo-500"
+                  onClick={() => void applyPlan(true)}
+                >
+                  Build my plan -&gt;
+                </Button>
+              </div>
             </div>
           </section>
         )}

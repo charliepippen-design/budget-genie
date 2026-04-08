@@ -4,6 +4,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { useFtdVelocityMetrics } from '@/hooks/use-media-plan-store';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
 
 interface FunnelNodeProps {
   label: string;
@@ -34,9 +35,23 @@ function FunnelNode({ label, value, subMetric, delta, tone, isDark }: FunnelNode
         !isDark && 'bg-white/80'
       )}
     >
-      <p className={cn("text-[11px] uppercase tracking-[0.14em]", isDark ? "text-slate-400" : "text-slate-500")}>{label}</p>
+      <p
+        className={cn(
+          'text-[11px] uppercase tracking-[0.14em]',
+          isDark ? 'text-slate-400' : 'text-slate-500'
+        )}
+      >
+        {label}
+      </p>
       <div className="mt-2 flex items-center gap-2">
-        <p className={cn("text-3xl font-black tracking-tight", isDark ? "text-slate-100" : "text-slate-900")}>{value}</p>
+        <p
+          className={cn(
+            'text-3xl font-black tracking-tight',
+            isDark ? 'text-slate-100' : 'text-slate-900'
+          )}
+        >
+          {value}
+        </p>
         {delta !== 0 ? (
           <span
             className={cn(
@@ -49,7 +64,9 @@ function FunnelNode({ label, value, subMetric, delta, tone, isDark }: FunnelNode
           </span>
         ) : null}
       </div>
-      <p className={cn("mt-2 text-xs", isDark ? "text-slate-400" : "text-slate-500")}>{subMetric}</p>
+      <p className={cn('mt-2 text-xs', isDark ? 'text-slate-400' : 'text-slate-500')}>
+        {subMetric}
+      </p>
     </div>
   );
 }
@@ -58,6 +75,7 @@ export function FTDVelocityEngine() {
   const { theme } = useTheme();
   const { format } = useCurrency();
   const metrics = useFtdVelocityMetrics();
+  const vc = useVerticalConfig();
   const isDark = theme === 'dark' || theme === 'contrast';
 
   const previousRef = useRef(metrics);
@@ -71,9 +89,8 @@ export function FTDVelocityEngine() {
 
   useEffect(() => {
     const previous = previousRef.current;
-    const computeDelta = (current: number, oldValue: number) =>
-      oldValue > 0 ? ((current - oldValue) / oldValue) * 100 : 0;
-
+    const computeDelta = (current: number, old: number) =>
+      old > 0 ? ((current - old) / old) * 100 : 0;
     setDeltas({
       impressions: computeDelta(metrics.totalImpressions, previous.totalImpressions),
       clicks: computeDelta(metrics.qualityClicks, previous.qualityClicks),
@@ -81,7 +98,6 @@ export function FTDVelocityEngine() {
       ftds: computeDelta(metrics.ftds, previous.ftds),
       ngr: computeDelta(metrics.ngr, previous.ngr),
     });
-
     previousRef.current = metrics;
   }, [metrics]);
 
@@ -97,33 +113,34 @@ export function FTDVelocityEngine() {
       {
         label: 'Quality Clicks',
         value: Math.round(metrics.qualityClicks).toLocaleString('en-US'),
-        subMetric: `${(metrics.clickToRegistrationRate * 100).toFixed(2)}% Click-to-Reg`,
+        subMetric: `${(metrics.clickToRegistrationRate * 100).toFixed(2)}% Click-to-${vc.terms.registrationLabel}`,
         delta: deltas.clicks,
         tone: 'cyan' as const,
       },
       {
-        label: 'Registrations',
+        label: vc.terms.registrationLabel,
         value: Math.round(metrics.registrations).toLocaleString('en-US'),
-        subMetric: `${(metrics.registrationToFtdRate * 100).toFixed(1)}% Reg-to-FTD`,
+        subMetric: `${(metrics.registrationToFtdRate * 100).toFixed(1)}% ${vc.terms.regToConversionRateLabel}`,
         delta: deltas.registrations,
         tone: 'violet' as const,
       },
       {
-        label: 'FTDs',
+        label: vc.terms.conversionPlural,
         value: Math.round(metrics.ftds).toLocaleString('en-US'),
-        subMetric: `${format(metrics.ngrPerFtd)} NGR/FTD`,
+        subMetric: `${format(metrics.ngrPerFtd)} ${vc.terms.revenuePerConversionLabel}`,
         delta: deltas.ftds,
         tone: 'emerald' as const,
       },
       {
-        label: 'Net Gaming Revenue',
+        label: vc.terms.revenueMetric,
         value: format(metrics.ngr),
-        subMetric: 'Post-bonus & cost adjusted',
+        subMetric:
+          vc.vertical === 'igaming' ? 'Post-bonus & cost adjusted' : 'Projected gross revenue',
         delta: deltas.ngr,
         tone: 'amber' as const,
       },
     ],
-    [deltas, format, metrics]
+    [deltas, format, metrics, vc]
   );
 
   return (
@@ -139,9 +156,8 @@ export function FTDVelocityEngine() {
           isDark ? 'text-slate-300' : 'text-slate-700'
         )}
       >
-        Macro Velocity & FTD Engine
+        {vc.terms.velocityEngineTitle}
       </h2>
-
       <div className="flex flex-row items-stretch justify-between gap-4 overflow-x-auto pb-1">
         {nodes.map((node, index) => (
           <div key={node.label} className="flex items-center gap-4 min-w-[180px]">

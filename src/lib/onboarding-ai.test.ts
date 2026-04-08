@@ -19,10 +19,15 @@ describe('generateOnboardingPlan', () => {
     vi.unstubAllEnvs();
 
     mockGoogleFactory.mockReturnValue((modelName: string) => `model:${modelName}`);
+    // Ensure tests use the Gemini fallback path, not the Edge Function
+    vi.stubEnv('VITE_SUPABASE_URL', '');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
   });
 
-  it('returns null when API key is missing', async () => {
+  it('returns null when both edge function and Gemini key are unavailable', async () => {
     vi.stubEnv('VITE_GOOGLE_GENERATIVE_AI_API_KEY', '');
+    vi.stubEnv('VITE_SUPABASE_URL', '');
+    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
 
     const result = await generateOnboardingPlan({
       budget: 50000,

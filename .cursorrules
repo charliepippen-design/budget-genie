@@ -1,7 +1,9 @@
 # Cursor Rules for Budget Genie
+
 # This file helps Cursor follow the same patterns as the project
 
 ## Project Context
+
 - Framework: React 18 + TypeScript with Vite 7.3.1
 - State: Zustand (use-media-plan-store is the central store)
 - Styling: Tailwind CSS + Shadcn/UI components
@@ -9,6 +11,7 @@
 - Build: npm run build, dev: npm run dev
 
 ## Code Style
+
 - Use TypeScript for all new code (.ts, .tsx)
 - Component files: PascalCase (e.g., OutputNav.tsx)
 - Hooks: use-kebab-case (e.g., use-media-plan-store.ts)
@@ -16,39 +19,44 @@
 - Constants: UPPER_SNAKE_CASE
 
 ## Component Patterns
+
 - Use functional components with hooks exclusively
 - Prefer composition over prop drilling - use React Context when state is shared
 - Use useMemo/useCallback to prevent unnecessary re-renders
 - Always declare memoized values explicitly with useMemo
 
 ## State Management
+
 - All plan data flows through useMediaPlanStore (Zustand)
 - Derived metrics computed via useChannelsWithMetrics() selector
 - Use persist middleware for localStorage auto-save
 - Actions should be pure functions in the store
 
 ## Testing
+
 - Write unit tests for logic files (lib/ and types/)
 - Use vitest for all tests (run with: npm run test:run)
 - Mock Zustand store in component tests via vi.mock()
 - Test file pattern: filename.test.ts
 
 ## File Organization
+
 src/
-├── pages/              # Full-page components (route views)
-├── components/         # Reusable UI components
-│   ├── dashboard/     # Dashboard-specific components
-│   ├── onboarding/    # Wizard and setup flows
-│   ├── import/        # Import/upload components
-│   ├── common/        # Shared UI patterns
-│   └── ui/            # Shadcn/UI primitives
-├── hooks/             # Custom React hooks (Zustand selectors)
-├── contexts/          # React Context providers
-├── lib/               # Pure utility functions and business logic
-├── types/             # TypeScript interfaces and enums
-└── store/             # Zustand store instances (not hooked)
+├── pages/ # Full-page components (route views)
+├── components/ # Reusable UI components
+│ ├── dashboard/ # Dashboard-specific components
+│ ├── onboarding/ # Wizard and setup flows
+│ ├── import/ # Import/upload components
+│ ├── common/ # Shared UI patterns
+│ └── ui/ # Shadcn/UI primitives
+├── hooks/ # Custom React hooks (Zustand selectors)
+├── contexts/ # React Context providers
+├── lib/ # Pure utility functions and business logic
+├── types/ # TypeScript interfaces and enums
+└── store/ # Zustand store instances (not hooked)
 
 ## Key Files to Understand
+
 - src/hooks/use-media-plan-store.ts — Central Zustand store (all plan data)
 - src/types/channel.ts — Channel math engine (calculateUnifiedMetrics)
 - src/lib/vertical-presets.ts — Preset configurations for each vertical
@@ -56,24 +64,28 @@ src/
 - src/pages/Output.tsx — Client-facing plan report
 
 ## Common Tasks
+
 1. Add a new channel metric → Edit calculateUnifiedMetrics() in src/types/channel.ts
 2. Add a new UI setting → Add to GlobalMultipliers in use-media-plan-store
 3. New filtering logic → Create selector hook in use-media-plan-store
 4. New page route → Create .tsx in src/pages/, lazy-import in App.tsx
-5. New validation rule → Add test in src/lib/*.test.ts, implement in lib/
+5. New validation rule → Add test in src/lib/\*.test.ts, implement in lib/
 
 ## API Integration
+
 - Supabase: src/lib/supabase.ts (auth, plan storage, realtime)
 - Google Generative AI: used for narrative generation (VITE_GOOGLE_GENERATIVE_AI_API_KEY env var)
 - stripe-webhook function: handles subscription status updates
 
 ## Performance Notes
+
 - All channel calculations are memoized (useChannelsWithMetrics selector)
 - Filters recursively remove inactive channels → O(n) but acceptable for ~30 channels max
 - Animations: use Tailwind animate classes (avoid raw CSS for consistency)
 - Images lazy-loaded where possible
 
 ## Common Gotchas
+
 1. REV_SHARE channels need secondaryPrice (%) set to calculate metrics
 2. FLAT_FEE/RETAINER spend is computed from allocation % during wizard (not preset price)
 3. Horizontal scroll tables: wrap in overflow-x-auto + w-full

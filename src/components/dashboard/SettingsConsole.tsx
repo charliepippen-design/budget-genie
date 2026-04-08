@@ -11,6 +11,7 @@ import { Input } from '../../components/ui/input';
 import { Slider } from '../../components/ui/slider';
 import { Label } from '../../components/ui/label';
 import { Badge } from '../../components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../../components/ui/tooltip';
 import {
   Dialog,
   DialogContent,
@@ -39,6 +40,7 @@ import {
   Folder,
   BadgeDollarSign,
   Percent,
+  Info,
 } from 'lucide-react';
 import { CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
@@ -79,9 +81,22 @@ const GlobalMultipliers: React.FC = () => {
       {/* Spend Multiplier */}
       <div className="space-y-2">
         <div className="flex justify-between items-center text-xs">
-          <Label className={cn(isDark ? 'text-slate-400' : 'text-slate-600')}>
-            Spend Multiplier
-          </Label>
+          <div className="flex items-center gap-1">
+            <Label className={cn(isDark ? 'text-slate-400' : 'text-slate-600')}>
+              Spend Multiplier
+            </Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" aria-label="Spend Multiplier info">
+                  <Info className="w-3 h-3 text-muted-foreground" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[160px]">
+                Scales all channel budgets proportionally. Use this to model what happens if your
+                total spend increases or decreases without changing your allocation mix.
+              </TooltipContent>
+            </Tooltip>
+          </div>
           <span className={cn('font-mono', isDark ? 'text-slate-200' : 'text-slate-800')}>
             {globalMultipliers.spendMultiplier.toFixed(2)}x
           </span>
@@ -191,23 +206,23 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'contrast';
 
-  const categoryDotClass: Record<ChannelCategory, string> = {
-    'SEO/Content': 'bg-[hsl(var(--chart-1))]',
-    'Display/Programmatic': 'bg-[hsl(var(--chart-2))]',
-    Affiliate: 'bg-[hsl(var(--chart-3))]',
-    'Paid Social': 'bg-[hsl(var(--chart-4))]',
-    'Paid Search': 'bg-[hsl(var(--chart-5))]',
-    'Offline/TV': 'bg-[hsl(var(--muted-foreground))]',
-    'Email/SMS': 'bg-[hsl(var(--primary))]',
-    Other: 'bg-[hsl(var(--secondary))]',
-  };
-
   const handleDelete = () => {
     deleteChannel(channel.id);
     toast({ title: 'Channel Deleted', description: `${channel.name} has been removed.` });
   };
 
   const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
+  const isApproachingThreshold = !isWarning && channel.metrics.roas < 2;
+  const dotClass = isWarning
+    ? 'bg-red-500'
+    : isApproachingThreshold
+      ? 'bg-amber-500'
+      : 'bg-green-500';
+  const dotTooltip = isWarning
+    ? 'Below target — review allocation'
+    : isApproachingThreshold
+      ? 'Approaching target threshold'
+      : 'Performing above target';
 
   return (
     <div
@@ -222,12 +237,19 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
       {/* LEFT: Data Column (Never obscured) */}
       <div className="flex items-center gap-3 min-w-0 overflow-hidden">
         {/* Status Dot */}
-        <div
-          className={cn(
-            'w-2.5 h-2.5 rounded-full shrink-0',
-            channel.isActive ? categoryDotClass[channel.category] : 'bg-slate-600'
-          )}
-        />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <div
+              className={cn(
+                'w-2.5 h-2.5 rounded-full shrink-0',
+                channel.isActive ? dotClass : 'bg-slate-600'
+              )}
+            />
+          </TooltipTrigger>
+          <TooltipContent side="top" className="max-w-[160px]">
+            {dotTooltip}
+          </TooltipContent>
+        </Tooltip>
 
         <div className="flex flex-col min-w-0">
           <span

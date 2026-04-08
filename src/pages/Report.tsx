@@ -22,9 +22,11 @@ import {
   CheckCircle,
   ArrowLeft,
   Download,
+  Moon,
   Sparkles,
   Clock,
   Shield,
+  Sun,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,6 +41,7 @@ import {
 } from '@/lib/planning-insights';
 import { generateReportNarrative, ReportNarrative } from '@/lib/report-narrator';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { useTheme } from '@/hooks/use-theme';
 
 const PIE_COLORS = [
   '#6366f1',
@@ -153,6 +156,8 @@ const Report = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const { theme, cycleTheme } = useTheme();
+
   const $ = (n: number) => format(n);
 
   const pageDate = useMemo(
@@ -188,25 +193,45 @@ const Report = () => {
   const roasTarget = globalMultipliers.roasTarget ?? 2;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-white">
-      <nav className="w-full border-b border-slate-800 bg-slate-950/95">
+    <div className="min-h-screen bg-background text-foreground">
+      <nav className="w-full border-b border-border bg-background/95">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Button
             variant="ghost"
             onClick={() => navigate('/')}
-            className="gap-2 text-slate-300 hover:text-white"
+            className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Plan
           </Button>
           <div className="text-center">
-            <p className="text-base font-semibold text-white">Performance Report</p>
-            <p className="text-xs text-slate-400">{pageDate}</p>
+            <p className="text-base font-semibold text-foreground">Performance Report</p>
+            <p className="text-xs text-muted-foreground">{pageDate}</p>
           </div>
-          <Button variant="ghost" disabled title="Coming soon" className="gap-2 text-slate-500">
-            <Download className="h-4 w-4" />
-            Export PDF
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={cycleTheme}
+              title="Switch theme"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {theme === 'dark' || theme === 'contrast' ? (
+                <Sun className="h-4 w-4" />
+              ) : (
+                <Moon className="h-4 w-4" />
+              )}
+            </Button>
+            <Button
+              variant="ghost"
+              disabled
+              title="Coming soon"
+              className="gap-2 text-muted-foreground"
+            >
+              <Download className="h-4 w-4" />
+              Export PDF
+            </Button>
+          </div>
         </div>
       </nav>
 
@@ -214,24 +239,24 @@ const Report = () => {
         <section className="space-y-5">
           <div>
             <h1 className="text-3xl font-bold">{vc.report.heroTitle}</h1>
-            <p className="mt-2 text-slate-400">
+            <p className="mt-2 text-muted-foreground">
               {verticalLabel} · {marketLabel}
             </p>
           </div>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-3 flex items-center gap-2 text-indigo-400">
                 <DollarSign className="h-5 w-5" />
                 <p className="text-sm">Monthly Investment</p>
               </div>
               <p className="text-4xl font-bold">{$(totalBudget)}</p>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 fully deployed across {active.length} channels
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-border bg-card p-5">
               <div
                 className={`mb-3 flex items-center gap-2 ${isProfit ? 'text-green-400' : 'text-red-400'}`}
               >
@@ -239,25 +264,25 @@ const Report = () => {
                 <p className="text-sm">{vc.report.revenueLabel}</p>
               </div>
               <p className="text-4xl font-bold text-green-400">{$(projectedRevenue)}</p>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {blendedRoas.toFixed(2)}x return on spend
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-3 flex items-center gap-2 text-indigo-400">
                 <Users className="h-5 w-5" />
                 <p className="text-sm">{vc.report.customerCountLabel}</p>
               </div>
               <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString()}</p>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 {blendedCpa
                   ? `at ${$(blendedCpa)} per ${vc.terms.conversion.toLowerCase()}`
                   : `${vc.terms.costPerConversion.toLowerCase()} not calculable`}
               </p>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-border bg-card p-5">
               <div className="mb-3 flex items-center gap-2 text-amber-400">
                 <Clock className="h-5 w-5" />
                 <p className="text-sm">{vc.report.paybackLabel}</p>
@@ -265,7 +290,7 @@ const Report = () => {
               <p className={`text-4xl font-bold ${paybackColor}`}>
                 {paybackMonths ? `${paybackMonths} months` : '24+ months'}
               </p>
-              <p className="mt-2 text-xs text-slate-400">
+              <p className="mt-2 text-xs text-muted-foreground">
                 based on {$(globalMultipliers.playerValue)} {vc.terms.customerValue.toLowerCase()}
               </p>
             </div>
@@ -277,43 +302,45 @@ const Report = () => {
             <Sparkles className="h-4 w-4" />
             AI Analysis
           </div>
-          <p className="text-sm text-slate-400">{vc.report.cohortValueLabel}</p>
+          <p className="text-sm text-muted-foreground">{vc.report.cohortValueLabel}</p>
           {narrativeLoading ? (
-            <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900 p-6">
-              <div className="h-5 w-4/5 animate-pulse rounded bg-slate-800" />
-              <div className="h-5 w-full animate-pulse rounded bg-slate-800" />
-              <div className="h-5 w-3/4 animate-pulse rounded bg-slate-800" />
+            <div className="space-y-3 rounded-2xl border border-border bg-card p-6">
+              <div className="h-5 w-4/5 animate-pulse rounded bg-muted" />
+              <div className="h-5 w-full animate-pulse rounded bg-muted" />
+              <div className="h-5 w-3/4 animate-pulse rounded bg-muted" />
             </div>
           ) : narrative ? (
             <>
-              <div className="rounded-2xl border border-indigo-500/30 bg-slate-900 p-6">
+              <div className="rounded-2xl border border-indigo-500/30 bg-card p-6">
                 <p className="text-xs uppercase tracking-widest text-indigo-400">
                   EXECUTIVE SUMMARY
                 </p>
-                <p className="mt-3 text-lg leading-relaxed text-slate-100">
+                <p className="mt-3 text-lg leading-relaxed text-foreground">
                   {narrative.executiveSummary}
                 </p>
               </div>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                  <p className="text-xs uppercase tracking-widest text-slate-400">
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
                     CAMPAIGN INSIGHT
                   </p>
-                  <p className="mt-2 text-sm text-slate-200">{narrative.operatorInsight}</p>
+                  <p className="mt-2 text-sm text-foreground/90">{narrative.operatorInsight}</p>
                 </div>
-                <div className="rounded-xl border border-slate-800 border-l-4 border-l-amber-400 bg-slate-900 p-4">
+                <div className="rounded-xl border border-border border-l-4 border-l-amber-400 bg-card p-4">
                   <p className="text-xs uppercase tracking-widest text-amber-400">BIGGEST RISK</p>
-                  <p className="mt-2 text-sm text-slate-200">{narrative.biggestRisk}</p>
+                  <p className="mt-2 text-sm text-foreground/90">{narrative.biggestRisk}</p>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-                  <p className="text-xs uppercase tracking-widest text-slate-400">WEEK 1 FOCUS</p>
-                  <p className="mt-2 text-sm text-slate-200">{narrative.firstCheckIn}</p>
+                <div className="rounded-xl border border-border bg-card p-4">
+                  <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                    WEEK 1 FOCUS
+                  </p>
+                  <p className="mt-2 text-sm text-foreground/90">{narrative.firstCheckIn}</p>
                 </div>
               </div>
             </>
           ) : (
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-6 text-slate-200">
+            <div className="rounded-2xl border border-border bg-card p-6 text-foreground/90">
               Plan is projecting {blendedRoas.toFixed(2)}x return on {$(totalSpend)} deployed.{' '}
               {topChannel ? `${topChannel.name} is your strongest channel.` : ''}
             </div>
@@ -322,37 +349,37 @@ const Report = () => {
 
         <section className="space-y-4">
           <h2 className="text-2xl font-bold">Profit & Loss Projection</h2>
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-8">
+          <div className="rounded-2xl border border-border bg-card p-8">
             <div className="grid grid-cols-1 gap-8 md:grid-cols-[1fr_auto_1fr_auto_1fr] md:items-start">
               <div>
-                <p className="text-sm text-slate-400">{vc.report.revenueLabel}</p>
+                <p className="text-sm text-muted-foreground">{vc.report.revenueLabel}</p>
                 <p className="mt-2 text-3xl font-bold text-green-400">{$(projectedRevenue)}</p>
-                <p className="mt-5 text-sm text-slate-400">{vc.report.cohortValueLabel}</p>
+                <p className="mt-5 text-sm text-muted-foreground">{vc.report.cohortValueLabel}</p>
                 <p className="mt-2 text-xl font-semibold">
                   {$(scenarioEnvelope[1].projectedCohortValue)}
                 </p>
-                <p className="text-xs text-slate-500">total cohort value (Base)</p>
+                <p className="text-xs text-muted-foreground">total cohort value (Base)</p>
               </div>
 
-              <div className="hidden h-full w-px bg-slate-800 md:block" />
+              <div className="hidden h-full w-px bg-border md:block" />
 
               <div>
-                <p className="text-sm text-slate-400">Total Investment</p>
-                <p className="mt-2 text-3xl font-bold text-slate-200">{$(totalSpend)}</p>
-                <p className="mt-5 text-sm text-slate-400">{vc.terms.costPerConversion}</p>
+                <p className="text-sm text-muted-foreground">Total Investment</p>
+                <p className="mt-2 text-3xl font-bold text-foreground">{$(totalSpend)}</p>
+                <p className="mt-5 text-sm text-muted-foreground">{vc.terms.costPerConversion}</p>
                 <p className="mt-2 text-xl font-semibold">{blendedCpa ? $(blendedCpa) : 'N/A'}</p>
               </div>
 
-              <div className="hidden h-full w-px bg-slate-800 md:block" />
+              <div className="hidden h-full w-px bg-border md:block" />
 
               <div>
-                <p className="text-sm text-slate-400">Net P&L (Month 1)</p>
+                <p className="text-sm text-muted-foreground">Net P&L (Month 1)</p>
                 <p
                   className={`mt-2 text-3xl font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}
                 >
                   {$(netPnl)}
                 </p>
-                <p className="mt-5 text-sm text-slate-400">LTV : CAC Ratio</p>
+                <p className="mt-5 text-sm text-muted-foreground">LTV : CAC Ratio</p>
                 <p
                   className={`mt-2 text-xl font-semibold ${
                     scenarioEnvelope[1].ltvToCac > 2
@@ -364,18 +391,18 @@ const Report = () => {
                 >
                   {scenarioEnvelope[1].ltvToCac.toFixed(2)}x
                 </p>
-                <p className="text-xs text-slate-500">lifetime value vs acquisition cost</p>
+                <p className="text-xs text-muted-foreground">lifetime value vs acquisition cost</p>
               </div>
             </div>
 
             <div className="mt-8">
-              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-800">
+              <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
                 <div
                   className="h-full rounded-full transition-all"
                   style={{ width: `${revenueVsSpendWidth}%`, backgroundColor: vc.accent.hex }}
                 />
               </div>
-              <div className="mt-2 flex items-center justify-between text-xs text-slate-400">
+              <div className="mt-2 flex items-center justify-between text-xs text-muted-foreground">
                 <span>Investment</span>
                 <span>Revenue</span>
               </div>
@@ -386,7 +413,7 @@ const Report = () => {
         <section className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">What Could Happen</h2>
-            <p className="mt-1 text-slate-400">
+            <p className="mt-1 text-muted-foreground">
               Three scenarios based on market conditions. Base is most likely.
             </p>
           </div>
@@ -394,15 +421,17 @@ const Report = () => {
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div className="rounded-2xl border border-red-500/30 bg-red-950/20 p-5">
               <Badge className="bg-red-500/20 text-red-300">BEAR CASE</Badge>
-              <p className="mt-4 text-sm text-slate-300">
+              <p className="mt-4 text-sm text-muted-foreground">
                 {vc.terms.customerValue} per {vc.terms.conversion}
               </p>
               <p className="text-2xl font-bold">{$(scenarioEnvelope[0].projectedLtvPerUser)}</p>
-              <p className="mt-3 text-sm text-slate-300">{vc.report.cohortValueLabel}</p>
+              <p className="mt-3 text-sm text-muted-foreground">{vc.report.cohortValueLabel}</p>
               <p className="text-lg font-semibold">{$(scenarioEnvelope[0].projectedCohortValue)}</p>
-              <p className="mt-3 text-sm text-slate-300">LTV:CAC</p>
+              <p className="mt-3 text-sm text-muted-foreground">LTV:CAC</p>
               <p className="text-lg font-semibold">{scenarioEnvelope[0].ltvToCac.toFixed(2)}x</p>
-              <p className="mt-4 text-xs text-slate-400">If market conditions worsen by 15%</p>
+              <p className="mt-4 text-xs text-muted-foreground">
+                If market conditions worsen by 15%
+              </p>
             </div>
 
             <div className="rounded-2xl border border-indigo-500/40 bg-indigo-950/20 p-5 ring-1 ring-indigo-500/40">
@@ -410,30 +439,30 @@ const Report = () => {
                 <Badge className="bg-indigo-500/20 text-indigo-300">BASE CASE</Badge>
                 <span className="text-xs text-indigo-300">Most Likely</span>
               </div>
-              <p className="mt-4 text-sm text-slate-300">
+              <p className="mt-4 text-sm text-muted-foreground">
                 {vc.terms.customerValue} per {vc.terms.conversion}
               </p>
               <p className="text-2xl font-bold">{$(scenarioEnvelope[1].projectedLtvPerUser)}</p>
-              <p className="mt-3 text-sm text-slate-300">{vc.report.cohortValueLabel}</p>
+              <p className="mt-3 text-sm text-muted-foreground">{vc.report.cohortValueLabel}</p>
               <p className="text-lg font-semibold">{$(scenarioEnvelope[1].projectedCohortValue)}</p>
-              <p className="mt-3 text-sm text-slate-300">LTV:CAC</p>
+              <p className="mt-3 text-sm text-muted-foreground">LTV:CAC</p>
               <p className="text-lg font-semibold">{scenarioEnvelope[1].ltvToCac.toFixed(2)}x</p>
-              <p className="mt-4 text-xs text-slate-400">
+              <p className="mt-4 text-xs text-muted-foreground">
                 Expected outcome based on your benchmarks
               </p>
             </div>
 
             <div className="rounded-2xl border border-green-500/30 bg-green-950/20 p-5">
               <Badge className="bg-green-500/20 text-green-300">BULL CASE</Badge>
-              <p className="mt-4 text-sm text-slate-300">
+              <p className="mt-4 text-sm text-muted-foreground">
                 {vc.terms.customerValue} per {vc.terms.conversion}
               </p>
               <p className="text-2xl font-bold">{$(scenarioEnvelope[2].projectedLtvPerUser)}</p>
-              <p className="mt-3 text-sm text-slate-300">{vc.report.cohortValueLabel}</p>
+              <p className="mt-3 text-sm text-muted-foreground">{vc.report.cohortValueLabel}</p>
               <p className="text-lg font-semibold">{$(scenarioEnvelope[2].projectedCohortValue)}</p>
-              <p className="mt-3 text-sm text-slate-300">LTV:CAC</p>
+              <p className="mt-3 text-sm text-muted-foreground">LTV:CAC</p>
               <p className="text-lg font-semibold">{scenarioEnvelope[2].ltvToCac.toFixed(2)}x</p>
-              <p className="mt-4 text-xs text-slate-400">If conditions improve by 15%</p>
+              <p className="mt-4 text-xs text-muted-foreground">If conditions improve by 15%</p>
             </div>
           </div>
         </section>
@@ -441,11 +470,11 @@ const Report = () => {
         <section className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">Channel by Channel</h2>
-            <p className="mt-1 text-slate-400">How each channel contributes to your plan.</p>
+            <p className="mt-1 text-muted-foreground">How each channel contributes to your plan.</p>
           </div>
 
-          <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900">
-            <div className="grid grid-cols-6 gap-3 bg-slate-800/50 px-4 py-3 text-xs uppercase tracking-wide text-slate-400">
+          <div className="overflow-hidden rounded-2xl border border-border bg-card">
+            <div className="grid grid-cols-6 gap-3 bg-muted/50 px-4 py-3 text-xs uppercase tracking-wide text-muted-foreground">
               <div>Channel</div>
               <div>Spend</div>
               <div>% of Budget</div>
@@ -466,11 +495,11 @@ const Report = () => {
               return (
                 <div
                   key={c.id}
-                  className="grid grid-cols-6 gap-3 border-b border-slate-800 px-4 py-3 hover:bg-slate-800/50"
+                  className="grid grid-cols-6 gap-3 border-b border-border px-4 py-3 hover:bg-muted/50"
                 >
                   <div>
-                    <p className="font-medium text-white">{c.name}</p>
-                    <span className="text-xs text-slate-500">{c.family}</span>
+                    <p className="font-medium text-foreground">{c.name}</p>
+                    <span className="text-xs text-muted-foreground">{c.family}</span>
                   </div>
                   <div>{$(c.metrics.spend)}</div>
                   <div>{pct.toFixed(1)}%</div>
@@ -482,8 +511,8 @@ const Report = () => {
             })}
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
-            <div className="flex h-5 overflow-hidden rounded-full border border-slate-700 bg-slate-800">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <div className="flex h-5 overflow-hidden rounded-full border border-border bg-muted">
               {sortedActiveBySpend.map((c, i) => {
                 const width = totalSpend > 0 ? (c.metrics.spend / totalSpend) * 100 : 0;
                 return (
@@ -506,7 +535,7 @@ const Report = () => {
           <h2 className="text-2xl font-bold">Where Your Budget Goes</h2>
 
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <div className="rounded-2xl border border-border bg-card p-4">
               <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
                   <Pie
@@ -534,7 +563,7 @@ const Report = () => {
               </ResponsiveContainer>
             </div>
 
-            <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+            <div className="rounded-2xl border border-border bg-card p-4">
               <div className="space-y-3">
                 {sortedPieLegend.map((row, i) => {
                   const pct = totalSpend > 0 ? (row.value / totalSpend) * 100 : 0;
@@ -545,31 +574,33 @@ const Report = () => {
                           className="h-3 w-3 rounded-full"
                           style={{ backgroundColor: PIE_COLORS[i % PIE_COLORS.length] }}
                         />
-                        <span className="text-sm text-slate-200">{row.name}</span>
+                        <span className="text-sm text-foreground/90">{row.name}</span>
                       </div>
                       <div className="text-right text-sm">
-                        <p className="text-slate-100">{$(row.value)}</p>
-                        <p className="text-xs text-slate-400">{pct.toFixed(1)}%</p>
+                        <p className="text-foreground">{$(row.value)}</p>
+                        <p className="text-xs text-muted-foreground">{pct.toFixed(1)}%</p>
                       </div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-5 border-t border-slate-800 pt-4">
-                <p className="mb-2 text-xs uppercase tracking-wide text-slate-400">Group totals</p>
+              <div className="mt-5 border-t border-border pt-4">
+                <p className="mb-2 text-xs uppercase tracking-wide text-muted-foreground">
+                  Group totals
+                </p>
                 <div className="grid grid-cols-2 gap-2 text-xs">
-                  <p className="text-slate-300">
-                    Paid: <span className="text-slate-100">{$(groupSpend.paid)}</span>
+                  <p className="text-muted-foreground">
+                    Paid: <span className="text-foreground">{$(groupSpend.paid)}</span>
                   </p>
-                  <p className="text-slate-300">
-                    Organic: <span className="text-slate-100">{$(groupSpend.organic)}</span>
+                  <p className="text-muted-foreground">
+                    Organic: <span className="text-foreground">{$(groupSpend.organic)}</span>
                   </p>
-                  <p className="text-slate-300">
-                    Affiliate: <span className="text-slate-100">{$(groupSpend.affiliate)}</span>
+                  <p className="text-muted-foreground">
+                    Affiliate: <span className="text-foreground">{$(groupSpend.affiliate)}</span>
                   </p>
-                  <p className="text-slate-300">
-                    Influencer: <span className="text-slate-100">{$(groupSpend.influencer)}</span>
+                  <p className="text-muted-foreground">
+                    Influencer: <span className="text-foreground">{$(groupSpend.influencer)}</span>
                   </p>
                 </div>
               </div>
@@ -580,13 +611,13 @@ const Report = () => {
         <section className="space-y-4">
           <div>
             <h2 className="text-2xl font-bold">Projected Performance Over 6 Months</h2>
-            <p className="mt-1 text-slate-400">
+            <p className="mt-1 text-muted-foreground">
               How each channel group's return is expected to evolve, accounting for audience
               saturation and retention.
             </p>
           </div>
 
-          <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4">
+          <div className="rounded-2xl border border-border bg-card p-4">
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={roasTrend}>
                 <XAxis dataKey="month" stroke="#94a3b8" />
@@ -659,7 +690,7 @@ const Report = () => {
                     </Badge>
                     <p className="font-semibold">{alert.channelName}</p>
                   </div>
-                  <p className="mt-2 text-slate-300">{alert.reason}</p>
+                  <p className="mt-2 text-muted-foreground">{alert.reason}</p>
                   {alert.severity === 'high' ? (
                     <p className="mt-2 text-xs text-red-400">Immediate attention recommended</p>
                   ) : null}
@@ -673,12 +704,12 @@ const Report = () => {
           <h2 className="text-2xl font-bold">Before You Launch</h2>
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border border-amber-500/30 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-amber-500/30 bg-card p-5">
               <div className="flex items-center gap-2 text-amber-400">
                 <Shield className="h-5 w-5" />
                 <p className="font-semibold">Key Risk</p>
               </div>
-              <p className="mt-3 text-slate-200">
+              <p className="mt-3 text-foreground/90">
                 {narrative?.biggestRisk
                   ? narrative.biggestRisk
                   : weakestChannel
@@ -689,12 +720,12 @@ const Report = () => {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-indigo-500/30 bg-slate-900 p-5">
+            <div className="rounded-2xl border border-indigo-500/30 bg-card p-5">
               <div className="flex items-center gap-2 text-indigo-400">
                 <CheckCircle className="h-5 w-5" />
                 <p className="font-semibold">What To Do After Week 1</p>
               </div>
-              <p className="mt-3 text-slate-200">
+              <p className="mt-3 text-foreground/90">
                 {narrative?.firstCheckIn
                   ? narrative.firstCheckIn
                   : `Review your ${vc.terms.costPerConversion.toLowerCase()} vs your target. If it's running above ${

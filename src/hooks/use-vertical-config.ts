@@ -15,6 +15,10 @@ export interface VerticalConfig {
     costPerConversion: string; // 'Cost per FTD' | 'Cost per Order' | etc
     revenueMetric: string; // 'NGR' | 'Revenue' | 'MRR' | 'Pipeline Value'
     returnMetric: string; // 'ROAS' | 'ROAS' | 'Payback Period' | 'Cost per Lead'
+    registrationLabel: string; // 'Registrations' | 'Sign-ups' | 'Sessions' | 'Contacts'
+    regToConversionRateLabel: string; // 'Reg-to-FTD' | 'Signup-to-Trial' | etc
+    revenuePerConversionLabel: string; // 'NGR/FTD' | 'Rev/Order' | 'MRR/Trial' | 'Value/Lead'
+    velocityEngineTitle: string; // section heading
   };
 
   // Dashboard panels — which specialised panels to show/hide
@@ -69,6 +73,10 @@ const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
       costPerConversion: 'Cost per FTD',
       revenueMetric: 'Projected NGR',
       returnMetric: 'ROAS',
+      registrationLabel: 'Registrations',
+      regToConversionRateLabel: 'Reg-to-FTD',
+      revenuePerConversionLabel: 'NGR/FTD',
+      velocityEngineTitle: 'Macro Velocity & FTD Engine',
     },
     panels: {
       showGeoMatrix: true,
@@ -85,7 +93,8 @@ const VERTICAL_CONFIGS: Record<Vertical, VerticalConfig> = {
 Prioritize LTV:CPA arbitrage over vanity spend metrics.
 Speak like a CFO, not a copywriter. Use iGaming terminology naturally:
 FTDs, NGR, player value, geo-arbitrage, affiliate CPA, ROAS.
-Be concise — 2-4 sentences max. Never execute tools without user confirmation.`,
+Be concise — 2-4 sentences max. Never execute tools without user confirmation.
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
       greeting: 'Oracle online. Show me the numbers.',
       quickActions: [
         {
@@ -133,6 +142,10 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       costPerConversion: 'Cost per Order',
       revenueMetric: 'Projected Revenue',
       returnMetric: 'ROAS',
+      registrationLabel: 'Sessions',
+      regToConversionRateLabel: 'Session-to-Order',
+      revenuePerConversionLabel: 'Rev/Order',
+      velocityEngineTitle: 'Purchase Funnel',
     },
     panels: {
       showGeoMatrix: false,
@@ -148,7 +161,8 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       persona: `You are a senior eCommerce growth analyst.
 Focus on ROAS, cost per order, AOV, and repeat purchase rate.
 Speak in eCommerce terms: conversion rate, cart abandonment, AOV, ROAS, CAC.
-Be concise — 2-4 sentences max. Never execute tools without user confirmation.`,
+Be concise — 2-4 sentences max. Never execute tools without user confirmation.
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
       greeting: 'Ready to grow your store. What do you want to optimise?',
       quickActions: [
         {
@@ -195,6 +209,10 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       costPerConversion: 'Cost per Trial',
       revenueMetric: 'Projected MRR',
       returnMetric: 'CAC Payback',
+      registrationLabel: 'Sign-ups',
+      regToConversionRateLabel: 'Signup-to-Trial',
+      revenuePerConversionLabel: 'MRR/Trial',
+      velocityEngineTitle: 'Growth Velocity Engine',
     },
     panels: {
       showGeoMatrix: false,
@@ -210,7 +228,8 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       persona: `You are a senior SaaS growth strategist.
 Focus on CAC payback, MRR impact, trial-to-paid conversion, and churn.
 Speak in SaaS terms: MRR, ARR, CAC, LTV, churn rate, trial conversion.
-Be concise — 2-4 sentences max. Never execute tools without user confirmation.`,
+Be concise — 2-4 sentences max. Never execute tools without user confirmation.
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
       greeting: 'SaaS growth mode. What metric are we moving today?',
       quickActions: [
         {
@@ -257,6 +276,10 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       costPerConversion: 'Cost per Lead',
       revenueMetric: 'Pipeline Value',
       returnMetric: 'Cost per Lead',
+      registrationLabel: 'Contacts',
+      regToConversionRateLabel: 'Contact-to-Lead',
+      revenuePerConversionLabel: 'Value/Lead',
+      velocityEngineTitle: 'Lead Pipeline',
     },
     panels: {
       showGeoMatrix: false,
@@ -272,7 +295,8 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       persona: `You are a senior lead generation strategist.
 Focus on cost per lead, lead quality, pipeline value, and close rates.
 Speak in lead gen terms: CPL, MQL, SQL, pipeline, conversion rate, close rate.
-Be concise — 2-4 sentences max. Never execute tools without user confirmation.`,
+Be concise — 2-4 sentences max. Never execute tools without user confirmation.
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
       greeting: 'Pipeline ready. What are we optimising today?',
       quickActions: [
         {
@@ -319,6 +343,10 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
       costPerConversion: 'Cost per Conversion',
       revenueMetric: 'Projected Revenue',
       returnMetric: 'ROAS',
+      registrationLabel: 'Visits',
+      regToConversionRateLabel: 'Visit-to-Conversion',
+      revenuePerConversionLabel: 'Rev/Conversion',
+      velocityEngineTitle: 'Acquisition Funnel',
     },
     panels: {
       showGeoMatrix: false,
@@ -333,7 +361,8 @@ Be concise — 2-4 sentences max. Never execute tools without user confirmation.
     genie: {
       persona: `You are a senior digital marketing analyst.
 Focus on ROAS, cost per conversion, and budget efficiency.
-Be concise — 2-4 sentences max. Never execute tools without user confirmation.`,
+    Be concise — 2-4 sentences max. Never execute tools without user confirmation.
+    You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
       greeting: 'Ready to optimise your marketing plan. What do you need?',
       quickActions: [
         {

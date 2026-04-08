@@ -1215,7 +1215,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             channels: createInitialChannels(),
             globalMultipliers: { ...DEFAULT_MULTIPLIERS },
             presets: [],
-          } as MediaPlanState;
+          } as unknown as MediaPlanState;
         }
         // Migration to v3 for isActive
         if (version < 3) {
@@ -1497,25 +1497,31 @@ export function useCategoryTotals(): Record<string, { spend: number; percentage:
 
 export function useFtdVelocityMetrics(): FtdVelocityMetrics {
   const channelsWithMetrics = useChannelsWithMetrics();
+  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
 
   return useMemo(() => {
-    const unlocked = channelsWithMetrics.filter((channel) => !channel.locked && channel.isActive);
+    const unlocked = channelsWithMetrics.filter((ch) => !ch.locked && ch.isActive);
 
-    const totalImpressions = unlocked.reduce(
-      (sum, channel) => sum + channel.metrics.impressions,
-      0
-    );
-    const rawClicks = unlocked.reduce((sum, channel) => sum + channel.metrics.clicks, 0);
+    const totalImpressions = unlocked.reduce((sum, ch) => sum + ch.metrics.impressions, 0);
+    const rawClicks = unlocked.reduce((sum, ch) => sum + ch.metrics.clicks, 0);
     const qualityClicks = rawClicks * 0.9;
-    const ftds = unlocked.reduce((sum, channel) => sum + channel.metrics.conversions, 0);
+    const ftds = unlocked.reduce((sum, ch) => sum + ch.metrics.conversions, 0);
 
-    // Operational funnel assumption for iGaming: ~42% registration-to-FTD conversion.
-    const registrationToFtdRate = 0.42;
+    // Registration-to-conversion rate by vertical
+    const regToConvRates: Record<string, number> = {
+      igaming: 0.42,
+      ecommerce: 0.12,
+      saas: 0.35,
+      lead_gen: 0.25,
+      other: 0.3,
+    };
+    const registrationToFtdRate = regToConvRates[vertical ?? 'other'] ?? 0.3;
     const registrations = ftds > 0 ? ftds / registrationToFtdRate : 0;
 
-    const projectedRevenue = unlocked.reduce((sum, channel) => sum + channel.metrics.revenue, 0);
-    // Approximate NGR after bonus, tax and platform costs.
-    const ngr = projectedRevenue * 0.78;
+    const projectedRevenue = unlocked.reduce((sum, ch) => sum + ch.metrics.revenue, 0);
+    // NGR adjustment: iGaming applies ~22% bonus/cost deduction; all other verticals use gross revenue
+    const ngrMultiplier = vertical === 'igaming' ? 0.78 : 1.0;
+    const ngr = projectedRevenue * ngrMultiplier;
 
     const impressionToClickRate = totalImpressions > 0 ? qualityClicks / totalImpressions : 0;
     const clickToRegistrationRate = qualityClicks > 0 ? registrations / qualityClicks : 0;
@@ -1532,7 +1538,7 @@ export function useFtdVelocityMetrics(): FtdVelocityMetrics {
       registrationToFtdRate,
       ngrPerFtd,
     };
-  }, [channelsWithMetrics]);
+  }, [channelsWithMetrics, vertical]);
 }
 
 export type Channel = ChannelData;

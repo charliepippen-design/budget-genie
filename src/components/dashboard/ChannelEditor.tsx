@@ -38,6 +38,7 @@ import {
 import { useMediaPlanStore, ChannelData } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { cn } from '@/lib/utils';
 
 interface ChannelEditorProps {
@@ -49,6 +50,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
   const { setChannelType, updateChannelConfigField, globalMultipliers } = useMediaPlanStore();
   const { format: formatCurrency, symbol } = useCurrency();
   const { theme } = useTheme();
+  const vc = useVerticalConfig();
   const [isOpen, setIsOpen] = useState(false);
 
   const isDark = theme === 'dark' || theme === 'contrast';
@@ -538,7 +540,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                       isDark={isDark}
                     />
                     <YieldMetricCard
-                      label="FTDs"
+                      label={vc.terms.conversionPlural}
                       value={previewMetrics.ftds.toFixed(0)}
                       icon={<Users className="h-4 w-4" />}
                       color="from-violet-500 to-purple-500"

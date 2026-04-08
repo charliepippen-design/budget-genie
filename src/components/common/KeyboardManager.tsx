@@ -4,10 +4,11 @@ import { useHistoryStore } from '@/hooks/use-history';
 import { useToast } from '@/components/ui/use-toast';
 
 const HOTKEY_DEBOUNCE_MS = 140;
+const TIERS = ['free', 'pro', 'enterprise'] as const;
 
 export function KeyboardManager() {
   const { undo, redo, canUndo, canRedo } = useHistoryStore();
-  const { setChannelAllocation, channels } = useMediaPlanStore();
+  const { setChannelAllocation, channels, subscriptionTier, setSubscriptionTier } = useMediaPlanStore();
   const { toast } = useToast();
   const lastHotkeyAtRef = useRef(0);
 
@@ -63,6 +64,22 @@ export function KeyboardManager() {
           }
           return;
         }
+
+        // QA God Mode: Ctrl+Shift+T — cycles subscription tier (DEV only)
+        if (import.meta.env.DEV && e.shiftKey && key === 't') {
+          e.preventDefault();
+          if (isDebouncedHotkey()) return;
+
+          const currentIndex = TIERS.indexOf(subscriptionTier as typeof TIERS[number]);
+          const nextTier = TIERS[(currentIndex + 1) % TIERS.length];
+          setSubscriptionTier(nextTier);
+          toast({
+            title: `QA Mode — Tier: ${nextTier.toUpperCase()}`,
+            description: 'Press Ctrl+Shift+T to cycle. DEV only.',
+            duration: 2000,
+          });
+          return;
+        }
       }
 
       // 2. Slider Shortcuts (Arrow Keys)
@@ -100,7 +117,7 @@ export function KeyboardManager() {
 
     window.addEventListener('keydown', handleKeyDown, { capture: true });
     return () => window.removeEventListener('keydown', handleKeyDown, { capture: true });
-  }, [undo, redo, canUndo, canRedo, setChannelAllocation, channels, toast]);
+  }, [undo, redo, canUndo, canRedo, setChannelAllocation, channels, subscriptionTier, setSubscriptionTier, toast]);
 
   return null;
 }

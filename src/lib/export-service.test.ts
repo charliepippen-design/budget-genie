@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { buildCsvContent } from '@/lib/export-service';
-import * as XLSX from 'xlsx';
 
 // Minimal ChannelWithMetrics fixture
 function makeChannel(overrides: Partial<{
@@ -124,42 +123,28 @@ describe('buildCsvContent', () => {
   });
 });
 
-// ─── exportToExcel (unit-level via XLSX in-memory) ───────────────────────────
-
-// We can't test file saving in jsdom, but we CAN test the sheet data logic
-// by importing the sheet-building helpers indirectly through a mock approach.
-// Instead we'll validate that buildCsvContent and the known fix (CPA N/A) are
-// consistent with what Excel would receive, since allocationSheetData mirrors it.
+// ─── Excel CPA column — data-level verification ──────────────────────────────
+// exportToExcel is async and triggers a file download; we can't test it end-to-end
+// in jsdom. These tests verify the data shape that would be written to the sheet.
 
 describe('Excel CPA column', () => {
-  it('N/A string survives round-trip through XLSX json_to_sheet', () => {
-    const data = [
-      { Channel: 'No-conv Channel', Spend: 500, CPA: 'N/A', ROAS: 0 },
-      { Channel: 'Normal Channel', Spend: 1000, CPA: 8.3333, ROAS: 4 },
-    ];
-
-    const ws = XLSX.utils.json_to_sheet(data);
-    const parsed = XLSX.utils.sheet_to_json<{ Channel: string; CPA: string | number }>(ws);
-
-    expect(parsed[0].CPA).toBe('N/A');
-    expect(typeof parsed[1].CPA).toBe('number');
-    expect((parsed[1].CPA as number).toFixed(2)).toBe('8.33');
+  it('null CPA appears as N/A in CSV (mirrors what Excel sheet receives)', () => {
+    const channel = makeChannel({ cpa: null, conversions: 0 });
+    const csv = buildCsvContent([channel], 500, { ...defaultBlended, blendedCpa: null }, defaultOptions);
+    expect(csv).toContain('"N/A"');
   });
 
-  it('0 is NOT an acceptable CPA value for no-conversion channels', () => {
-    // Before the fix, safeNumber(null) = 0 was written to the sheet
-    // Verify that our fix means CPA:0 is only written for channels that genuinely have 0 CPA
-    // (i.e., 0 is distinguishable from null by the 'N/A' sentinel)
-    const data = [
-      { CPA: 'N/A' }, // null cpa
-      { CPA: 0 },     // hypothetical 0 cpa (shouldn't happen in practice)
-    ];
-    const ws = XLSX.utils.json_to_sheet(data);
-    const parsed = XLSX.utils.sheet_to_json<{ CPA: string | number }>(ws);
-    // 'N/A' and 0 must be distinguishable
-    expect(parsed[0].CPA).toBe('N/A');
-    expect(parsed[1].CPA).toBe(0);
-    expect(parsed[0].CPA).not.toBe(parsed[1].CPA);
+  it('numeric CPA is distinct from the N/A sentinel', () => {
+    const channelWithCpa = makeChannel({ cpa: 8.3333, conversions: 120 });
+    const channelNoCpa = makeChannel({ name: 'No Conv', cpa: null, conversions: 0 });
+    const csv = buildCsvContent([channelWithCpa, channelNoCpa], 1000, defaultBlended, defaultOptions);
+    // numeric cpa row should NOT contain N/A
+    const lines = csv.split('\n');
+    const withCpaLine = lines.find((l) => l.includes('Test Channel'));
+    const noCpaLine = lines.find((l) => l.includes('No Conv'));
+    expect(noCpaLine).toContain('"N/A"');
+    // withCpaLine has a real number — should not say N/A
+    expect(withCpaLine).not.toContain('"N/A"');
   });
 });
 

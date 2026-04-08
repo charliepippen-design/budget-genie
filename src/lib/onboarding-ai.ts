@@ -33,10 +33,7 @@ const RefinedPlanSchema = z.object({
 
 export type RefinedPlan = z.infer<typeof RefinedPlanSchema>;
 
-export async function generateOnboardingPlan(answers: WizardAnswers): Promise<RefinedPlan | null> {
-  const apiKey = import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) return null;
-
+function buildPrompt(answers: WizardAnswers): string {
   const preset = VERTICAL_PRESETS[answers.vertical];
   const knownGeoNames = new Set(TOP_IGAMING_GEOS.map((g) => g.name));
   const validGeos = answers.geos.filter((geo) => knownGeoNames.has(geo));
@@ -61,8 +58,7 @@ export async function generateOnboardingPlan(answers: WizardAnswers): Promise<Re
     maintain: 'Maintain current performance, minimise risk.',
   };
 
-  const prompt = `
-You are a senior performance marketing strategist. A client has provided these details:
+  return `You are a senior performance marketing strategist. A client has provided these details:
 
 Budget: $${answers.budget.toLocaleString()}/month
 Vertical: ${preset.label} (${preset.description})
@@ -89,27 +85,78 @@ Your job:
 5. Tell the client what to check first after the plan goes live.
 
 Be decisive. Do not hedge. A client with no marketing knowledge needs a clear answer.
-  `.trim();
+
+Respond with valid JSON matching this exact shape — no markdown, no explanation around it:
+{
+  "rationale": "...",
+  "channelAdjustments": [{ "channelName": "...", "allocationPct": 0, "reasoning": "..." }],
+  "recommendedCpaTarget": 0,
+  "recommendedRoasTarget": 0,
+  "recommendedPlayerValue": 0,
+  "keyRisk": "...",
+  "firstActionAfterLaunch": "..."
+}`;
+}
+
+async function tryEdgeFunction(prompt: string): Promise<RefinedPlan | null> {
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+
+  const res = await fetch(`${supabaseUrl}/functions/v1/generate-plan`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseAnonKey,
+      Authorization: `Bearer ${supabaseAnonKey}`,
+    },
+    body: JSON.stringify({ prompt }),
+  });
+
+  if (!res.ok) throw new Error(`generate-plan: ${res.status}`);
+
+  const data = await res.json();
+  const parsed = RefinedPlanSchema.safeParse(data);
+  return parsed.success ? parsed.data : null;
+}
+
+async function tryGemini(prompt: string): Promise<RefinedPlan | null> {
+  const apiKey = import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY;
+  if (!apiKey) return null;
 
   const google = createGoogleGenerativeAI({ apiKey });
 
-  try {
-    const result = await generateObject({
-      model: google('gemini-2.0-flash'),
-      schema: RefinedPlanSchema,
-      prompt,
-    });
-    return result.object;
-  } catch {
+  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash-latest']) {
     try {
       const result = await generateObject({
-        model: google('gemini-1.5-flash-latest'),
+        model: google(model),
         schema: RefinedPlanSchema,
         prompt,
       });
       return result.object;
     } catch {
-      return null;
+      // try next model
     }
+  }
+  return null;
+}
+
+export async function generateOnboardingPlan(answers: WizardAnswers): Promise<RefinedPlan | null> {
+  const prompt = buildPrompt(answers);
+
+  // 1. Try secure Edge Function first
+  try {
+    const result = await tryEdgeFunction(prompt);
+    if (result) return result;
+  } catch (err) {
+    console.warn('Onboarding plan: Edge function unavailable, falling back to client SDK.', err);
+  }
+
+  // 2. Fall back to direct Gemini call (works locally with VITE_GOOGLE_GENERATIVE_AI_API_KEY)
+  try {
+    return await tryGemini(prompt);
+  } catch (err) {
+    console.error('Onboarding plan generation failed.', err);
+    return null;
   }
 }

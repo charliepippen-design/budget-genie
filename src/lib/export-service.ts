@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import * as XLSX from 'xlsx';
+import ExcelJS from 'exceljs';
 import { ChannelWithMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
 import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
 import {
@@ -361,14 +361,14 @@ export function buildCsvContent(
   ].join('\n');
 }
 
-export function exportToExcel(
+export async function exportToExcel(
   channels: ChannelWithMetrics[],
   totalBudget: number,
   blendedMetrics: BlendedMetricsData,
   scenarioOutputs: ScenarioEnvelopePoint[] = [],
   efficiencyAlerts: ExportAlert[] = [],
   sandboxSnapshot: SandboxExportSnapshot | null = null
-): void {
+): Promise<void> {
   try {
     const scenarios =
       scenarioOutputs.length > 0
@@ -379,153 +379,166 @@ export function exportToExcel(
               : 0,
             conversions: blendedMetrics.totalConversions,
             cpa: blendedMetrics.blendedCpa ?? 0,
-            assumptions: {
-              churnRate: 0.04,
-              cpaMultiplier: 1,
-              roasMultiplier: 1,
-            },
+            assumptions: { churnRate: 0.04, cpaMultiplier: 1, roasMultiplier: 1 },
           });
 
     const alerts =
       efficiencyAlerts.length > 0
         ? efficiencyAlerts
-        : getEfficiencyAlerts(channels).map((alert) => ({
-            channelName: alert.channelName,
-            reason: alert.reason,
-            severity: alert.severity,
+        : getEfficiencyAlerts(channels).map((a) => ({
+            channelName: a.channelName,
+            reason: a.reason,
+            severity: a.severity,
           }));
 
-    const allocationSheetData = channels.map((channel) => ({
-      Channel: channel.name,
-      Family: safeFamilyName(channel.family),
-      BuyingModel: safeBuyingModelName(channel.buyingModel),
-      AllocationPct: Number(safeNumber(channel.allocationPct).toFixed(4)),
-      Spend: Number(safeNumber(channel.metrics.spend).toFixed(4)),
-      Impressions: Number(safeNumber(channel.metrics.impressions).toFixed(0)),
-      Clicks: Number(safeNumber(channel.metrics.clicks).toFixed(0)),
-      FTDs: Number(safeNumber(channel.metrics.conversions).toFixed(2)),
-      CPA: channel.metrics.cpa != null ? Number(channel.metrics.cpa.toFixed(4)) : 'N/A',
-      Revenue: Number(safeNumber(channel.metrics.revenue).toFixed(4)),
-      ROAS: Number(safeNumber(channel.metrics.roas).toFixed(4)),
-    }));
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'MediaPlanner Pro';
+    workbook.created = new Date();
 
-    const scenarioSheetData = scenarios.map((scenario) => ({
-      Scenario: scenario.scenario,
-      ProjectedLtvPerUser: Number(scenario.projectedLtvPerUser.toFixed(4)),
-      ProjectedCohortValue: Number(scenario.projectedCohortValue.toFixed(4)),
-      LtvToCacRatio: Number(scenario.ltvToCac.toFixed(4)),
-    }));
-
-    const alertsSheetData = alerts.map((alert) => ({
-      Channel: alert.channelName,
-      Severity: alert.severity.toUpperCase(),
-      Reason: alert.reason,
-    }));
-
-    const summarySheetData = [
-      { Metric: 'Total Budget', Value: Number(safeNumber(totalBudget).toFixed(4)) },
-      {
-        Metric: 'Blended CPA',
-        Value: blendedMetrics.blendedCpa ? Number(blendedMetrics.blendedCpa.toFixed(4)) : 'N/A',
-      },
-      {
-        Metric: 'Total Conversions',
-        Value: Number(safeNumber(blendedMetrics.totalConversions).toFixed(2)),
-      },
-      {
-        Metric: 'Projected Revenue',
-        Value: Number(safeNumber(blendedMetrics.projectedRevenue).toFixed(4)),
-      },
-      { Metric: 'Blended ROAS', Value: Number(safeNumber(blendedMetrics.blendedRoas).toFixed(4)) },
+    // ── Sheet 1: Allocation Table ──────────────────────────────────────────────
+    const alloc = workbook.addWorksheet('Allocation Table');
+    alloc.columns = [
+      { header: 'Channel', key: 'Channel', width: 28 },
+      { header: 'Family', key: 'Family', width: 18 },
+      { header: 'Buying Model', key: 'BuyingModel', width: 14 },
+      { header: 'Allocation %', key: 'AllocationPct', width: 13 },
+      { header: 'Spend', key: 'Spend', width: 12 },
+      { header: 'Impressions', key: 'Impressions', width: 13 },
+      { header: 'Clicks', key: 'Clicks', width: 10 },
+      { header: 'Conversions', key: 'Conversions', width: 13 },
+      { header: 'CPA', key: 'CPA', width: 12 },
+      { header: 'Revenue', key: 'Revenue', width: 12 },
+      { header: 'ROAS', key: 'ROAS', width: 10 },
     ];
+    alloc.getRow(1).font = { bold: true };
+    channels.forEach((ch) => {
+      alloc.addRow({
+        Channel: ch.name,
+        Family: safeFamilyName(ch.family),
+        BuyingModel: safeBuyingModelName(ch.buyingModel),
+        AllocationPct: Number(safeNumber(ch.allocationPct).toFixed(4)),
+        Spend: Number(safeNumber(ch.metrics.spend).toFixed(4)),
+        Impressions: Math.round(safeNumber(ch.metrics.impressions)),
+        Clicks: Math.round(safeNumber(ch.metrics.clicks)),
+        Conversions: Number(safeNumber(ch.metrics.conversions).toFixed(2)),
+        CPA: ch.metrics.cpa != null ? Number(ch.metrics.cpa.toFixed(4)) : 'N/A',
+        Revenue: Number(safeNumber(ch.metrics.revenue).toFixed(4)),
+        ROAS: Number(safeNumber(ch.metrics.roas).toFixed(4)),
+      });
+    });
 
-    const sandboxSummarySheetData = sandboxSnapshot
-      ? [
-          { Metric: 'Sandbox Enabled', Value: sandboxSnapshot.enabled ? 'Yes' : 'No' },
-          { Metric: 'Insight', Value: sandboxSnapshot.summaryText },
-          {
-            Metric: 'Baseline Spend',
-            Value: Number(sandboxSnapshot.baselineMetrics.totalSpend.toFixed(4)),
-          },
-          {
-            Metric: 'Adjusted Spend',
-            Value: Number(sandboxSnapshot.adjustedMetrics.totalSpend.toFixed(4)),
-          },
-          {
-            Metric: 'Baseline ROI %',
-            Value: Number(sandboxSnapshot.baselineMetrics.roiPct.toFixed(4)),
-          },
-          {
-            Metric: 'Adjusted ROI %',
-            Value: Number(sandboxSnapshot.adjustedMetrics.roiPct.toFixed(4)),
-          },
-        ]
-      : [];
+    // ── Sheet 2: Scenarios ─────────────────────────────────────────────────────
+    const scen = workbook.addWorksheet('Scenario Outputs');
+    scen.columns = [
+      { header: 'Scenario', key: 'Scenario', width: 10 },
+      { header: 'LTV / User', key: 'LtvPerUser', width: 14 },
+      { header: 'Cohort Value', key: 'CohortValue', width: 16 },
+      { header: 'LTV : CAC', key: 'LtvToCac', width: 12 },
+    ];
+    scen.getRow(1).font = { bold: true };
+    scenarios.forEach((s) => {
+      scen.addRow({
+        Scenario: s.scenario,
+        LtvPerUser: Number(s.projectedLtvPerUser.toFixed(4)),
+        CohortValue: Number(s.projectedCohortValue.toFixed(4)),
+        LtvToCac: Number(s.ltvToCac.toFixed(4)),
+      });
+    });
 
-    const sandboxChannelsSheetData = sandboxSnapshot
-      ? sandboxSnapshot.channelComparisons.map((channel) => ({
-          Channel: channel.channelName,
-          Group: channel.group,
-          BaselineSpend: Number(channel.baselineSpend.toFixed(4)),
-          AdjustedSpend: Number(channel.adjustedSpend.toFixed(4)),
-          BaselineCpa: Number(channel.baselineCpa.toFixed(4)),
-          AdjustedCpa: Number(channel.adjustedCpa.toFixed(4)),
-          BaselineRoas: Number(channel.baselineRoas.toFixed(4)),
-          AdjustedRoas: Number(channel.adjustedRoas.toFixed(4)),
-          ChurnPct: Number(channel.churnPct.toFixed(4)),
-        }))
-      : [];
+    // ── Sheet 3: Efficiency Alerts ─────────────────────────────────────────────
+    const alertSheet = workbook.addWorksheet('Efficiency Alerts');
+    alertSheet.columns = [
+      { header: 'Channel', key: 'Channel', width: 28 },
+      { header: 'Severity', key: 'Severity', width: 10 },
+      { header: 'Reason', key: 'Reason', width: 50 },
+    ];
+    alertSheet.getRow(1).font = { bold: true };
+    alerts.forEach((a) => {
+      alertSheet.addRow({ Channel: a.channelName, Severity: a.severity.toUpperCase(), Reason: a.reason });
+    });
 
-    const sandboxScenariosSheetData = sandboxSnapshot
-      ? sandboxSnapshot.scenarioComparisons.map((scenario) => ({
-          Scenario: scenario.scenario,
-          BaselineProjectedCohortValue: Number(scenario.baselineProjectedCohortValue.toFixed(4)),
-          AdjustedProjectedCohortValue: Number(scenario.adjustedProjectedCohortValue.toFixed(4)),
-          BaselineLtvToCac: Number(scenario.baselineLtvToCac.toFixed(4)),
-          AdjustedLtvToCac: Number(scenario.adjustedLtvToCac.toFixed(4)),
-          BaselineRoiPct: Number(scenario.baselineRoiPct.toFixed(4)),
-          AdjustedRoiPct: Number(scenario.adjustedRoiPct.toFixed(4)),
-        }))
-      : [];
+    // ── Sheet 4: Summary ───────────────────────────────────────────────────────
+    const summ = workbook.addWorksheet('Summary');
+    summ.columns = [
+      { header: 'Metric', key: 'Metric', width: 22 },
+      { header: 'Value', key: 'Value', width: 18 },
+    ];
+    summ.getRow(1).font = { bold: true };
+    summ.addRows([
+      { Metric: 'Total Budget', Value: Number(safeNumber(totalBudget).toFixed(4)) },
+      { Metric: 'Blended CPA', Value: blendedMetrics.blendedCpa ? Number(blendedMetrics.blendedCpa.toFixed(4)) : 'N/A' },
+      { Metric: 'Total Conversions', Value: Number(safeNumber(blendedMetrics.totalConversions).toFixed(2)) },
+      { Metric: 'Projected Revenue', Value: Number(safeNumber(blendedMetrics.projectedRevenue).toFixed(4)) },
+      { Metric: 'Blended ROAS', Value: Number(safeNumber(blendedMetrics.blendedRoas).toFixed(4)) },
+    ]);
 
-    const workbook = XLSX.utils.book_new();
-
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(allocationSheetData),
-      'Allocation Table'
-    );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(scenarioSheetData),
-      'Scenario Outputs'
-    );
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.json_to_sheet(alertsSheetData),
-      'Efficiency Alerts'
-    );
-    XLSX.utils.book_append_sheet(workbook, XLSX.utils.json_to_sheet(summarySheetData), 'Summary');
-
+    // ── Optional sandbox sheets ────────────────────────────────────────────────
     if (sandboxSnapshot) {
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(sandboxSummarySheetData),
-        'Sandbox Summary'
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(sandboxChannelsSheetData),
-        'Sandbox Channels'
-      );
-      XLSX.utils.book_append_sheet(
-        workbook,
-        XLSX.utils.json_to_sheet(sandboxScenariosSheetData),
-        'Sandbox Scenarios'
-      );
+      const sbSumm = workbook.addWorksheet('Sandbox Summary');
+      sbSumm.columns = [{ header: 'Metric', key: 'Metric', width: 22 }, { header: 'Value', key: 'Value', width: 24 }];
+      sbSumm.getRow(1).font = { bold: true };
+      sbSumm.addRows([
+        { Metric: 'Sandbox Enabled', Value: sandboxSnapshot.enabled ? 'Yes' : 'No' },
+        { Metric: 'Insight', Value: sandboxSnapshot.summaryText },
+        { Metric: 'Baseline Spend', Value: Number(sandboxSnapshot.baselineMetrics.totalSpend.toFixed(4)) },
+        { Metric: 'Adjusted Spend', Value: Number(sandboxSnapshot.adjustedMetrics.totalSpend.toFixed(4)) },
+        { Metric: 'Baseline ROI %', Value: Number(sandboxSnapshot.baselineMetrics.roiPct.toFixed(4)) },
+        { Metric: 'Adjusted ROI %', Value: Number(sandboxSnapshot.adjustedMetrics.roiPct.toFixed(4)) },
+      ]);
+
+      const sbCh = workbook.addWorksheet('Sandbox Channels');
+      sbCh.columns = [
+        { header: 'Channel', key: 'Channel', width: 28 }, { header: 'Group', key: 'Group', width: 14 },
+        { header: 'Baseline Spend', key: 'BaselineSpend', width: 16 }, { header: 'Adjusted Spend', key: 'AdjustedSpend', width: 16 },
+        { header: 'Baseline CPA', key: 'BaselineCpa', width: 14 }, { header: 'Adjusted CPA', key: 'AdjustedCpa', width: 14 },
+        { header: 'Baseline ROAS', key: 'BaselineRoas', width: 14 }, { header: 'Adjusted ROAS', key: 'AdjustedRoas', width: 14 },
+        { header: 'Churn %', key: 'ChurnPct', width: 10 },
+      ];
+      sbCh.getRow(1).font = { bold: true };
+      sandboxSnapshot.channelComparisons.forEach((c) => {
+        sbCh.addRow({
+          Channel: c.channelName, Group: c.group,
+          BaselineSpend: Number(c.baselineSpend.toFixed(4)), AdjustedSpend: Number(c.adjustedSpend.toFixed(4)),
+          BaselineCpa: Number(c.baselineCpa.toFixed(4)), AdjustedCpa: Number(c.adjustedCpa.toFixed(4)),
+          BaselineRoas: Number(c.baselineRoas.toFixed(4)), AdjustedRoas: Number(c.adjustedRoas.toFixed(4)),
+          ChurnPct: Number(c.churnPct.toFixed(4)),
+        });
+      });
+
+      const sbSc = workbook.addWorksheet('Sandbox Scenarios');
+      sbSc.columns = [
+        { header: 'Scenario', key: 'Scenario', width: 10 },
+        { header: 'Baseline Cohort', key: 'BaselineCohort', width: 16 }, { header: 'Adjusted Cohort', key: 'AdjustedCohort', width: 16 },
+        { header: 'Baseline LTV:CAC', key: 'BaselineLtv', width: 16 }, { header: 'Adjusted LTV:CAC', key: 'AdjustedLtv', width: 16 },
+        { header: 'Baseline ROI %', key: 'BaselineRoi', width: 14 }, { header: 'Adjusted ROI %', key: 'AdjustedRoi', width: 14 },
+      ];
+      sbSc.getRow(1).font = { bold: true };
+      sandboxSnapshot.scenarioComparisons.forEach((s) => {
+        sbSc.addRow({
+          Scenario: s.scenario,
+          BaselineCohort: Number(s.baselineProjectedCohortValue.toFixed(4)),
+          AdjustedCohort: Number(s.adjustedProjectedCohortValue.toFixed(4)),
+          BaselineLtv: Number(s.baselineLtvToCac.toFixed(4)),
+          AdjustedLtv: Number(s.adjustedLtvToCac.toFixed(4)),
+          BaselineRoi: Number(s.baselineRoiPct.toFixed(4)),
+          AdjustedRoi: Number(s.adjustedRoiPct.toFixed(4)),
+        });
+      });
     }
 
-    XLSX.writeFile(workbook, `mediaplan-${new Date().toISOString().split('T')[0]}.xlsx`);
+    // ── Write & download ───────────────────────────────────────────────────────
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `mediaplan-${new Date().toISOString().split('T')[0]}.xlsx`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   } catch (error) {
     console.error('Excel Export Error:', error);
     throw new Error('Failed to generate Excel export. Please try again.');
