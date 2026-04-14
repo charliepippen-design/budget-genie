@@ -253,7 +253,12 @@ export const OnboardWizard = () => {
       goToStep('generating');
 
       const startedAt = Date.now();
-      const refinedPlan = await generateOnboardingPlan(answers);
+      let refinedPlan: Awaited<ReturnType<typeof generateOnboardingPlan>> = null;
+      try {
+        refinedPlan = await generateOnboardingPlan(answers);
+      } catch {
+        // AI generation failed — continue with preset defaults
+      }
       const elapsed = Date.now() - startedAt;
       if (elapsed < 2000) {
         await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
