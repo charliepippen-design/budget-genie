@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MediaPlanner Pro — Coming Soon</title>
+  <meta name="description" content="MediaPlanner Pro is an AI-powered media planning platform for performance marketers. Launching soon." />
+  <meta name="robots" content="noindex, nofollow" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0f1e;
+      --surface:   #111827;
+      --border:    rgba(99, 102, 241, 0.18);
+      --primary:   #6366f1;
+      --primary-g: #818cf8;
+      --text:      #f1f5f9;
+      --muted:     #94a3b8;
+      --glow:      rgba(99, 102, 241, 0.35);
+    }
+
+    html, body {
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Subtle animated grid */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(99,102,241,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(99,102,241,0.04) 1px, transparent 1px);
+      background-size: 48px 48px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* Radial glow blob */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 500px;
+      background: radial-gradient(ellipse, rgba(99,102,241,0.12) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .page {
+      position: relative;
+      z-index: 1;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+      text-align: center;
+    }
+
+    /* Logo / wordmark */
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 3rem;
+    }
+
+    .logo-icon {
+      width: 40px;
+      height: 40px;
+      background: linear-gradient(135deg, var(--primary), var(--primary-g));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 24px var(--glow);
+      flex-shrink: 0;
+    }
+
+    .logo-icon svg { width: 22px; height: 22px; fill: #fff; }
+
+    .logo-text {
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text);
+    }
+
+    .logo-text span {
+      background: linear-gradient(90deg, var(--primary), var(--primary-g));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Card */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3rem 2.5rem;
+      max-width: 520px;
+      width: 100%;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.4), 0 0 0 1px rgba(99,102,241,0.06);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: rgba(99,102,241,0.12);
+      border: 1px solid rgba(99,102,241,0.25);
+      border-radius: 999px;
+      padding: 0.3rem 0.9rem;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--primary-g);
+      margin-bottom: 1.5rem;
+    }
+
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--primary);
+      box-shadow: 0 0 6px var(--primary);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.8); }
+    }
+
+    h1 {
+      font-size: clamp(1.8rem, 5vw, 2.4rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+
+    h1 span {
+      background: linear-gradient(90deg, var(--primary), var(--primary-g));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      font-size: 1rem;
+      line-height: 1.65;
+      margin-bottom: 2rem;
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 2rem 0;
+    }
+
+    /* Features */
+    .features {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      text-align: left;
+      margin-bottom: 2rem;
+    }
+
+    .feature {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.65rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+
+    .feature-icon {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+      margin-top: 1px;
+      color: var(--primary-g);
+    }
+
+    /* Email form */
+    .form-label {
+      font-size: 0.82rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 0.6rem;
+      display: block;
+      text-align: left;
+    }
+
+    .form-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .form-input {
+      flex: 1;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.7rem 1rem;
+      color: var(--text);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-input::placeholder { color: var(--muted); }
+    .form-input:focus { border-color: var(--primary); }
+
+    .form-btn {
+      background: linear-gradient(135deg, var(--primary), var(--primary-g));
+      border: none;
+      border-radius: 10px;
+      padding: 0.7rem 1.2rem;
+      color: #fff;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: opacity 0.2s, transform 0.15s;
+      box-shadow: 0 4px 16px var(--glow);
+    }
+
+    .form-btn:hover { opacity: 0.9; transform: translateY(-1px); }
+    .form-btn:active { transform: translateY(0); }
+
+    .success-msg {
+      display: none;
+      color: #34d399;
+      font-size: 0.88rem;
+      margin-top: 0.6rem;
+      text-align: left;
+    }
+
+    /* Footer */
+    .footer {
+      margin-top: 2.5rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .footer a {
+      color: var(--primary-g);
+      text-decoration: none;
+    }
+
+    .footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 480px) {
+      .card { padding: 2rem 1.25rem; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+
+    <div class="logo">
+      <div class="logo-icon">
+        <!-- Bar chart icon -->
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="10" width="4" height="12" rx="1" opacity="0.7"/>
+          <rect x="9" y="5"  width="4" height="17" rx="1"/>
+          <rect x="16" y="2" width="4" height="20" rx="1" opacity="0.85"/>
+        </svg>
+      </div>
+      <div class="logo-text">MediaPlanner <span>Pro</span></div>
+    </div>
+
+    <div class="card">
+      <div class="badge">
+        <span class="badge-dot"></span>
+        Under Construction
+      </div>
+
+      <h1>Smarter media planning<br />is <span>almost here.</span></h1>
+
+      <p class="subtitle">
+        MediaPlanner Pro is an AI-powered platform that helps performance marketers
+        plan, optimise, and forecast their entire media budget — across every channel,
+        vertical, and market.
+      </p>
+
+      <div class="features">
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+          </svg>
+          AI-driven budget allocation across paid, organic, affiliate & influencer
+        </div>
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+          </svg>
+          Real-time ROAS forecasting with Bear / Base / Bull scenario modelling
+        </div>
+        <div class="feature">
+          <svg class="feature-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          Built for iGaming, SaaS, eCommerce & lead generation verticals
+        </div>
+      </div>
+
+      <div class="divider"></div>
+
+      <label class="form-label" for="email">Get early access</label>
+      <div class="form-row">
+        <input
+          class="form-input"
+          type="email"
+          id="email"
+          placeholder="you@company.com"
+          autocomplete="email"
+        />
+        <button class="form-btn" onclick="handleSubmit()">Notify me</button>
+      </div>
+      <p class="success-msg" id="success">
+        ✓ You're on the list. We'll be in touch soon.
+      </p>
+    </div>
+
+    <div class="footer">
+      &copy; 2025 MediaPlanner Pro. All rights reserved.<br />
+      Questions? <a href="mailto:hello@mediaplannerpro.com">hello@mediaplannerpro.com</a>
+    </div>
+
+  </div>
+
+  <script>
+    function handleSubmit() {
+      const input = document.getElementById('email');
+      const success = document.getElementById('success');
+      const email = input.value.trim();
+      const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+
+      if (!valid) {
+        input.style.borderColor = '#f87171';
+        setTimeout(() => input.style.borderColor = '', 1500);
+        return;
+      }
+
+      // Store locally until you wire up a backend
+      const list = JSON.parse(localStorage.getItem('waitlist') || '[]');
+      if (!list.includes(email)) list.push(email);
+      localStorage.setItem('waitlist', JSON.stringify(list));
+
+      input.value = '';
+      input.style.display = 'none';
+      document.querySelector('.form-btn').style.display = 'none';
+      success.style.display = 'block';
+    }
+
+    document.getElementById('email').addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') handleSubmit();
+    });
+  </script>
+</body>
+</html>
