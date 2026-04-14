@@ -7,13 +7,15 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { ChannelData, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { TIER_DEFAULTS, TOP_IGAMING_GEOS } from '@/lib/geo-market-data';
+import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import { WizardAnswers, generateOnboardingPlan } from '@/lib/onboarding-ai';
-import { Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
+import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 
 interface WizardState {
-  step: 1 | 2 | 3 | 4 | 5 | 'generating' | 'done';
+  step: 1 | 2 | 3 | 4 | 5 | 6 | 'generating' | 'done';
   budget: number | '';
   vertical: Vertical | null;
+  subvertical: IgamingSubvertical | null;
   goal: WizardAnswers['goal'] | null;
   geos: string[];
   benchmarks: { cpa: string; ltv: string };
@@ -125,6 +127,7 @@ export const OnboardWizard = () => {
   const navigate = useNavigate();
   const setTotalBudget = useMediaPlanStore((state) => state.setTotalBudget);
   const setOnboardingVertical = useMediaPlanStore((state) => state.setOnboardingVertical);
+  const setOnboardingSubvertical = useMediaPlanStore((state) => state.setOnboardingSubvertical);
   const setChannels = useMediaPlanStore((state) => state.setChannels);
   const normalizeAllocations = useMediaPlanStore((state) => state.normalizeAllocations);
   const setGlobalMultipliers = useMediaPlanStore((state) => state.setGlobalMultipliers);
@@ -137,6 +140,7 @@ export const OnboardWizard = () => {
     step: 1,
     budget: '',
     vertical: null,
+    subvertical: null,
     goal: null,
     geos: [],
     benchmarks: { cpa: '', ltv: '' },
@@ -156,6 +160,10 @@ export const OnboardWizard = () => {
   const selectedPreset = useMemo(
     () => (state.vertical ? VERTICAL_PRESETS[state.vertical] : null),
     [state.vertical]
+  );
+  const selectedSubverticalPreset = useMemo(
+    () => (state.subvertical ? IGAMING_SUBVERTICAL_PRESETS[state.subvertical] : null),
+    [state.subvertical]
   );
 
   const isBudgetValid =
@@ -192,8 +200,16 @@ export const OnboardWizard = () => {
 
   const selectVertical = useCallback(
     (vertical: Vertical) => {
-      setState((prev) => ({ ...prev, vertical }));
-      window.setTimeout(() => goToStep(3), 300);
+      setState((prev) => ({ ...prev, vertical, subvertical: null }));
+      window.setTimeout(() => goToStep(vertical === 'igaming' ? 3 : 4), 300);
+    },
+    [goToStep]
+  );
+
+  const selectSubvertical = useCallback(
+    (subvertical: IgamingSubvertical | null) => {
+      setState((prev) => ({ ...prev, subvertical }));
+      window.setTimeout(() => goToStep(4), 300);
     },
     [goToStep]
   );
@@ -201,7 +217,7 @@ export const OnboardWizard = () => {
   const selectGoal = useCallback(
     (goal: WizardAnswers['goal']) => {
       setState((prev) => ({ ...prev, goal }));
-      window.setTimeout(() => goToStep(4), 300);
+      window.setTimeout(() => goToStep(5), 300);
     },
     [goToStep]
   );
@@ -245,6 +261,7 @@ export const OnboardWizard = () => {
 
       setTotalBudget(answers.budget);
       setOnboardingVertical(answers.vertical);
+      setOnboardingSubvertical(state.subvertical);
 
       const adjustedPresetChannels = preset.channels.map((channel) => {
         const aiAdj = refinedPlan?.channelAdjustments.find(
@@ -300,10 +317,24 @@ export const OnboardWizard = () => {
 
       // Use || (not ??) so that a zero returned by the AI falls through to the preset
       // default. playerValue === 0 would make all revenue calculations return 0.
+      const revenueModelDefaults =
+        answers.vertical === 'igaming' && state.subvertical
+          ? IGAMING_SUBVERTICAL_PRESETS[state.subvertical]
+          : null;
+
       setGlobalMultipliers({
-        playerValue: parsedLtv || refinedPlan?.recommendedPlayerValue || preset.defaultPlayerValue,
+        playerValue:
+          parsedLtv ||
+          refinedPlan?.recommendedPlayerValue ||
+          revenueModelDefaults?.playerValue ||
+          preset.defaultPlayerValue,
         cpaTarget: parsedCpa || refinedPlan?.recommendedCpaTarget || preset.defaultCpaTarget,
         roasTarget: refinedPlan?.recommendedRoasTarget || preset.defaultRoasTarget,
+        retentionRate: revenueModelDefaults?.retentionRate,
+        regToFtdCvr: revenueModelDefaults?.regToFtdCvr,
+        turnoverRate: revenueModelDefaults?.turnoverRate,
+        margin: revenueModelDefaults?.margin,
+        bonusRate: revenueModelDefaults?.bonusRate,
         spendMultiplier: 1,
       });
 
@@ -340,6 +371,7 @@ export const OnboardWizard = () => {
       setChannels,
       setGlobalMultipliers,
       setHasCompletedOnboarding,
+      setOnboardingSubvertical,
       setOnboardingVertical,
       setTierAllocation,
       setTotalBudget,
@@ -380,10 +412,10 @@ export const OnboardWizard = () => {
       if (state.step === 1) {
         event.preventDefault();
         continueFromBudget();
-      } else if (state.step === 4) {
-        event.preventDefault();
-        goToStep(5);
       } else if (state.step === 5) {
+        event.preventDefault();
+        goToStep(6);
+      } else if (state.step === 6) {
         event.preventDefault();
         void applyPlan(true);
       }
@@ -393,14 +425,14 @@ export const OnboardWizard = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [applyPlan, continueFromBudget, goToStep, state.step]);
 
-  const progress = typeof state.step === 'number' ? state.step : 5;
+  const progress = typeof state.step === 'number' ? Math.min(state.step, 6) : 6;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 pb-12 pt-8 sm:px-8">
         {state.step !== 'generating' && (
           <div className="mb-8 flex items-center gap-2">
-            {[1, 2, 3, 4, 5].map((dot) => (
+            {[1, 2, 3, 4, 5, 6].map((dot) => (
               <span
                 key={dot}
                 className={`h-2.5 w-8 rounded-full transition-colors ${
@@ -567,6 +599,80 @@ export const OnboardWizard = () => {
 
         {state.step === 3 && (
           <section className="flex flex-1 flex-col">
+            <h1 className="text-4xl font-bold tracking-tight">Choose your iGaming preset</h1>
+            <p className="mt-3 text-slate-400">
+              These are industry benchmarks. You can adjust them in Settings at any time.
+            </p>
+
+            <div className="mt-10 grid grid-cols-1 gap-4 md:grid-cols-3">
+              {(Object.keys(IGAMING_SUBVERTICAL_PRESETS) as IgamingSubvertical[]).map((key) => {
+                const preset = IGAMING_SUBVERTICAL_PRESETS[key];
+                const selected = state.subvertical === key;
+
+                return (
+                  <Card
+                    key={key}
+                    role="button"
+                    tabIndex={0}
+                    className={`cursor-pointer border bg-slate-900 p-5 transition-all ${
+                      selected
+                        ? 'border-indigo-500 ring-2 ring-indigo-500/60'
+                        : 'border-slate-700 hover:border-indigo-400'
+                    }`}
+                    onClick={() => selectSubvertical(key)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter') {
+                        event.preventDefault();
+                        selectSubvertical(key);
+                      }
+                    }}
+                  >
+                    <h3 className="text-lg font-semibold">{preset.label}</h3>
+                    <p className="mt-2 text-sm text-slate-400">{preset.description}</p>
+                    <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-sm text-slate-300 space-y-1">
+                      <p>Margin: {(preset.margin * 100).toFixed(1)}%</p>
+                      <p>Bonus Rate: {(preset.bonusRate * 100).toFixed(1)}%</p>
+                      <p>Reg to FTD CVR: {(preset.regToFtdCvr * 100).toFixed(1)}%</p>
+                      <p>Player Value: ${preset.playerValue}</p>
+                      <p>Retention Rate: {(preset.retentionRate * 100).toFixed(0)}%</p>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+
+            <div className="mt-10 rounded-2xl border border-slate-700 bg-slate-900 p-6">
+              <p className="text-sm font-semibold text-slate-200">Preview</p>
+              <p className="mt-2 text-sm text-slate-400">
+                {selectedSubverticalPreset
+                  ? `${selectedSubverticalPreset.label}: margin ${(selectedSubverticalPreset.margin * 100).toFixed(1)}%, bonus ${(selectedSubverticalPreset.bonusRate * 100).toFixed(1)}%, reg to FTD ${(selectedSubverticalPreset.regToFtdCvr * 100).toFixed(1)}%, player value $${selectedSubverticalPreset.playerValue}, retention ${(selectedSubverticalPreset.retentionRate * 100).toFixed(0)}%.`
+                  : 'Skip this if you want to enter your own revenue model inputs later.'}
+              </p>
+            </div>
+
+            <div className="mt-10 flex flex-wrap items-center justify-between gap-3">
+              <Button
+                variant="ghost"
+                className="text-muted-foreground hover:bg-slate-900 hover:text-white"
+                onClick={() => goToStep(2)}
+              >
+                ← Back
+              </Button>
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  variant="ghost"
+                  className="text-slate-300 hover:bg-slate-900 hover:text-white"
+                  onClick={() => selectSubvertical(null)}
+                >
+                  Skip / I'll enter my own numbers
+                </Button>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {state.step === 4 && (
+          <section className="flex flex-1 flex-col">
             <h1 className="text-4xl font-bold tracking-tight">
               What's your primary goal this month?
             </h1>
@@ -613,7 +719,7 @@ export const OnboardWizard = () => {
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:bg-slate-900 hover:text-white"
-                onClick={() => goToStep(2)}
+                onClick={() => goToStep(state.vertical === 'igaming' ? 3 : 2)}
               >
                 ← Back
               </Button>
@@ -622,7 +728,7 @@ export const OnboardWizard = () => {
           </section>
         )}
 
-        {state.step === 4 && (
+        {state.step === 5 && (
           <section className="flex flex-1 flex-col">
             <h1 className="text-4xl font-bold tracking-tight">Where are your target markets?</h1>
             <p className="mt-3 max-w-3xl text-slate-400">
@@ -668,7 +774,7 @@ export const OnboardWizard = () => {
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:bg-slate-900 hover:text-white"
-                onClick={() => goToStep(3)}
+                onClick={() => goToStep(4)}
               >
                 ← Back
               </Button>
@@ -678,14 +784,14 @@ export const OnboardWizard = () => {
                   className="text-slate-300 hover:bg-slate-900 hover:text-white"
                   onClick={() => {
                     setState((prev) => ({ ...prev, geos: [] }));
-                    goToStep(5);
+                    goToStep(6);
                   }}
                 >
                   Skip - use global defaults
                 </Button>
                 <Button
                   className="bg-indigo-600 px-7 hover:bg-indigo-500"
-                  onClick={() => goToStep(5)}
+                  onClick={() => goToStep(6)}
                 >
                   Continue -&gt;
                 </Button>
@@ -694,7 +800,7 @@ export const OnboardWizard = () => {
           </section>
         )}
 
-        {state.step === 5 && (
+        {state.step === 6 && (
           <section className="flex flex-1 flex-col">
             <h1 className="text-4xl font-bold tracking-tight">Do you know your numbers?</h1>
             <p className="mt-3 max-w-3xl text-slate-400">
@@ -762,7 +868,7 @@ export const OnboardWizard = () => {
               <Button
                 variant="ghost"
                 className="text-muted-foreground hover:bg-slate-900 hover:text-white"
-                onClick={() => goToStep(4)}
+                onClick={() => goToStep(5)}
               >
                 ← Back
               </Button>

@@ -3,6 +3,7 @@ import { DistributionStrategy } from '@/lib/distribution-logic';
 import { BuyingModel, ChannelFamily } from '@/types/channel';
 
 export type Vertical = 'igaming' | 'ecommerce' | 'saas' | 'lead_gen' | 'other';
+export type IgamingSubvertical = 'casino' | 'sportsbook' | 'crypto_casino';
 
 export interface VerticalPreset {
   label: string;

@@ -15,8 +15,14 @@ import {
 import { normalizeAllocations as normalizeAllocationsUtil } from '@/lib/math-utils';
 import { calculateScoredAllocation } from '@/lib/distribution-logic';
 import { GeoTierKey, TOP_IGAMING_GEOS, TIER_DEFAULTS } from '@/lib/geo-market-data';
+import {
+  DEFAULT_IGAMING_REVENUE_INPUTS,
+  calculateIgamingRevenueMonth,
+  isIgamingVertical,
+  normalizeIgamingRevenueInputs,
+} from '@/lib/igaming-revenue-model';
 import { sanitizeChannelName } from '@/lib/utils';
-import { Vertical } from '@/lib/vertical-presets';
+import { IgamingSubvertical, Vertical } from '@/lib/vertical-presets';
 
 export type { ChannelCategory };
 
@@ -58,6 +64,11 @@ export interface GlobalMultipliers {
   cpaTarget: number | null;
   roasTarget: number | null;
   playerValue: number; // LTV per FTD for revenue calc
+  retentionRate: number;
+  regToFtdCvr: number;
+  turnoverRate: number;
+  margin: number;
+  bonusRate: number;
 }
 
 export interface CalculatedChannelMetrics {
@@ -269,6 +280,11 @@ const DEFAULT_MULTIPLIERS: GlobalMultipliers = {
   cpaTarget: null,
   roasTarget: null,
   playerValue: 150, // Default LTV per FTD
+  retentionRate: DEFAULT_IGAMING_REVENUE_INPUTS.retentionRate,
+  regToFtdCvr: DEFAULT_IGAMING_REVENUE_INPUTS.regToFtdCvr,
+  turnoverRate: DEFAULT_IGAMING_REVENUE_INPUTS.turnoverRate,
+  margin: DEFAULT_IGAMING_REVENUE_INPUTS.margin,
+  bonusRate: DEFAULT_IGAMING_REVENUE_INPUTS.bonusRate,
 };
 
 // Helper to create type config from legacy channel data
@@ -549,6 +565,7 @@ export interface MediaPlanState {
   isGenieOpen: boolean;
   hasCompletedOnboarding: boolean;
   onboardingVertical: Vertical | null;
+  onboardingSubvertical: IgamingSubvertical | null;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
@@ -569,6 +586,7 @@ export interface MediaPlanState {
   setIsGenieOpen: (open: boolean) => void;
   setHasCompletedOnboarding: (value: boolean) => void;
   setOnboardingVertical: (v: Vertical | null) => void;
+  setOnboardingSubvertical: (v: IgamingSubvertical | null) => void;
 
   // Actions - Channels
   setChannelAllocation: (channelId: string, percentage: number) => void;
@@ -640,6 +658,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       isGenieOpen: false,
       hasCompletedOnboarding: false,
       onboardingVertical: null,
+      onboardingSubvertical: null,
 
       // Budget
       setTotalBudget: (value) =>
@@ -742,6 +761,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       setIsGenieOpen: (open) => set({ isGenieOpen: open }),
       setHasCompletedOnboarding: (value) => set({ hasCompletedOnboarding: value }),
       setOnboardingVertical: (v) => set({ onboardingVertical: v }),
+      setOnboardingSubvertical: (v) => set({ onboardingSubvertical: v }),
 
       // Channel allocation
       setChannelAllocation: (channelId, percentage) => {
@@ -1147,6 +1167,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             m3: null,
             m6: null,
           },
+          onboardingSubvertical: null,
         });
       },
 
@@ -1201,25 +1222,34 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         userStatus: state.userStatus,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         onboardingVertical: state.onboardingVertical,
+        onboardingSubvertical: state.onboardingSubvertical,
       }),
-      version: 8,
+      version: 9,
       migrate: (persistedState: unknown, version) => {
         const safeState = (persistedState ?? {}) as Partial<MediaPlanState> & {
           channels?: Array<Partial<ChannelData>>;
         };
+        const withRevenueModelDefaults = (state: Partial<MediaPlanState>) => ({
+          ...state,
+          globalMultipliers: {
+            ...DEFAULT_MULTIPLIERS,
+            ...(state.globalMultipliers ?? {}),
+          },
+          onboardingSubvertical: state.onboardingSubvertical ?? null,
+        });
 
         if (version < 2) {
           // Hard reset for version 2 (Types totally changed)
-          return {
+          return withRevenueModelDefaults({
             totalBudget: 50000,
             channels: createInitialChannels(),
             globalMultipliers: { ...DEFAULT_MULTIPLIERS },
             presets: [],
-          } as unknown as MediaPlanState;
+          }) as unknown as MediaPlanState;
         }
         // Migration to v3 for isActive
         if (version < 3) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             channels: (safeState.channels ?? []).map((ch) => ({
               ...ch,
@@ -1227,10 +1257,10 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             })),
             activeTiers: { ...TIER_DEFAULTS },
             activeGeos: [],
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
         if (version < 4) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             activeTiers: {
               ...TIER_DEFAULTS,
@@ -1239,23 +1269,23 @@ export const useMediaPlanStore = create<MediaPlanState>()(
             activeGeos: (safeState as Partial<MediaPlanState>).activeGeos ?? [],
             subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
             userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
         if (version < 5) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
             userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
         if (version < 6) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
         if (version < 7) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             geoOverrides: (safeState as Partial<MediaPlanState>).geoOverrides ?? {},
             observedLtv: (safeState as Partial<MediaPlanState>).observedLtv ?? {
@@ -1263,15 +1293,15 @@ export const useMediaPlanStore = create<MediaPlanState>()(
               m3: null,
               m6: null,
             },
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
         if (version < 8) {
-          return {
+          return withRevenueModelDefaults({
             ...safeState,
             onboardingVertical: (safeState as Partial<MediaPlanState>).onboardingVertical ?? null,
-          } as MediaPlanState;
+          }) as MediaPlanState;
         }
-        return safeState as MediaPlanState;
+        return withRevenueModelDefaults(safeState) as MediaPlanState;
       },
     }
   )
@@ -1331,6 +1361,11 @@ const DEFAULT_MULTIPLIERS_FALLBACK: GlobalMultipliers = {
   cpaTarget: null,
   roasTarget: null,
   playerValue: 150,
+  retentionRate: DEFAULT_IGAMING_REVENUE_INPUTS.retentionRate,
+  regToFtdCvr: DEFAULT_IGAMING_REVENUE_INPUTS.regToFtdCvr,
+  turnoverRate: DEFAULT_IGAMING_REVENUE_INPUTS.turnoverRate,
+  margin: DEFAULT_IGAMING_REVENUE_INPUTS.margin,
+  bonusRate: DEFAULT_IGAMING_REVENUE_INPUTS.bonusRate,
 };
 
 export function useChannelsWithMetrics(): ChannelWithMetrics[] {
@@ -1498,6 +1533,7 @@ export function useCategoryTotals(): Record<string, { spend: number; percentage:
 export function useFtdVelocityMetrics(): FtdVelocityMetrics {
   const channelsWithMetrics = useChannelsWithMetrics();
   const vertical = useMediaPlanStore((s) => s.onboardingVertical);
+  const globalMultipliers = useMediaPlanStore((s) => s.globalMultipliers);
 
   return useMemo(() => {
     const unlocked = channelsWithMetrics.filter((ch) => !ch.locked && ch.isActive);
@@ -1509,7 +1545,7 @@ export function useFtdVelocityMetrics(): FtdVelocityMetrics {
 
     // Registration-to-conversion rate by vertical
     const regToConvRates: Record<string, number> = {
-      igaming: 0.42,
+      igaming: globalMultipliers.regToFtdCvr,
       ecommerce: 0.12,
       saas: 0.35,
       lead_gen: 0.25,
@@ -1519,9 +1555,21 @@ export function useFtdVelocityMetrics(): FtdVelocityMetrics {
     const registrations = ftds > 0 ? ftds / registrationToFtdRate : 0;
 
     const projectedRevenue = unlocked.reduce((sum, ch) => sum + ch.metrics.revenue, 0);
-    // NGR adjustment: iGaming applies ~22% bonus/cost deduction; all other verticals use gross revenue
-    const ngrMultiplier = vertical === 'igaming' ? 0.78 : 1.0;
-    const ngr = projectedRevenue * ngrMultiplier;
+    const igamingInputs = normalizeIgamingRevenueInputs(
+      globalMultipliers,
+      globalMultipliers.playerValue
+    );
+    const waterfall = isIgamingVertical(vertical)
+      ? calculateIgamingRevenueMonth(
+          {
+            ftds,
+            marketingCost: 0,
+          },
+          0,
+          igamingInputs
+        )
+      : null;
+    const ngr = waterfall?.ngr ?? projectedRevenue;
 
     const impressionToClickRate = totalImpressions > 0 ? qualityClicks / totalImpressions : 0;
     const clickToRegistrationRate = qualityClicks > 0 ? registrations / qualityClicks : 0;
@@ -1538,7 +1586,7 @@ export function useFtdVelocityMetrics(): FtdVelocityMetrics {
       registrationToFtdRate,
       ngrPerFtd,
     };
-  }, [channelsWithMetrics, vertical]);
+  }, [channelsWithMetrics, globalMultipliers, vertical]);
 }
 
 export type Channel = ChannelData;

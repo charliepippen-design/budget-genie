@@ -10,6 +10,7 @@ import {
   CartesianGrid,
   LineChart,
   Line,
+  ReferenceLine,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,7 @@ import {
 } from '@/components/ui/accordion';
 import { ChannelWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
 import {
   buildBudgetUtilization,
   buildChannelStackData,
@@ -36,6 +38,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
 
 interface ChartSectionProps {
   channels: ChannelWithMetrics[];
@@ -73,6 +76,8 @@ type ViewMode = 'category' | 'channel';
 export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
   const { format: formatCurrency } = useCurrency();
   const { theme } = useTheme();
+  const vc = useVerticalConfig();
+  const { months: multiMonthMetrics } = useMultiMonthMetrics();
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [groupView, setGroupView] = useState<ChannelGroup | 'all'>('all');
   const totalBudget = useMediaPlanStore((state) => state.totalBudget);
@@ -186,6 +191,52 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
       }),
     [channels]
   );
+
+  const planHealthData = useMemo(
+    () =>
+      multiMonthMetrics.map((month, index) => ({
+        month: month.label.split(' ')[0]?.slice(0, 3) || `Month ${index + 1}`,
+        grossContribution: month.grossContribution || 0,
+        marketingCost: month.totalSpend || 0,
+        delta: (month.grossContribution || 0) - (month.totalSpend || 0),
+        ngr: month.ngr || 0,
+      })),
+    [multiMonthMetrics]
+  );
+
+  const showPlanHealthChart =
+    vc.vertical === 'igaming' && planHealthData.some((month) => month.ngr > 0);
+
+  const PlanHealthTooltip = ({
+    active,
+    payload,
+  }: TooltipProps<Record<string, number | string>>) => {
+    if (!active || !payload || payload.length === 0) return null;
+    const data = payload[0]?.payload as
+      | { month: string; grossContribution: number; marketingCost: number; delta: number }
+      | undefined;
+
+    if (!data) return null;
+
+    return (
+      <div className={`${tooltipClass} rounded-lg p-3 shadow-lg backdrop-blur`}>
+        <p className="font-semibold text-sm">{data.month}</p>
+        <p className="text-sm">
+          Gross Contribution:{' '}
+          <span className="font-mono text-foreground">
+            {formatCurrency(data.grossContribution)}
+          </span>
+        </p>
+        <p className="text-sm">
+          Marketing Cost:{' '}
+          <span className="font-mono text-foreground">{formatCurrency(data.marketingCost)}</span>
+        </p>
+        <p className="text-sm">
+          Delta: <span className="font-mono text-foreground">{formatCurrency(data.delta)}</span>
+        </p>
+      </div>
+    );
+  };
 
   return (
     <div className="grid grid-cols-1 gap-6 xl:grid-cols-3">
@@ -428,6 +479,67 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
           </Accordion>
         </CardContent>
       </Card>
+
+      {showPlanHealthChart ? (
+        <Card className="xl:col-span-3 border border-slate-700/60 bg-slate-900/50 backdrop-blur-md shadow-[0_10px_35px_rgba(15,23,42,0.45)]">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-semibold">Plan Health</CardTitle>
+            <p className="text-sm text-slate-400">Gross Contribution vs Marketing Spend</p>
+          </CardHeader>
+          <CardContent>
+            <div className="h-[280px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart
+                  data={planHealthData}
+                  margin={{ top: 10, right: 20, left: 0, bottom: 5 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartGridColor} />
+                  <XAxis
+                    dataKey="month"
+                    tick={{ fill: chartAxisColor, fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <YAxis
+                    tickFormatter={(value: number) => formatCurrency(value)}
+                    tick={{ fill: chartAxisColor, fontSize: 11 }}
+                    tickLine={false}
+                  />
+                  <Tooltip content={<PlanHealthTooltip />} />
+                  <Legend
+                    formatter={(value) => <span className="text-slate-200 text-xs">{value}</span>}
+                  />
+                  <ReferenceLine
+                    y={0}
+                    stroke={theme === 'dark' ? '#94a3b8' : '#64748b'}
+                    strokeDasharray="4 4"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="grossContribution"
+                    name="Gross Contribution"
+                    stroke="hsl(var(--primary))"
+                    strokeWidth={2.5}
+                    dot={false}
+                    animationDuration={450}
+                    animationEasing="ease-in-out"
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="marketingCost"
+                    name="Marketing Cost"
+                    stroke={theme === 'dark' ? '#94a3b8' : '#64748b'}
+                    strokeWidth={2}
+                    strokeDasharray="6 4"
+                    dot={false}
+                    animationDuration={450}
+                    animationEasing="ease-in-out"
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
     </div>
   );
 }

@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { ChannelCategory } from '@/lib/mediaplan-data';
+import {
+  calculateIgamingRevenueSeries,
+  isIgamingVertical,
+  normalizeIgamingRevenueInputs,
+} from '@/lib/igaming-revenue-model';
 import { ChannelFamily, BuyingModel, ChannelTypeConfig } from '@/types/channel';
 import { useMediaPlanStore } from './use-media-plan-store';
 
@@ -69,6 +74,12 @@ export interface MonthData {
   totalSpend?: number;
   totalConversions?: number;
   revenue?: number;
+  registrations?: number;
+  activePlayers?: number;
+  ggr?: number;
+  bonus?: number;
+  ngr?: number;
+  grossContribution?: number;
   operatingCosts?: number;
   netProfit?: number;
   cumulativeProfit?: number;
@@ -128,17 +139,149 @@ export interface OptimizationResult {
 // ========== DEFAULT DATA ==========
 
 const DEFAULT_CHANNELS: ChannelMonthConfig[] = [
-  { channelId: 'seo-tech', name: 'SEO - Tech Audit', category: 'SEO/Content', allocationPct: 2.33, cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'seo-content', name: 'SEO - Content', category: 'SEO/Content', allocationPct: 6.98, cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'seo-backlinks', name: 'SEO - Backlinks', category: 'SEO/Content', allocationPct: 4.65, cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-native', name: 'Paid - Native Ads', category: 'Display/Programmatic', allocationPct: 11.63, cpm: 4.2, ctr: 0.35, cr: 2.5, roas: 1.8, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-push', name: 'Paid - Push', category: 'Display/Programmatic', allocationPct: 6.98, cpm: 1.2, ctr: 2.5, cr: 2.5, roas: 2.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-programmatic', name: 'Paid - Display', category: 'Display/Programmatic', allocationPct: 4.65, cpm: 5.5, ctr: 0.15, cr: 2.5, roas: 1.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'paid-retargeting', name: 'Paid - Retargeting', category: 'Display/Programmatic', allocationPct: 2.33, cpm: 8.0, ctr: 1.8, cr: 2.5, roas: 4.2, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'affiliate-listing', name: 'Affiliate - Listing', category: 'Affiliate', allocationPct: 4.65, cpm: 15.0, ctr: 3.5, cr: 2.5, roas: 2.0, impressionMode: 'FIXED', fixedImpressions: 100000, locked: false },
-  { channelId: 'affiliate-cpa', name: 'Affiliate - CPA', category: 'Affiliate', allocationPct: 39.53, cpm: 25.0, ctr: 4.2, cr: 2.5, roas: 3.5, impressionMode: 'CPM', fixedImpressions: 100000, locked: false },
-  { channelId: 'influencer-retainers', name: 'Influencer - Retainers', category: 'Paid Social', allocationPct: 9.30, cpm: 12.0, ctr: 1.5, cr: 2.5, roas: 2.5, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
-  { channelId: 'influencer-funds', name: 'Influencer - Play Funds', category: 'Paid Social', allocationPct: 6.98, cpm: 10.0, ctr: 2.0, cr: 2.5, roas: 3.0, impressionMode: 'FIXED', fixedImpressions: 200000, locked: false },
+  {
+    channelId: 'seo-tech',
+    name: 'SEO - Tech Audit',
+    category: 'SEO/Content',
+    allocationPct: 2.33,
+    cpm: 2.5,
+    ctr: 0.8,
+    cr: 2.5,
+    roas: 3.2,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'seo-content',
+    name: 'SEO - Content',
+    category: 'SEO/Content',
+    allocationPct: 6.98,
+    cpm: 1.8,
+    ctr: 1.2,
+    cr: 2.5,
+    roas: 4.5,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'seo-backlinks',
+    name: 'SEO - Backlinks',
+    category: 'SEO/Content',
+    allocationPct: 4.65,
+    cpm: 3.5,
+    ctr: 0.5,
+    cr: 2.5,
+    roas: 2.8,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'paid-native',
+    name: 'Paid - Native Ads',
+    category: 'Display/Programmatic',
+    allocationPct: 11.63,
+    cpm: 4.2,
+    ctr: 0.35,
+    cr: 2.5,
+    roas: 1.8,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'paid-push',
+    name: 'Paid - Push',
+    category: 'Display/Programmatic',
+    allocationPct: 6.98,
+    cpm: 1.2,
+    ctr: 2.5,
+    cr: 2.5,
+    roas: 2.2,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'paid-programmatic',
+    name: 'Paid - Display',
+    category: 'Display/Programmatic',
+    allocationPct: 4.65,
+    cpm: 5.5,
+    ctr: 0.15,
+    cr: 2.5,
+    roas: 1.5,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'paid-retargeting',
+    name: 'Paid - Retargeting',
+    category: 'Display/Programmatic',
+    allocationPct: 2.33,
+    cpm: 8.0,
+    ctr: 1.8,
+    cr: 2.5,
+    roas: 4.2,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'affiliate-listing',
+    name: 'Affiliate - Listing',
+    category: 'Affiliate',
+    allocationPct: 4.65,
+    cpm: 15.0,
+    ctr: 3.5,
+    cr: 2.5,
+    roas: 2.0,
+    impressionMode: 'FIXED',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'affiliate-cpa',
+    name: 'Affiliate - CPA',
+    category: 'Affiliate',
+    allocationPct: 39.53,
+    cpm: 25.0,
+    ctr: 4.2,
+    cr: 2.5,
+    roas: 3.5,
+    impressionMode: 'CPM',
+    fixedImpressions: 100000,
+    locked: false,
+  },
+  {
+    channelId: 'influencer-retainers',
+    name: 'Influencer - Retainers',
+    category: 'Paid Social',
+    allocationPct: 9.3,
+    cpm: 12.0,
+    ctr: 1.5,
+    cr: 2.5,
+    roas: 2.5,
+    impressionMode: 'FIXED',
+    fixedImpressions: 200000,
+    locked: false,
+  },
+  {
+    channelId: 'influencer-funds',
+    name: 'Influencer - Play Funds',
+    category: 'Paid Social',
+    allocationPct: 6.98,
+    cpm: 10.0,
+    ctr: 2.0,
+    cr: 2.5,
+    roas: 3.0,
+    impressionMode: 'FIXED',
+    fixedImpressions: 200000,
+    locked: false,
+  },
 ];
 
 const DEFAULT_GLOBAL_SETTINGS: GlobalPlanSettings = {
@@ -230,7 +373,7 @@ export function calculateDistribution(
   const totalWeight = weights.reduce((a, b) => a + b, 0);
   let distributedTotal = 0;
 
-  const budgets = weights.map(w => {
+  const budgets = weights.map((w) => {
     const amount = Math.floor((w / totalWeight) * totalBudget);
     distributedTotal += amount;
     return amount;
@@ -282,7 +425,10 @@ function createMonth(
 
 // ========== METRICS CALCULATION ==========
 
-export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPlanSettings): {
+export function calculateMonthMetrics(
+  month: MonthData,
+  globalSettings: GlobalPlanSettings
+): {
   totalSpend: number;
   totalImpressions: number;
   totalClicks: number;
@@ -300,7 +446,7 @@ export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPl
   let totalConversions = 0;
   let totalRevenue = 0;
 
-  month.channels.forEach(ch => {
+  month.channels.forEach((ch) => {
     const spend = (ch.allocationPct / 100) * actualBudget;
     const cpm = ch.cpm;
     const ctr = ch.ctr + (month.ctrBump ?? globalSettings.ctrBump);
@@ -334,13 +480,26 @@ export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPl
   };
 }
 
-export function calculatePlanMetrics(months: MonthData[], globalSettings: GlobalPlanSettings): {
+export function calculatePlanMetrics(
+  months: MonthData[],
+  globalSettings: GlobalPlanSettings,
+  revenueModel?: {
+    playerValue: number;
+    retentionRate: number;
+    regToFtdCvr: number;
+    turnoverRate: number;
+    margin: number;
+    bonusRate: number;
+  }
+): {
   months: MonthData[];
   totals: {
     totalAllocatedBudget: number;
     totalSpend: number;
     totalConversions: number;
     totalRevenue: number;
+    totalNgr: number;
+    totalGrossContribution: number;
     operatingCosts: number;
     netProfit: number;
     avgMonthlyBudget: number;
@@ -353,7 +512,7 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
   let cumulativeProfit = 0;
   let breakEvenMonth: number | null = null;
 
-  const enrichedMonths = months.map((month, idx) => {
+  const baseMonths = months.map((month, idx) => {
     const metrics = calculateMonthMetrics(month, globalSettings);
     const operatingCosts = metrics.revenue * 0.15; // 15% operating costs
     const netProfit = metrics.revenue - metrics.totalSpend - operatingCosts;
@@ -374,12 +533,42 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
     };
   });
 
+  const waterfallSeries = revenueModel
+    ? calculateIgamingRevenueSeries(
+        baseMonths.map((month) => ({
+          ftds: month.totalConversions || 0,
+          marketingCost: month.totalSpend || 0,
+        })),
+        normalizeIgamingRevenueInputs(revenueModel, revenueModel.playerValue)
+      )
+    : [];
+
+  const enrichedMonths = baseMonths.map((month, idx) => {
+    const waterfall = waterfallSeries[idx];
+
+    return {
+      ...month,
+      registrations: waterfall?.registrations,
+      activePlayers: waterfall?.activePlayers,
+      ggr: waterfall?.ggr,
+      bonus: waterfall?.bonus,
+      ngr: waterfall?.ngr,
+      grossContribution: waterfall?.grossContribution,
+    };
+  });
+
   const totalAllocatedBudget = enrichedMonths.reduce((sum, m) => sum + (m.budget || 0), 0);
   const totalSpend = enrichedMonths.reduce((sum, m) => sum + (m.totalSpend || 0), 0);
   const totalConversions = enrichedMonths.reduce((sum, m) => sum + (m.totalConversions || 0), 0);
   const totalRevenue = enrichedMonths.reduce((sum, m) => sum + (m.revenue || 0), 0);
+  const totalNgr = enrichedMonths.reduce((sum, m) => sum + (m.ngr || 0), 0);
+  const totalGrossContribution = enrichedMonths.reduce(
+    (sum, m) => sum + (m.grossContribution || 0),
+    0
+  );
   const totalOperatingCosts = enrichedMonths.reduce((sum, m) => sum + (m.operatingCosts || 0), 0);
-  const endingCumulativeProfit = enrichedMonths.length > 0 ? enrichedMonths[enrichedMonths.length - 1].cumulativeProfit : 0;
+  const endingCumulativeProfit =
+    enrichedMonths.length > 0 ? enrichedMonths[enrichedMonths.length - 1].cumulativeProfit : 0;
 
   return {
     months: enrichedMonths,
@@ -388,9 +577,12 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
       totalSpend,
       totalConversions,
       totalRevenue,
+      totalNgr,
+      totalGrossContribution,
       operatingCosts: totalOperatingCosts,
       netProfit: totalRevenue - totalSpend - totalOperatingCosts,
-      avgMonthlyBudget: enrichedMonths.length > 0 ? totalAllocatedBudget / enrichedMonths.length : 0, // Keeping for backward compat if needed
+      avgMonthlyBudget:
+        enrichedMonths.length > 0 ? totalAllocatedBudget / enrichedMonths.length : 0, // Keeping for backward compat if needed
       avgCpa: totalConversions > 0 ? totalSpend / totalConversions : null,
       avgRoas: totalSpend > 0 ? totalRevenue / totalSpend : 0,
       breakEvenMonth,
@@ -401,7 +593,7 @@ export function calculatePlanMetrics(months: MonthData[], globalSettings: Global
 
 // ========== STORE ==========
 
-interface MultiMonthState {
+export interface MultiMonthState {
   // Plan Configuration
   includeSoftLaunch: boolean;
   planningMonths: number;
@@ -453,7 +645,11 @@ interface MultiMonthState {
   generateMonths: (totalBudget?: number) => void;
   applyPattern: () => void; // Uses CURRENT total budget
   updateMonth: (monthId: string, updates: Partial<MonthData>) => void;
-  updateMonthChannel: (monthId: string, channelId: string, updates: Partial<ChannelMonthConfig>) => void;
+  updateMonthChannel: (
+    monthId: string,
+    channelId: string,
+    updates: Partial<ChannelMonthConfig>
+  ) => void;
   copyFromPreviousMonth: (monthId: string) => void;
   resetMonthToGlobal: (monthId: string) => void;
   applyToRemainingMonths: (fromMonthId: string) => void;
@@ -545,8 +741,11 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         set({ globalSettings: newSettings });
 
         // React to changes
-        const budgetChanged = updates.baseMonthlyBudget !== undefined && updates.baseMonthlyBudget !== prevSettings.baseMonthlyBudget;
-        const growthChanged = (updates.growthRate !== undefined && updates.growthRate !== prevSettings.growthRate) ||
+        const budgetChanged =
+          updates.baseMonthlyBudget !== undefined &&
+          updates.baseMonthlyBudget !== prevSettings.baseMonthlyBudget;
+        const growthChanged =
+          (updates.growthRate !== undefined && updates.growthRate !== prevSettings.growthRate) ||
           (updates.growthType !== undefined && updates.growthType !== prevSettings.growthType);
 
         // If Budget or Growth params change, we should re-distribute
@@ -565,11 +764,11 @@ export const useMultiMonthStore = create<MultiMonthState>()(
             { ...state.patternParams, growthRate: newSettings.growthRate }
           );
 
-          set(curr => ({
+          set((curr) => ({
             months: curr.months.map((m, i) => ({
               ...m,
               budget: budgets[i] || m.budget,
-            }))
+            })),
           }));
         }
       },
@@ -601,12 +800,10 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           targetBudget = state.globalSettings.baseMonthlyBudget * totalMonths;
         }
 
-        const budgets = calculateDistribution(
-          state.progressionPattern,
-          targetBudget,
-          totalMonths,
-          { ...state.patternParams, growthRate: state.globalSettings.growthRate }
-        );
+        const budgets = calculateDistribution(state.progressionPattern, targetBudget, totalMonths, {
+          ...state.patternParams,
+          growthRate: state.globalSettings.growthRate,
+        });
 
         const newMonths: MonthData[] = [];
         for (let i = 0; i < totalMonths; i++) {
@@ -641,24 +838,22 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       },
 
       updateMonth: (monthId, updates) => {
-        set(state => ({
-          months: state.months.map(m =>
-            m.id === monthId ? { ...m, ...updates } : m
-          ),
+        set((state) => ({
+          months: state.months.map((m) => (m.id === monthId ? { ...m, ...updates } : m)),
         }));
       },
 
       updateMonthChannel: (monthId, channelId, updates) => {
-        set(state => ({
-          months: state.months.map(m =>
+        set((state) => ({
+          months: state.months.map((m) =>
             m.id === monthId
               ? {
-                ...m,
-                useGlobalChannels: false,
-                channels: m.channels.map(ch =>
-                  ch.channelId === channelId ? { ...ch, ...updates } : ch
-                ),
-              }
+                  ...m,
+                  useGlobalChannels: false,
+                  channels: m.channels.map((ch) =>
+                    ch.channelId === channelId ? { ...ch, ...updates } : ch
+                  ),
+                }
               : m
           ),
         }));
@@ -666,7 +861,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
       copyFromPreviousMonth: (monthId) => {
         const state = get();
-        const monthIndex = state.months.findIndex(m => m.id === monthId);
+        const monthIndex = state.months.findIndex((m) => m.id === monthId);
         if (monthIndex <= 0) return;
 
         const prevMonth = state.months[monthIndex - 1];
@@ -674,30 +869,30 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           months: state.months.map((m, idx) =>
             idx === monthIndex
               ? {
-                ...m,
-                spendMultiplier: prevMonth.spendMultiplier,
-                cpmOverride: prevMonth.cpmOverride,
-                ctrBump: prevMonth.ctrBump,
-                channels: JSON.parse(JSON.stringify(prevMonth.channels)),
-                useGlobalChannels: prevMonth.useGlobalChannels,
-              }
+                  ...m,
+                  spendMultiplier: prevMonth.spendMultiplier,
+                  cpmOverride: prevMonth.cpmOverride,
+                  ctrBump: prevMonth.ctrBump,
+                  channels: JSON.parse(JSON.stringify(prevMonth.channels)),
+                  useGlobalChannels: prevMonth.useGlobalChannels,
+                }
               : m
           ),
         });
       },
 
       resetMonthToGlobal: (monthId) => {
-        set(state => ({
-          months: state.months.map(m =>
+        set((state) => ({
+          months: state.months.map((m) =>
             m.id === monthId
               ? {
-                ...m,
-                spendMultiplier: null,
-                cpmOverride: null,
-                ctrBump: null,
-                channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
-                useGlobalChannels: true,
-              }
+                  ...m,
+                  spendMultiplier: null,
+                  cpmOverride: null,
+                  ctrBump: null,
+                  channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
+                  useGlobalChannels: true,
+                }
               : m
           ),
         }));
@@ -705,7 +900,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
       applyToRemainingMonths: (fromMonthId) => {
         const state = get();
-        const fromIndex = state.months.findIndex(m => m.id === fromMonthId);
+        const fromIndex = state.months.findIndex((m) => m.id === fromMonthId);
         if (fromIndex < 0) return;
 
         const sourceMonth = state.months[fromIndex];
@@ -713,13 +908,13 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           months: state.months.map((m, idx) =>
             idx > fromIndex
               ? {
-                ...m,
-                spendMultiplier: sourceMonth.spendMultiplier,
-                cpmOverride: sourceMonth.cpmOverride,
-                ctrBump: sourceMonth.ctrBump,
-                channels: JSON.parse(JSON.stringify(sourceMonth.channels)),
-                useGlobalChannels: sourceMonth.useGlobalChannels,
-              }
+                  ...m,
+                  spendMultiplier: sourceMonth.spendMultiplier,
+                  cpmOverride: sourceMonth.cpmOverride,
+                  ctrBump: sourceMonth.ctrBump,
+                  channels: JSON.parse(JSON.stringify(sourceMonth.channels)),
+                  useGlobalChannels: sourceMonth.useGlobalChannels,
+                }
               : m
           ),
         });
@@ -743,7 +938,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
               channels: JSON.parse(JSON.stringify(sourceChannels)),
               useGlobalChannels: true, // Reset override flag
             };
-          })
+          }),
         });
       },
 
@@ -763,14 +958,14 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           months: JSON.parse(JSON.stringify(state.months)),
         };
 
-        set(s => ({
-          scenarios: [...s.scenarios.filter(sc => sc.name !== name), scenario],
+        set((s) => ({
+          scenarios: [...s.scenarios.filter((sc) => sc.name !== name), scenario],
           activeScenarioId: scenario.id,
         }));
       },
 
       loadScenario: (id) => {
-        const scenario = get().scenarios.find(s => s.id === id);
+        const scenario = get().scenarios.find((s) => s.id === id);
         if (!scenario) return;
 
         set({
@@ -786,15 +981,16 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       },
 
       deleteScenario: (id) => {
-        set(state => ({
-          scenarios: state.scenarios.filter(s => s.id !== id),
+        set((state) => ({
+          scenarios: state.scenarios.filter((s) => s.id !== id),
           activeScenarioId: state.activeScenarioId === id ? null : state.activeScenarioId,
-          comparisonScenarioId: state.comparisonScenarioId === id ? null : state.comparisonScenarioId,
+          comparisonScenarioId:
+            state.comparisonScenarioId === id ? null : state.comparisonScenarioId,
         }));
       },
 
       cloneScenario: (id, newName) => {
-        const scenario = get().scenarios.find(s => s.id === id);
+        const scenario = get().scenarios.find((s) => s.id === id);
         if (!scenario) return;
 
         const cloned: PlanScenario = {
@@ -804,7 +1000,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           createdAt: new Date(),
         };
 
-        set(s => ({ scenarios: [...s.scenarios, cloned] }));
+        set((s) => ({ scenarios: [...s.scenarios, cloned] }));
       },
 
       setActiveScenario: (id) => set({ activeScenarioId: id }),
@@ -813,29 +1009,33 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       // Optimization
       setOptimizationGoal: (goal) => set({ optimizationGoal: goal }),
       setRiskLevel: (level) => set({ riskLevel: level }),
-      setConstraints: (updates) => set(s => ({
-        constraints: { ...s.constraints, ...updates },
-      })),
+      setConstraints: (updates) =>
+        set((s) => ({
+          constraints: { ...s.constraints, ...updates },
+        })),
 
       runOptimization: async () => {
         set({ isOptimizing: true, optimizationResults: [] });
 
         // Simulate optimization with different patterns
         const state = get();
-        const patterns: ProgressionPattern[] = ['linear', 'exponential', 'aggressive-launch', 'flat', 'step'];
+        const patterns: ProgressionPattern[] = [
+          'linear',
+          'exponential',
+          'aggressive-launch',
+          'flat',
+          'step',
+        ];
         const results: OptimizationResult[] = [];
 
-        // We need a baseline total budget to optimize against? 
+        // We need a baseline total budget to optimize against?
         // Or assume use current base * months?
         const baseTotal = state.globalSettings.baseMonthlyBudget * state.months.length;
 
         for (const pattern of patterns) {
-          const budgets = calculateDistribution(
-            pattern,
-            baseTotal,
-            state.months.length,
-            { growthRate: state.globalSettings.growthRate }
-          );
+          const budgets = calculateDistribution(pattern, baseTotal, state.months.length, {
+            growthRate: state.globalSettings.growthRate,
+          });
 
           const testMonths = state.months.map((m, idx) => ({
             ...m,
@@ -859,10 +1059,13 @@ export const useMultiMonthStore = create<MultiMonthState>()(
               score = metrics.totals.netProfit / 1000;
               break;
             case 'breakeven-fastest':
-              score = metrics.totals.breakEvenMonth !== null ? (12 - metrics.totals.breakEvenMonth) * 10 : 0;
+              score =
+                metrics.totals.breakEvenMonth !== null
+                  ? (12 - metrics.totals.breakEvenMonth) * 10
+                  : 0;
               break;
             default:
-              score = (metrics.totals.avgRoas * 20) + (metrics.totals.netProfit / 5000);
+              score = metrics.totals.avgRoas * 20 + metrics.totals.netProfit / 5000;
           }
 
           results.push({
@@ -898,9 +1101,10 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       },
 
       // PDF
-      setPdfSections: (sections) => set(s => ({
-        pdfSections: { ...s.pdfSections, ...sections },
-      })),
+      setPdfSections: (sections) =>
+        set((s) => ({
+          pdfSections: { ...s.pdfSections, ...sections },
+        })),
       setUserNotes: (notes) => set({ userNotes: notes }),
 
       // Reset
@@ -941,12 +1145,29 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
 export function useMultiMonthMetrics() {
   const { months, globalSettings } = useMultiMonthStore();
-  return calculatePlanMetrics(months, globalSettings);
+  const vertical = useMediaPlanStore((state) => state.onboardingVertical);
+  const multipliers = useMediaPlanStore((state) => state.globalMultipliers);
+
+  return calculatePlanMetrics(
+    months,
+    globalSettings,
+    isIgamingVertical(vertical)
+      ? normalizeIgamingRevenueInputs(multipliers, multipliers.playerValue)
+      : undefined
+  );
 }
 
 export function useScenarioMetrics(scenarioId: string | null) {
   const { scenarios, globalSettings } = useMultiMonthStore();
-  const scenario = scenarios.find(s => s.id === scenarioId);
+  const vertical = useMediaPlanStore((state) => state.onboardingVertical);
+  const multipliers = useMediaPlanStore((state) => state.globalMultipliers);
+  const scenario = scenarios.find((s) => s.id === scenarioId);
   if (!scenario) return null;
-  return calculatePlanMetrics(scenario.months, scenario.globalSettings);
+  return calculatePlanMetrics(
+    scenario.months,
+    scenario.globalSettings || globalSettings,
+    isIgamingVertical(vertical)
+      ? normalizeIgamingRevenueInputs(multipliers, multipliers.playerValue)
+      : undefined
+  );
 }

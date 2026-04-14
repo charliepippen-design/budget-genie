@@ -16,6 +16,8 @@ import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { toast } from 'sonner';
 import { ScenarioListSkeleton } from '@/components/common/AppSkeletons';
 import { cn } from '@/lib/utils';
+import type { MediaPlanState } from '@/hooks/use-media-plan-store';
+import type { MultiMonthState } from '@/hooks/use-multi-month-store';
 
 interface Project {
   id: string;
@@ -105,10 +107,10 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
       // We need to be careful not to overwrite persisted storage configs if any
       // But setState usually merges if not replaced carefully.
       // Zustand's persist middleware handles hydration, but manual setState works too.
-      useMediaPlanStore.setState(project.mediaPlanState);
+      useMediaPlanStore.setState(project.mediaPlanState as Partial<MediaPlanState>);
 
       // 2. Load Multi-Month State
-      useMultiMonthStore.setState(project.multiMonthState);
+      useMultiMonthStore.setState(project.multiMonthState as Partial<MultiMonthState>);
 
       toast.success(`Loaded project: ${project.name}`);
       setOpen(false);

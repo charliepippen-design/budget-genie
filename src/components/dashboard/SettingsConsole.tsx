@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 // FIX: Use the requested relative import for the store
 import { useProjectStore } from '../../store/useProjectStore';
 import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
+import { calculateIgamingRevenueMonth } from '@/lib/igaming-revenue-model';
 
 // FIX: Use relative imports for UI components as requested
 import { Button } from '../../components/ui/button';
@@ -47,6 +48,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn, sanitizeChannelName } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { ChannelEditor } from './ChannelEditor';
 import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
@@ -56,10 +58,25 @@ import {
   inferChannelFamily,
   getLikelyModel,
 } from '@/types/channel';
+import type { GlobalMultipliers } from '@/hooks/use-media-plan-store';
 
 const BudgetWizard = lazy(() =>
   import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard }))
 );
+
+const GLOBAL_MULTIPLIERS_FALLBACK: GlobalMultipliers = {
+  spendMultiplier: 1,
+  defaultCpmOverride: null,
+  ctrBump: 0,
+  cpaTarget: null,
+  roasTarget: null,
+  playerValue: 150,
+  retentionRate: 0.55,
+  regToFtdCvr: 0.2,
+  turnoverRate: 1,
+  margin: 0.06,
+  bonusRate: 0.25,
+};
 
 // ------------------------------------------------------------------
 // SUB-COMPONENT: GlobalMultipliers
@@ -67,14 +84,43 @@ const BudgetWizard = lazy(() =>
 const GlobalMultipliers: React.FC = () => {
   // We can use the same store hook here
   const {
-    globalMultipliers = { spendMultiplier: 1, cpaTarget: null, roasTarget: null },
+    globalMultipliers = GLOBAL_MULTIPLIERS_FALLBACK,
     setGlobalMultipliers,
     totalBudget,
   } = useProjectStore();
+  const channelsWithMetrics = useChannelsWithMetrics();
+  const vc = useVerticalConfig();
   const { symbol, format } = useCurrency();
   const { toast } = useToast();
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'contrast';
+  const isIgaming = vc.vertical === 'igaming';
+
+  const revenueModelOutputs = useMemo(() => {
+    if (!isIgaming) return null;
+
+    const marketingCost = channelsWithMetrics.reduce(
+      (sum, channel) => sum + channel.metrics.spend,
+      0
+    );
+    const ftds = channelsWithMetrics.reduce((sum, channel) => sum + channel.metrics.conversions, 0);
+
+    return calculateIgamingRevenueMonth(
+      {
+        ftds,
+        marketingCost,
+      },
+      0,
+      {
+        playerValue: globalMultipliers.playerValue,
+        retentionRate: globalMultipliers.retentionRate,
+        regToFtdCvr: globalMultipliers.regToFtdCvr,
+        turnoverRate: globalMultipliers.turnoverRate,
+        margin: globalMultipliers.margin,
+        bonusRate: globalMultipliers.bonusRate,
+      }
+    );
+  }, [channelsWithMetrics, globalMultipliers, isIgaming]);
 
   return (
     <div className="space-y-4">
@@ -193,6 +239,184 @@ const GlobalMultipliers: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {isIgaming && revenueModelOutputs ? (
+        <div className="rounded-xl border border-border/60 p-4 space-y-4 bg-background/40">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <BadgeDollarSign className="w-4 h-4 text-emerald-400" />
+              <Label
+                className={cn(
+                  'text-sm font-semibold',
+                  isDark ? 'text-slate-200' : 'text-slate-900'
+                )}
+              >
+                Revenue Model
+              </Label>
+            </div>
+            <p className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}>
+              Inputs drive the iGaming waterfall. Downstream values are computed and read-only.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label
+                className={cn(
+                  'text-xs uppercase tracking-wider',
+                  isDark ? 'text-slate-500' : 'text-slate-600'
+                )}
+              >
+                Reg to FTD CVR
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={globalMultipliers.regToFtdCvr}
+                onChange={(e) =>
+                  setGlobalMultipliers({
+                    regToFtdCvr: Math.max(0, parseFloat(e.target.value) || 0),
+                  })
+                }
+                className={cn(
+                  'h-10 text-sm',
+                  isDark
+                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-900'
+                )}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label
+                className={cn(
+                  'text-xs uppercase tracking-wider',
+                  isDark ? 'text-slate-500' : 'text-slate-600'
+                )}
+              >
+                Monthly Retention Rate
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={globalMultipliers.retentionRate}
+                onChange={(e) =>
+                  setGlobalMultipliers({
+                    retentionRate: Math.max(0, parseFloat(e.target.value) || 0),
+                  })
+                }
+                className={cn(
+                  'h-10 text-sm',
+                  isDark
+                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-900'
+                )}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label
+                className={cn(
+                  'text-xs uppercase tracking-wider',
+                  isDark ? 'text-slate-500' : 'text-slate-600'
+                )}
+              >
+                Turnover Rate
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={globalMultipliers.turnoverRate}
+                onChange={(e) =>
+                  setGlobalMultipliers({
+                    turnoverRate: Math.max(0, parseFloat(e.target.value) || 0),
+                  })
+                }
+                className={cn(
+                  'h-10 text-sm',
+                  isDark
+                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-900'
+                )}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label
+                className={cn(
+                  'text-xs uppercase tracking-wider',
+                  isDark ? 'text-slate-500' : 'text-slate-600'
+                )}
+              >
+                Margin
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={globalMultipliers.margin}
+                onChange={(e) =>
+                  setGlobalMultipliers({ margin: Math.max(0, parseFloat(e.target.value) || 0) })
+                }
+                className={cn(
+                  'h-10 text-sm',
+                  isDark
+                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-900'
+                )}
+              />
+            </div>
+            <div className="space-y-1 col-span-2">
+              <Label
+                className={cn(
+                  'text-xs uppercase tracking-wider',
+                  isDark ? 'text-slate-500' : 'text-slate-600'
+                )}
+              >
+                Bonus Rate
+              </Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={globalMultipliers.bonusRate}
+                onChange={(e) =>
+                  setGlobalMultipliers({ bonusRate: Math.max(0, parseFloat(e.target.value) || 0) })
+                }
+                className={cn(
+                  'h-10 text-sm',
+                  isDark
+                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    : 'bg-white border-slate-300 text-slate-900'
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/20">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">GGR</p>
+              <p className="mt-1 font-mono text-sm">{format(revenueModelOutputs.ggr)}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/20">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">Bonus</p>
+              <p className="mt-1 font-mono text-sm">{format(revenueModelOutputs.bonus)}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/20">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">NGR</p>
+              <p className="mt-1 font-mono text-sm">{format(revenueModelOutputs.ngr)}</p>
+            </div>
+            <div className="rounded-lg border border-border/50 p-3 bg-muted/20">
+              <p className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                Gross Contribution
+              </p>
+              <p className="mt-1 font-mono text-sm">
+                {format(revenueModelOutputs.grossContribution)}
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

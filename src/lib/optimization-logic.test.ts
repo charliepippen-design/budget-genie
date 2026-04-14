@@ -59,6 +59,11 @@ describe('optimizeBudget', () => {
       cpaTarget: 100,
       roasTarget: 2,
       playerValue: 200,
+      retentionRate: 0.55,
+      regToFtdCvr: 0.2,
+      turnoverRate: 1,
+      margin: 0.06,
+      bonusRate: 0.25,
     });
 
     expect(result.changes.slashed).toContain('high-cpa');

@@ -71,7 +71,7 @@ const CATEGORY_TINT_BG_CLASSES: Record<ChannelCategory, string> = {
   Other: 'bg-[hsl(var(--secondary)/0.2)]',
 };
 
-type SortKey = 'spend' | 'impressions' | 'cpa' | 'roas';
+type SortKey = 'spend' | 'impressions' | 'cpa' | 'roas' | 'payback';
 
 const CategoryIcon = ({ category }: { category: ChannelCategory }) => {
   const Icon = CATEGORY_ICONS[category] || Settings2;
@@ -177,6 +177,7 @@ export function ChannelTable() {
     totalBudget,
     toggleChannelLock,
     setGhostProjectedRevenue,
+    globalMultipliers,
   } = useMediaPlanStore();
   // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
@@ -202,6 +203,16 @@ export function ChannelTable() {
   >(
     channels,
     (row, key) => {
+      const ngrPerPlayer =
+        globalMultipliers.playerValue *
+        globalMultipliers.turnoverRate *
+        globalMultipliers.margin *
+        (1 - globalMultipliers.bonusRate);
+      const paybackMonths =
+        row.metrics.cpa && ngrPerPlayer > 0 && globalMultipliers.retentionRate > 0
+          ? row.metrics.cpa / (ngrPerPlayer * globalMultipliers.retentionRate)
+          : null;
+
       switch (key) {
         case 'spend':
           return formatCurrency(row.metrics.spend);
@@ -213,13 +224,44 @@ export function ChannelTable() {
           return row.metrics.cpa ? formatCurrency(row.metrics.cpa) : '0';
         case 'roas':
           return `${row.metrics.roas.toFixed(2)}x`;
+        case 'payback':
+          return paybackMonths ?? Number.MAX_SAFE_INTEGER;
         default:
           return 0;
       }
     },
-    'roas',
+    vc.vertical === 'igaming' ? 'payback' : 'roas',
     'desc'
   );
+
+  const getPaybackMonths = useCallback(
+    (channel: ChannelWithMetrics) => {
+      const ngrPerPlayer =
+        globalMultipliers.playerValue *
+        globalMultipliers.turnoverRate *
+        globalMultipliers.margin *
+        (1 - globalMultipliers.bonusRate);
+
+      if (
+        !channel.metrics.cpa ||
+        channel.metrics.cpa <= 0 ||
+        ngrPerPlayer <= 0 ||
+        globalMultipliers.retentionRate <= 0
+      ) {
+        return null;
+      }
+
+      return channel.metrics.cpa / (ngrPerPlayer * globalMultipliers.retentionRate);
+    },
+    [globalMultipliers]
+  );
+
+  const getPaybackTone = useCallback((paybackMonths: number | null) => {
+    if (paybackMonths === null) return 'text-muted-foreground';
+    if (paybackMonths <= 3) return 'text-emerald-500';
+    if (paybackMonths <= 6) return 'text-amber-500';
+    return 'text-destructive';
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -468,6 +510,21 @@ export function ChannelTable() {
               <TableHead className="text-right">
                 {renderSortHeader(vc.terms.costPerConversion, 'cpa')}
               </TableHead>
+              {vc.vertical === 'igaming' ? (
+                <TableHead className="text-right">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span className="inline-flex cursor-help items-center gap-1">
+                        {renderSortHeader('Payback (mo)', 'payback')}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Months to recover acquisition cost from NGR. Sort ascending to prioritize
+                      fastest-payback channels.
+                    </TooltipContent>
+                  </Tooltip>
+                </TableHead>
+              ) : null}
               <TableHead className="text-right">{renderSortHeader('ROAS', 'roas')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -476,7 +533,7 @@ export function ChannelTable() {
               <Fragment key={category}>
                 {/* Category Header Row */}
                 <TableRow key={`header-${category}`} className="bg-muted/40 hover:bg-muted/40">
-                  <TableCell colSpan={9} className="py-2">
+                  <TableCell colSpan={vc.vertical === 'igaming' ? 10 : 9} className="py-2">
                     <div className="flex items-center gap-2">
                       <div
                         className={cn(
@@ -703,6 +760,18 @@ export function ChannelTable() {
                         >
                           {channel.metrics.cpa ? formatCurrency(channel.metrics.cpa) : 'N/A'}
                         </TableCell>
+                        {vc.vertical === 'igaming' ? (
+                          <TableCell
+                            className={cn(
+                              'text-right font-mono text-sm',
+                              getPaybackTone(getPaybackMonths(channel))
+                            )}
+                          >
+                            {getPaybackMonths(channel) === null
+                              ? '—'
+                              : `${getPaybackMonths(channel)!.toFixed(1)} mo`}
+                          </TableCell>
+                        ) : null}
                         <TableCell className="text-right">
                           <Badge
                             variant="outline"
@@ -725,7 +794,7 @@ export function ChannelTable() {
                       <AnimatePresence>
                         {expandedRows[channel.id] ? (
                           <TableRow key={`${channel.id}-expanded`}>
-                            <TableCell colSpan={9} className="p-0">
+                            <TableCell colSpan={vc.vertical === 'igaming' ? 10 : 9} className="p-0">
                               <motion.div
                                 initial={{ opacity: 0, height: 0 }}
                                 animate={{ opacity: 1, height: 'auto' }}
@@ -925,6 +994,21 @@ export function ChannelTable() {
                           {formatNumber(channel.metrics.conversions)}
                         </p>
                       </div>
+                      {vc.vertical === 'igaming' ? (
+                        <div>
+                          <span className="text-muted-foreground">Payback</span>
+                          <p
+                            className={cn(
+                              'font-mono font-medium',
+                              getPaybackTone(getPaybackMonths(channel))
+                            )}
+                          >
+                            {getPaybackMonths(channel) === null
+                              ? '—'
+                              : `${getPaybackMonths(channel)!.toFixed(1)} mo`}
+                          </p>
+                        </div>
+                      ) : null}
                     </div>
 
                     <AnimatePresence>

@@ -59,6 +59,11 @@ describe('rebalanceToTargets action', () => {
         cpaTarget: null,
         roasTarget: 2,
         playerValue: 150,
+        retentionRate: 0.55,
+        regToFtdCvr: 0.2,
+        turnoverRate: 1,
+        margin: 0.06,
+        bonusRate: 0.25,
       },
     });
   });

@@ -1,10 +1,5 @@
 import { useCallback, useMemo, useState, lazy, Suspense } from 'react';
-import {
-  LayoutGrid,
-  Upload,
-  Sparkles,
-  Calendar,
-} from 'lucide-react';
+import { LayoutGrid, Upload, Sparkles, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -16,20 +11,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import {
-  useMultiMonthStore,
-} from '@/hooks/use-multi-month-store';
+import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
 
-const ImportWizard = lazy(() => import('./ImportWizard').then((m) => ({ default: m.ImportWizard })));
+const ImportWizard = lazy(() =>
+  import('./ImportWizard').then((m) => ({ default: m.ImportWizard }))
+);
 
 // PATTERN_INFO moved to ProgressionPatternSelector.tsx
 
@@ -56,12 +46,14 @@ export function MonthConfigPanel() {
   }, [months]);
 
   const generateMonthOptions = useCallback(() => {
-    const options = [];
+    const options: Array<{ value: string; label: string }> = [];
     const now = new Date();
     for (let i = -3; i <= 12; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
       const value = date.toISOString().slice(0, 7);
-      const label = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(date);
+      const label = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
+        date
+      );
       options.push({ value, label });
     }
     return options;
@@ -77,14 +69,19 @@ export function MonthConfigPanel() {
             <div className="flex flex-wrap items-center gap-4">
               {/* Duration */}
               <div className="flex items-center gap-3">
-                <Label className="text-sm font-medium text-foreground whitespace-nowrap">Plan Duration</Label>
+                <Label className="text-sm font-medium text-foreground whitespace-nowrap">
+                  Plan Duration
+                </Label>
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="soft-launch"
                     checked={includeSoftLaunch}
                     onCheckedChange={(checked) => setIncludeSoftLaunch(checked === true)}
                   />
-                  <Label htmlFor="soft-launch" className="text-xs text-muted-foreground cursor-pointer">
+                  <Label
+                    htmlFor="soft-launch"
+                    className="text-xs text-muted-foreground cursor-pointer"
+                  >
                     Include Soft Launch
                   </Label>
                 </div>

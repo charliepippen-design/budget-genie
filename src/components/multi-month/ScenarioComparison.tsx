@@ -39,17 +39,12 @@ interface ComparisonMetric {
 }
 
 export function ScenarioComparison() {
-  const {
-    scenarios,
-    comparisonScenarioId,
-    setComparisonScenario,
-    globalSettings,
-    months,
-  } = useMultiMonthStore();
+  const { scenarios, comparisonScenarioId, setComparisonScenario, globalSettings, months } =
+    useMultiMonthStore();
 
   const { symbol } = useCurrency();
   const currentMetrics = useMultiMonthMetrics();
-  const comparisonScenario = scenarios.find(s => s.id === comparisonScenarioId);
+  const comparisonScenario = scenarios.find((s) => s.id === comparisonScenarioId);
   const comparisonMetrics = useMemo(() => {
     if (!comparisonScenario) return null;
     return calculatePlanMetrics(comparisonScenario.months, comparisonScenario.globalSettings);
@@ -70,7 +65,7 @@ export function ScenarioComparison() {
       const diffPct = bVal !== 0 ? (diff / Math.abs(bVal)) * 100 : 0;
       let winner: 'A' | 'B' | 'tie' = 'tie';
       if (Math.abs(diff) > 0.01) {
-        winner = higherIsBetter ? (diff > 0 ? 'A' : 'B') : (diff < 0 ? 'A' : 'B');
+        winner = higherIsBetter ? (diff > 0 ? 'A' : 'B') : diff < 0 ? 'A' : 'B';
       }
       return { diff, diffPct, winner };
     };
@@ -117,9 +112,18 @@ export function ScenarioComparison() {
         scenarioB: b.breakEvenMonth !== null ? `M${b.breakEvenMonth + 1}` : 'Never',
         diff: (a.breakEvenMonth ?? 99) - (b.breakEvenMonth ?? 99),
         diffPct: 0,
-        winner: a.breakEvenMonth !== null && b.breakEvenMonth !== null
-          ? (a.breakEvenMonth < b.breakEvenMonth ? 'A' : a.breakEvenMonth > b.breakEvenMonth ? 'B' : 'tie')
-          : a.breakEvenMonth !== null ? 'A' : b.breakEvenMonth !== null ? 'B' : 'tie',
+        winner:
+          a.breakEvenMonth !== null && b.breakEvenMonth !== null
+            ? a.breakEvenMonth < b.breakEvenMonth
+              ? 'A'
+              : a.breakEvenMonth > b.breakEvenMonth
+                ? 'B'
+                : 'tie'
+            : a.breakEvenMonth !== null
+              ? 'A'
+              : b.breakEvenMonth !== null
+                ? 'B'
+                : 'tie',
         format: 'month' as const,
       },
     ];
@@ -128,14 +132,20 @@ export function ScenarioComparison() {
   // Chart data for overlay
   const overlayData = useMemo(() => {
     if (!comparisonMetrics) return [];
-    
+
     const maxLen = Math.max(currentMetrics.months.length, comparisonMetrics.months.length);
-    const data = [];
-    
+    const data: Array<{
+      name: string;
+      currentRevenue: number;
+      currentProfit: number;
+      compRevenue: number;
+      compProfit: number;
+    }> = [];
+
     for (let i = 0; i < maxLen; i++) {
       const currentMonth = currentMetrics.months[i];
       const compMonth = comparisonMetrics.months[i];
-      
+
       data.push({
         name: `M${i + 1}`,
         currentRevenue: currentMonth?.revenue || 0,
@@ -144,7 +154,7 @@ export function ScenarioComparison() {
         compProfit: compMonth?.cumulativeProfit || 0,
       });
     }
-    
+
     return data;
   }, [currentMetrics, comparisonMetrics]);
 
@@ -214,26 +224,37 @@ export function ScenarioComparison() {
                 <CardContent className="p-3">
                   <div className="text-xs text-muted-foreground mb-2">{m.label}</div>
                   <div className="space-y-1">
-                    <div className={cn(
-                      "flex justify-between text-sm",
-                      m.winner === 'A' && "text-green-500 font-medium"
-                    )}>
+                    <div
+                      className={cn(
+                        'flex justify-between text-sm',
+                        m.winner === 'A' && 'text-green-500 font-medium'
+                      )}
+                    >
                       <span>A:</span>
                       <span className="font-mono">{formatValue(m.scenarioA, m.format)}</span>
                     </div>
-                    <div className={cn(
-                      "flex justify-between text-sm",
-                      m.winner === 'B' && "text-green-500 font-medium"
-                    )}>
+                    <div
+                      className={cn(
+                        'flex justify-between text-sm',
+                        m.winner === 'B' && 'text-green-500 font-medium'
+                      )}
+                    >
                       <span>B:</span>
                       <span className="font-mono">{formatValue(m.scenarioB, m.format)}</span>
                     </div>
                     {m.format === 'currency' && (
-                      <div className={cn(
-                        "text-xs text-center pt-1 border-t",
-                        m.diff > 0 ? "text-green-500" : m.diff < 0 ? "text-destructive" : "text-muted-foreground"
-                      )}>
-                        {m.diff > 0 ? '+' : ''}{formatCurrency(m.diff, true)} ({m.diffPct.toFixed(1)}%)
+                      <div
+                        className={cn(
+                          'text-xs text-center pt-1 border-t',
+                          m.diff > 0
+                            ? 'text-green-500'
+                            : m.diff < 0
+                              ? 'text-destructive'
+                              : 'text-muted-foreground'
+                        )}
+                      >
+                        {m.diff > 0 ? '+' : ''}
+                        {formatCurrency(m.diff, true)} ({m.diffPct.toFixed(1)}%)
                       </div>
                     )}
                   </div>
@@ -254,8 +275,8 @@ export function ScenarioComparison() {
                     <LineChart data={overlayData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))" 
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                         tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                       />
@@ -268,17 +289,17 @@ export function ScenarioComparison() {
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="currentRevenue" 
-                        stroke="hsl(var(--primary))" 
+                      <Line
+                        type="monotone"
+                        dataKey="currentRevenue"
+                        stroke="hsl(var(--primary))"
                         strokeWidth={2}
                         name="Current (A)"
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="compRevenue" 
-                        stroke="hsl(var(--chart-3))" 
+                      <Line
+                        type="monotone"
+                        dataKey="compRevenue"
+                        stroke="hsl(var(--chart-3))"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         name="Comparison (B)"
@@ -299,8 +320,8 @@ export function ScenarioComparison() {
                     <LineChart data={overlayData}>
                       <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                       <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={10} />
-                      <YAxis 
-                        stroke="hsl(var(--muted-foreground))" 
+                      <YAxis
+                        stroke="hsl(var(--muted-foreground))"
                         fontSize={10}
                         tickFormatter={(v) => `${symbol}${(v / 1000).toFixed(0)}K`}
                       />
@@ -313,17 +334,17 @@ export function ScenarioComparison() {
                         formatter={(value: number) => formatCurrency(value)}
                       />
                       <Legend />
-                      <Line 
-                        type="monotone" 
-                        dataKey="currentProfit" 
-                        stroke="hsl(var(--primary))" 
+                      <Line
+                        type="monotone"
+                        dataKey="currentProfit"
+                        stroke="hsl(var(--primary))"
                         strokeWidth={2}
                         name="Current (A)"
                       />
-                      <Line 
-                        type="monotone" 
-                        dataKey="compProfit" 
-                        stroke="hsl(var(--chart-3))" 
+                      <Line
+                        type="monotone"
+                        dataKey="compProfit"
+                        stroke="hsl(var(--chart-3))"
                         strokeWidth={2}
                         strokeDasharray="5 5"
                         name="Comparison (B)"
