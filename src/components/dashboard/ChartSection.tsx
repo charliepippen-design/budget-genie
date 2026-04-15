@@ -205,7 +205,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
   );
 
   const showPlanHealthChart =
-    vc.vertical === 'igaming' && planHealthData.some((month) => month.ngr > 0);
+    vc.vertical === 'igaming' && planHealthData.length > 0;
 
   const PlanHealthTooltip = ({
     active,
