@@ -264,9 +264,10 @@ export const OnboardWizard = () => {
         await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
       }
 
-      setTotalBudget(answers.budget);
       setOnboardingVertical(answers.vertical);
       setOnboardingSubvertical(state.subvertical);
+      setHasCompletedOnboarding(true);
+      setTotalBudget(answers.budget);
 
       const adjustedPresetChannels = preset.channels.map((channel) => {
         const aiAdj = refinedPlan?.channelAdjustments.find(
@@ -351,9 +352,8 @@ export const OnboardWizard = () => {
         setTierAllocation('tier2', TIER_DEFAULTS.tier2);
       }
 
-      setHasCompletedOnboarding(true);
       goToStep('done');
-      navigate('/', { replace: true });
+      window.requestAnimationFrame(() => navigate('/', { replace: true }));
 
       if (refinedPlan) {
         toast('Your plan is ready', {
