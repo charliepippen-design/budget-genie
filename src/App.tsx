@@ -9,12 +9,15 @@ import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ClerkProvider } from '@clerk/clerk-react';
 import { RouteLoadingSkeleton } from '@/components/common/AppSkeletons';
 import { useTheme } from '@/hooks/use-theme';
+import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 
 import { useStoreSync } from './hooks/use-store-sync';
 import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
 
+const Landing = lazy(() => import('./pages/Landing'));
 const Index = lazy(() => import('./pages/Index'));
+const Pricing = lazy(() => import('./pages/Pricing'));
 const NotFound = lazy(() => import('./pages/NotFound'));
 const Auth = lazy(() => import('./pages/Auth'));
 const Settings = lazy(() => import('./pages/Settings'));
@@ -54,12 +57,49 @@ const AppShell = () => {
             <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
-                  <Route path="/" element={<Index />} />
+                  <Route path="/" element={<Landing />} />
                   <Route path="/auth" element={<Auth />} />
-                  <Route path="/settings" element={<Settings />} />
-                  <Route path="/onboard" element={<Onboard />} />
-                  <Route path="/report" element={<Report />} />
-                  <Route path="/output" element={<Output />} />
+                  <Route path="/pricing" element={<Pricing />} />
+                  <Route
+                    path="/app"
+                    element={
+                      <ProtectedRoute>
+                        <Index />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      <ProtectedRoute>
+                        <Settings />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/onboard"
+                    element={
+                      <ProtectedRoute>
+                        <Onboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/report"
+                    element={
+                      <ProtectedRoute>
+                        <Report />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/output"
+                    element={
+                      <ProtectedRoute>
+                        <Output />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </Suspense>
