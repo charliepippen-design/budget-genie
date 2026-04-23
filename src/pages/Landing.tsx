@@ -38,8 +38,11 @@ export default function Landing() {
       <div className="relative z-10 text-center px-4 max-w-2xl">
         {/* Logo/Brand */}
         <div className="mb-8">
+          <p className="text-sm uppercase tracking-[0.4em] text-blue-100/80 mb-3">
+            MediaPlannerPro presents
+          </p>
           <h1 className="text-6xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg">
-            Budget Genie
+            MediaPlannerPro Budget Genie
           </h1>
           <p className="text-xl md:text-2xl text-blue-100 drop-shadow">
             AI-Powered Media Planning Intelligence

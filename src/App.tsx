@@ -112,11 +112,26 @@ const AppShell = () => {
     </div>
   );
 
-  if (clerkEnabled) {
-    return <ClerkProvider publishableKey={clerkPubKey}>{appContent}</ClerkProvider>;
+  if (!clerkEnabled) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-950 text-white px-6">
+        <div className="max-w-xl text-center rounded-3xl border border-white/10 bg-slate-900/90 p-10 shadow-2xl">
+          <h1 className="text-3xl font-bold mb-4">Site configuration is missing</h1>
+          <p className="text-slate-300 mb-6 leading-7">
+            Budget Genie requires Clerk configuration to run. Please add the environment variable{' '}
+            <code className="bg-slate-800 px-2 py-1 rounded">VITE_CLERK_PUBLISHABLE_KEY</code> to
+            your Vercel project and redeploy.
+          </p>
+          <p className="text-slate-400 text-sm">
+            This error means the app is trying to use Clerk authentication before the provider is
+            available.
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  return appContent;
+  return <ClerkProvider publishableKey={clerkPubKey}>{appContent}</ClerkProvider>;
 };
 
 const App = () => {

@@ -57,12 +57,8 @@ export default function Pricing() {
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-            Choose Your Plan
-          </h1>
-          <p className="text-xl text-gray-600">
-            Unlock the full power of Budget Genie
-          </p>
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
+          <p className="text-xl text-gray-600">Unlock the full power of Budget Genie</p>
         </div>
 
         {/* Pricing Cards */}
@@ -151,12 +147,8 @@ export default function Pricing() {
 
         {/* FAQ or Additional Info */}
         <div className="bg-white rounded-lg p-8 text-center">
-          <p className="text-gray-600 mb-4">
-            Questions about our pricing?
-          </p>
-          <Button variant="link">
-            Contact our sales team
-          </Button>
+          <p className="text-gray-600 mb-4">Questions about our pricing?</p>
+          <Button variant="link">Contact our sales team</Button>
         </div>
       </div>
     </div>
