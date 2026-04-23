@@ -23,6 +23,7 @@ import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-stor
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
 import { createCheckoutSession } from '@/lib/billing';
+import { usePaymentStatus } from '@/hooks/use-payment-status';
 
 const NOWPAYMENTS_CHECKOUT_URL = 'https://nowpayments.io/payment/?iid=4321051348&source=button';
 const NOWPAYMENTS_BUTTON_SRC = 'https://nowpayments.io/images/embeds/payment-button-white.svg';
@@ -125,6 +126,7 @@ export default function Settings() {
   const subscriptionTier = useMediaPlanStore((state) => state.subscriptionTier);
   const setSubscriptionTier = useMediaPlanStore((state) => state.setSubscriptionTier);
   const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
+  const { hasActivePayment, isSuperUser, effectiveTier } = usePaymentStatus();
   const pendingCheckoutKey = 'billing_pending_checkout';
 
   const trackNowPaymentsEvent = useCallback(
@@ -196,11 +198,24 @@ export default function Settings() {
       return refreshedTier;
     }
 
+    if (isSuperUser || hasActivePayment) {
+      setMetadataTier(effectiveTier);
+      setSubscriptionTier(effectiveTier);
+      setBillingSyncStatus('synced');
+      setBillingSyncMessage(
+        isSuperUser
+          ? 'Superuser access active via Clerk metadata'
+          : `Payment access active via Clerk metadata (${effectiveTier.toUpperCase()})`
+      );
+      setLastSyncedAt(new Date().toISOString());
+      return effectiveTier;
+    }
+
     setMetadataTier(null);
     setBillingSyncStatus('error');
     setBillingSyncMessage('No subscription_tier found in auth metadata');
     return null;
-  }, [setSubscriptionTier]);
+  }, [effectiveTier, hasActivePayment, isSuperUser, setSubscriptionTier]);
 
   useEffect(() => {
     async function fetchData() {

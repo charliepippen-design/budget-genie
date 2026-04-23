@@ -14,6 +14,7 @@ import { ProtectedRoute } from '@/components/common/ProtectedRoute';
 import { useStoreSync } from './hooks/use-store-sync';
 import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
+import { SubscriptionAccessSync } from '@/components/common/SubscriptionAccessSync';
 
 const Landing = lazy(() => import('./pages/Landing'));
 const Index = lazy(() => import('./pages/Index'));
@@ -53,6 +54,7 @@ const AppShell = () => {
           <Toaster />
           <Sonner />
           <KeyboardManager />
+          <SubscriptionAccessSync />
           <BrowserRouter>
             <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
