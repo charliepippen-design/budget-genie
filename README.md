@@ -24,18 +24,17 @@ MediaPlanner Pro is the ultimate budget scaling and allocation tool for iGaming 
 
 Provider keys are **not** bundled in the browser for the main flows. Edge Functions read secrets from the Supabase project:
 
-| Flow | Model | Edge Function |
-|------|--------|----------------|
-| Onboarding plan | Claude (Anthropic API) | `generate-plan` |
-| Report narrative | Claude (Anthropic API) | `generate-narrative` |
-| Genie chat | Gemini (Google Generative Language API) | `genie-chat` |
+| Flow             | Model                                   | Edge Function        |
+| ---------------- | --------------------------------------- | -------------------- |
+| Onboarding plan  | Claude (Anthropic API)                  | `generate-plan`      |
+| Report narrative | Claude (Anthropic API)                  | `generate-narrative` |
+| Genie chat       | Gemini (Google Generative Language API) | `genie-chat`         |
 
 ### Environment variables
 
 1. **Copy** [`.env.example`](./.env.example) to `.env.local` and fill in values. Do not commit `.env.local`.
 
 2. **Client-safe variables** (Vite `import.meta.env`, prefixed with `VITE_`):
-
    - `VITE_CLERK_PUBLISHABLE_KEY` — from the [Clerk dashboard](https://dashboard.clerk.com) → API Keys
    - `VITE_SUPABASE_URL` — Supabase project URL
    - `VITE_SUPABASE_ANON_KEY` — Supabase anon (public) key
@@ -55,6 +54,17 @@ Provider keys are **not** bundled in the browser for the main flows. Edge Functi
 ### CI / build
 
 GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) supplies stub `VITE_*` values for `npm run build`. Production deploys should use real values in your host’s environment.
+
+### Superuser access (Clerk)
+
+If you want one personal account to bypass paywall checks (for owner/admin access), set either of these values on your Clerk user `publicMetadata`:
+
+- `is_superuser: true`
+- `role: "superuser"`
+
+You can edit this in Clerk Dashboard -> Users -> your user -> Metadata -> Public metadata.
+
+When either flag is present, this app treats the account as having active access while normal users still require payment metadata.
 
 ## Billing (Stripe + Supabase Edge Functions)
 
