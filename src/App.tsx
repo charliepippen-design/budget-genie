@@ -1,3 +1,4 @@
+import { AITokenBridge } from '@/lib/ai-client';
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -55,6 +56,7 @@ const AppShell = () => {
           <Sonner />
           <KeyboardManager />
           <SubscriptionAccessSync />
+          <AITokenBridge />
           <BrowserRouter>
             <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>

@@ -15,9 +15,6 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
-    "@ai-sdk/google": "^3.0.6",
-    "@ai-sdk/openai": "^3.0.7",
-    "@ai-sdk/react": "^3.0.28",
     "@clerk/clerk-react": "^5.61.4",
     "@hookform/resolvers": "^3.10.0",
     "@radix-ui/react-accordion": "^1.2.11",
@@ -52,7 +49,6 @@
     "@tanstack/react-table": "^8.20.6",
     "@types/papaparse": "^5.5.2",
     "@types/react-helmet": "^6.1.11",
-    "ai": "^6.0.18",
     "baseline-browser-mapping": "^2.9.13",
     "caniuse-lite": "^1.0.30001763",
     "class-variance-authority": "^0.7.1",
@@ -64,6 +60,7 @@
     "framer-motion": "^12.38.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.4.2",
+    "jose": "^6.2.12",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.462.0",

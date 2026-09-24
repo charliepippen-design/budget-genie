@@ -1,5 +1,4 @@
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateObject } from 'ai';
+import { generateJSON } from '@/lib/ai-client';
 import { z } from 'zod';
 
 export interface ReportNarratorInput {
@@ -68,65 +67,16 @@ Respond with valid JSON matching this exact shape — no markdown, no explanatio
 }`;
 }
 
-async function tryEdgeFunction(prompt: string): Promise<ReportNarrative | null> {
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  if (!supabaseUrl || !supabaseAnonKey) return null;
-
-  const res = await fetch(`${supabaseUrl}/functions/v1/generate-narrative`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-    },
-    body: JSON.stringify({ prompt }),
-  });
-
-  if (!res.ok) throw new Error(`generate-narrative: ${res.status}`);
-
-  const data = await res.json();
-  const parsed = NarrativeSchema.safeParse(data);
-  return parsed.success ? parsed.data : null;
-}
-
-async function tryGemini(prompt: string): Promise<ReportNarrative | null> {
-  const apiKey = import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY;
-  if (!apiKey) return null;
-
-  const google = createGoogleGenerativeAI({ apiKey });
-
-  for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash-latest']) {
-    try {
-      const result = await generateObject({
-        model: google(model),
-        schema: NarrativeSchema,
-        prompt,
-      });
-      return result.object;
-    } catch {
-      // try next model
-    }
-  }
-  return null;
-}
-
 export async function generateReportNarrative(
   input: ReportNarratorInput
 ): Promise<ReportNarrative | null> {
   const prompt = buildPrompt(input);
-
-  // 1. Try secure Edge Function first
   try {
-    const result = await tryEdgeFunction(prompt);
-    if (result) return result;
-  } catch (err) {
-    console.warn('Report narrator: Edge function unavailable, falling back to client SDK.', err);
-  }
+    // JSON must match the schema exactly; anything else is treated as no answer.
+    const parsed = NarrativeSchema.safeParse(await generateJSON(`${prompt}
 
-  // 2. Fall back to direct Gemini call (works locally with VITE_GOOGLE_GENERATIVE_AI_API_KEY)
-  try {
-    return await tryGemini(prompt);
+Return ONLY a JSON object with the fields described above.`));
+    return parsed.success ? parsed.data : null;
   } catch (err) {
     console.error('Report narrative generation failed.', err);
     return null;

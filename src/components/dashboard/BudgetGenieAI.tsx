@@ -1,3 +1,4 @@
+import { PlannerChat } from '../planner/PlannerChat';
 import {
   useState,
   useMemo,
@@ -44,9 +45,6 @@ import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 
 const BudgetWizard = lazy(() =>
   import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard }))
-);
-const GenieAssistant = lazy(() =>
-  import('./GenieAssistant').then((m) => ({ default: m.GenieAssistant }))
 );
 const ImportWizard = lazy(() =>
   import('../multi-month/ImportWizard').then((m) => ({ default: m.ImportWizard }))
@@ -439,9 +437,10 @@ export const BudgetGenieAI = () => {
           </main>
         </div>
 
+        <PlannerChat />
+
         {/* MODALS */}
         <Suspense fallback={null}>
-          <GenieAssistant />
           <ImportWizard open={isImportOpen} onOpenChange={setIsImportOpen} />
         </Suspense>
       </div>

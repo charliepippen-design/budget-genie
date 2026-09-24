@@ -26,3 +26,5 @@ dist-ssr
 *.tsbuildinfo
 test-results/
 supabase/.temp/
+.vercel
+supabase/.temp

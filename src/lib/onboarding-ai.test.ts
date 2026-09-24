@@ -1,122 +1,52 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockGenerateObject = vi.fn();
-const mockGoogleFactory = vi.fn();
+const mockGenerateJSON = vi.fn();
 
-vi.mock('ai', () => ({
-  generateObject: (...args: unknown[]) => mockGenerateObject(...args),
+vi.mock('@/lib/ai-client', () => ({
+  generateJSON: (...args: unknown[]) => mockGenerateJSON(...args),
 }));
 
-vi.mock('@ai-sdk/google', () => ({
-  createGoogleGenerativeAI: (...args: unknown[]) => mockGoogleFactory(...args),
-}));
+import { generateOnboardingPlan, type WizardAnswers } from '@/lib/onboarding-ai';
 
-import { generateOnboardingPlan } from '@/lib/onboarding-ai';
+const answers: WizardAnswers = {
+  budget: 50000,
+  vertical: 'igaming',
+  goal: 'acquire_volume',
+  geos: ['Germany', 'Unknownland'],
+  benchmarks: {},
+};
+
+const validPlan = {
+  rationale: 'Primary response',
+  channelAdjustments: [{ channelName: 'Affiliates', allocationPct: 100, reasoning: 'x' }],
+  recommendedCpaTarget: 70,
+  recommendedRoasTarget: 2.7,
+  recommendedPlayerValue: 210,
+  keyRisk: 'Risk',
+  firstActionAfterLaunch: 'Action',
+};
 
 describe('generateOnboardingPlan', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    vi.unstubAllEnvs();
-
-    mockGoogleFactory.mockReturnValue((modelName: string) => `model:${modelName}`);
-    // Ensure tests use the Gemini fallback path, not the Edge Function
-    vi.stubEnv('VITE_SUPABASE_URL', '');
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
   });
 
-  it('returns null when both edge function and Gemini key are unavailable', async () => {
-    vi.stubEnv('VITE_GOOGLE_GENERATIVE_AI_API_KEY', '');
-    vi.stubEnv('VITE_SUPABASE_URL', '');
-    vi.stubEnv('VITE_SUPABASE_ANON_KEY', '');
+  it('returns the plan when the gateway answers with valid JSON', async () => {
+    mockGenerateJSON.mockResolvedValueOnce(validPlan);
+    expect(await generateOnboardingPlan(answers)).toEqual(validPlan);
 
-    const result = await generateOnboardingPlan({
-      budget: 50000,
-      vertical: 'igaming',
-      goal: 'acquire_volume',
-      geos: ['Germany'],
-      benchmarks: {},
-    });
-
-    expect(result).toBeNull();
-    expect(mockGenerateObject).not.toHaveBeenCalled();
+    const prompt = mockGenerateJSON.mock.calls[0][0] as string;
+    expect(prompt).toContain('Germany');
+    expect(prompt).not.toContain('Unknownland');
   });
 
-  it('returns primary model result when first call succeeds', async () => {
-    vi.stubEnv('VITE_GOOGLE_GENERATIVE_AI_API_KEY', 'test-key');
-
-    const expected = {
-      rationale: 'Primary response',
-      channelAdjustments: [],
-      recommendedCpaTarget: 70,
-      recommendedRoasTarget: 2.7,
-      recommendedPlayerValue: 210,
-      keyRisk: 'Risk',
-      firstActionAfterLaunch: 'Action',
-    };
-
-    mockGenerateObject.mockResolvedValueOnce({ object: expected });
-
-    const result = await generateOnboardingPlan({
-      budget: 50000,
-      vertical: 'igaming',
-      goal: 'acquire_volume',
-      geos: ['Germany'],
-      benchmarks: {},
-    });
-
-    expect(result).toEqual(expected);
-    expect(mockGenerateObject).toHaveBeenCalledTimes(1);
-    expect(mockGenerateObject.mock.calls[0][0].model).toBe('model:gemini-2.0-flash');
+  it('returns null when the JSON does not match the schema', async () => {
+    mockGenerateJSON.mockResolvedValueOnce({ rationale: 'missing fields' });
+    expect(await generateOnboardingPlan(answers)).toBeNull();
   });
 
-  it('falls back to secondary model when primary throws', async () => {
-    vi.stubEnv('VITE_GOOGLE_GENERATIVE_AI_API_KEY', 'test-key');
-
-    const fallback = {
-      rationale: 'Fallback response',
-      channelAdjustments: [],
-      recommendedCpaTarget: 65,
-      recommendedRoasTarget: 2.4,
-      recommendedPlayerValue: 190,
-      keyRisk: 'Risk',
-      firstActionAfterLaunch: 'Action',
-    };
-
-    mockGenerateObject.mockRejectedValueOnce(new Error('primary failed'));
-    mockGenerateObject.mockResolvedValueOnce({ object: fallback });
-
-    const result = await generateOnboardingPlan({
-      budget: 65000,
-      vertical: 'lead_gen',
-      goal: 'maximize_revenue',
-      geos: ['Germany', 'Unknownland'],
-      benchmarks: { cpa: 60 },
-    });
-
-    expect(result).toEqual(fallback);
-    expect(mockGenerateObject).toHaveBeenCalledTimes(2);
-    expect(mockGenerateObject.mock.calls[1][0].model).toBe('model:gemini-1.5-flash-latest');
-
-    const usedPrompt = mockGenerateObject.mock.calls[0][0].prompt as string;
-    expect(usedPrompt).toContain('Germany');
-    expect(usedPrompt).not.toContain('Unknownland');
-  });
-
-  it('returns null when both primary and fallback fail', async () => {
-    vi.stubEnv('VITE_GOOGLE_GENERATIVE_AI_API_KEY', 'test-key');
-
-    mockGenerateObject.mockRejectedValueOnce(new Error('primary failed'));
-    mockGenerateObject.mockRejectedValueOnce(new Error('fallback failed'));
-
-    const result = await generateOnboardingPlan({
-      budget: 40000,
-      vertical: 'other',
-      goal: 'maintain',
-      geos: [],
-      benchmarks: {},
-    });
-
-    expect(result).toBeNull();
-    expect(mockGenerateObject).toHaveBeenCalledTimes(2);
+  it('returns null when the gateway fails', async () => {
+    mockGenerateJSON.mockRejectedValueOnce(new Error('Sign in to use the AI planner.'));
+    expect(await generateOnboardingPlan(answers)).toBeNull();
   });
 });
