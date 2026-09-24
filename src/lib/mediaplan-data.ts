@@ -279,21 +279,28 @@ export function formatCurrency(value: number, compact = false): string {
 }
 
 export function formatNumber(value: number, compact = false): string {
+  if (value === null || value === undefined || isNaN(value) || !isFinite(value)) {
+    return '0';
+  }
   if (compact) {
-    if (value >= 1000000000) {
+    const absVal = Math.abs(value);
+    if (absVal >= 1000000000) {
       return `${(value / 1000000000).toFixed(1)}B`;
     }
-    if (value >= 1000000) {
+    if (absVal >= 1000000) {
       return `${(value / 1000000).toFixed(1)}M`;
     }
-    if (value >= 1000) {
+    if (absVal >= 1000) {
       return `${(value / 1000).toFixed(1)}K`;
     }
   }
-  return new Intl.NumberFormat('de-DE').format(Math.round(value));
+  return new Intl.NumberFormat('en-US').format(Math.round(value));
 }
 
 export function formatPercentage(value: number): string {
+  if (value === null || value === undefined || isNaN(value) || !isFinite(value)) {
+    return '0.0%';
+  }
   return `${value.toFixed(1)}%`;
 }
 

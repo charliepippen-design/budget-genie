@@ -50,8 +50,8 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const format = (value: number, compact = false) => {
-    const info = CURRENCIES[code];
-    if (!info) return `${value}`;
+    if (value === null || value === undefined || isNaN(value) || !isFinite(value)) return '--';
+    const info = CURRENCIES[code] || CURRENCIES['EUR'];
     
     // Apply exchange rate to the value
     const convertedValue = value * info.rate;

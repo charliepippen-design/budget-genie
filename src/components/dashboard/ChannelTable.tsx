@@ -17,10 +17,9 @@ import {
   ChannelCategory,
 } from '@/lib/mediaplan-data';
 import {
-  useCategoryTotals,
   ChannelWithMetrics,
   useMediaPlanStore,
-  useChannelsWithMetrics,
+  usePlanMetrics,
 } from '@/hooks/use-media-plan-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -140,8 +139,11 @@ function EditableCell({
 
 export function ChannelTable() {
   const { setChannelAllocation, updateChannelConfigField } = useMediaPlanStore();
-  const channels = useChannelsWithMetrics();
-  const categoryTotals = useCategoryTotals();
+  const planMetrics = usePlanMetrics();
+  const channels = planMetrics.channelsWithMetrics;
+  const categoryTotals = planMetrics.categoryTotals;
+  const totalAllocation = planMetrics.totalAllocationPct;
+  const { unallocatedBudget, overBudgetAmount } = planMetrics;
   const { symbol, format: formatCurrency } = useCurrency();
   const [hideUnallocated, setHideUnallocated] = useState(false);
 
@@ -204,15 +206,9 @@ export function ChannelTable() {
 
   const handleSliderChange = useCallback(
     (channelId: string, values: number[]) => {
-      setChannelAllocation(channelId, values[0]);
+      setChannelAllocation(channelId, Math.max(0, Math.min(100, values[0] || 0)));
     },
     [setChannelAllocation]
-  );
-
-  // Calculate total allocation
-  const totalAllocation = useMemo(() =>
-    channels.reduce((sum, ch) => sum + ch.allocationPct, 0),
-    [channels]
   );
 
   const overrideSummary = useMemo(() => {
@@ -244,6 +240,16 @@ export function ChannelTable() {
           >
             {formatPercentage(totalAllocation)}
           </Badge>
+          {unallocatedBudget > 0.5 && (
+            <span className="text-xs text-amber-400 font-mono">
+              (Unallocated: {formatCurrency(unallocatedBudget)})
+            </span>
+          )}
+          {overBudgetAmount > 0.5 && (
+            <span className="text-xs text-rose-400 font-mono">
+              (Over Budget: {formatCurrency(overBudgetAmount)})
+            </span>
+          )}
           <AddChannelDialog
             trigger={
               <Button size="sm" variant="outline" className="h-8 gap-1 border-indigo-500/30 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10">
@@ -272,9 +278,9 @@ export function ChannelTable() {
               <TableHead className="text-right">Spend</TableHead>
               <TableHead className="text-right">Price</TableHead>
               <TableHead className="text-right">Impressions</TableHead>
-              <TableHead className="text-right">CTR %</TableHead>
-              <TableHead className="text-right">Conversions</TableHead>
-              <TableHead className="text-right">CPA</TableHead>
+              <TableHead className="text-right">CTR</TableHead>
+              <TableHead className="text-right" title="Conversions = First Time Depositors (FTD)">Conversions (FTD)</TableHead>
+              <TableHead className="text-right" title="Cost Per Acquisition (FTD) and Cost Per Lead (Registration)">CPA / CPL</TableHead>
               <TableHead className="text-right">Exp. LTV</TableHead>
               <TableHead className="text-right">ROAS</TableHead>
             </TableRow>
@@ -420,13 +426,19 @@ export function ChannelTable() {
                           }
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {formatNumber(channel.metrics.conversions)}
+                          <div>{formatNumber(channel.metrics.conversions)}</div>
+                          {channel.metrics.registrations > 0 && (
+                            <div className="text-[10px] text-muted-foreground">{formatNumber(channel.metrics.registrations)} regs</div>
+                          )}
                         </TableCell>
                         <TableCell className={cn(
                           "text-right font-mono text-sm",
                           channel.aboveCpaTarget && "text-destructive font-semibold"
                         )}>
-                          {channel.metrics.cpa ? formatCurrency(channel.metrics.cpa) : 'N/A'}
+                          <div>{channel.metrics.cpa ? formatCurrency(channel.metrics.cpa) : 'N/A'}</div>
+                          {channel.metrics.cpl && (
+                            <div className="text-[10px] text-muted-foreground">CPL: {formatCurrency(channel.metrics.cpl)}</div>
+                          )}
                         </TableCell>
                         <TableCell className="text-right">
                           <EditableCell
@@ -542,8 +554,11 @@ export function ChannelTable() {
                           </p>
                         </div>
                         <div>
-                          <span className="text-muted-foreground">Conv.</span>
+                          <span className="text-muted-foreground">FTDs (Conv.)</span>
                           <p className="font-mono font-medium">{formatNumber(channel.metrics.conversions)}</p>
+                          {channel.metrics.registrations > 0 && (
+                            <p className="text-[10px] text-muted-foreground">{formatNumber(channel.metrics.registrations)} regs</p>
+                          )}
                         </div>
                       </div>
                     </div>

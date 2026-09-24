@@ -7,6 +7,7 @@ import { useBlendedMetrics, useChannelsWithMetrics, useMediaPlanStore, useCatego
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { ShieldCheck, AlertTriangle, TrendingUp, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { evaluateBenchmarkComparison } from '@/lib/plan-math';
 
 type VerticalType = 'casino' | 'sports' | 'poker' | 'bingo';
 
@@ -141,7 +142,7 @@ export function IndustryBenchmarks() {
         <div>
           <CardTitle className="text-lg font-bold text-white">iGaming Industry Benchmarks</CardTitle>
           <CardDescription className="text-slate-400">
-            Compare your blended planning metrics against standard B2B iGaming verticals.
+            Compare your blended planning metrics against standard iGaming verticals.
           </CardDescription>
         </div>
         <div className="flex items-center gap-4">
@@ -235,9 +236,8 @@ export function IndustryBenchmarks() {
               title="Blended ROAS"
               planVal={`${planRoas.toFixed(2)}x`}
               benchVal={`${benchmark.roas.toFixed(1)}x`}
-              pct={compareRoas}
-              better={planRoas >= benchmark.roas}
-              unit="x"
+              rawPlanNumber={planRoas}
+              rawBenchNumber={benchmark.roas}
               desc="Return on Ad Spend tells you the revenue generated per unit currency spent."
             />
 
@@ -246,10 +246,9 @@ export function IndustryBenchmarks() {
               title="Blended CPA"
               planVal={planCpa > 0 ? `${symbol}${Math.round(planCpa)}` : '--'}
               benchVal={`${symbol}${benchmark.cpa}`}
-              pct={compareCpa}
-              better={planCpa > 0 && planCpa <= benchmark.cpa}
+              rawPlanNumber={planCpa}
+              rawBenchNumber={benchmark.cpa}
               invertColors // CPA lower is better
-              unit="CPA"
               desc="Cost Per Acquisition (FTD) benchmark is crucial to verify affiliate deal thresholds."
             />
 
@@ -258,9 +257,8 @@ export function IndustryBenchmarks() {
               title="Click-Through Rate (CTR)"
               planVal={`${planCtr.toFixed(2)}%`}
               benchVal={`${benchmark.ctr.toFixed(1)}%`}
-              pct={compareCtr}
-              better={planCtr >= benchmark.ctr}
-              unit="%"
+              rawPlanNumber={planCtr}
+              rawBenchNumber={benchmark.ctr}
               desc="Aggregated media plan ad click density. Higher CTR indicates better hook relevance."
             />
 
@@ -269,13 +267,17 @@ export function IndustryBenchmarks() {
               title="Conversion Rate (CR)"
               planVal={`${planCr.toFixed(2)}%`}
               benchVal={`${benchmark.cr.toFixed(1)}%`}
-              pct={compareCr}
-              better={planCr >= benchmark.cr}
-              unit="%"
+              rawPlanNumber={planCr}
+              rawBenchNumber={benchmark.cr}
               desc="Percentage of site/landing page clicks converted to First Time Depositors (FTDs)."
             />
           </div>
         )}
+
+        <div className="text-[11px] text-slate-500 italic flex flex-col sm:flex-row sm:items-center justify-between gap-1 border-t border-slate-800/60 pt-3">
+          <span>Source: H2 Gambling Capital / EGR Global Benchmarks (Q2 2026 update).</span>
+          <span>Metrics reflect blended performance across active campaigns.</span>
+        </div>
       </CardContent>
     </Card>
   );
@@ -285,47 +287,35 @@ function BenchmarkCard({
   title,
   planVal,
   benchVal,
-  pct,
-  better,
+  rawPlanNumber,
+  rawBenchNumber,
   invertColors = false,
   desc
 }: {
   title: string;
   planVal: string;
   benchVal: string;
-  pct: number;
-  better: boolean;
+  rawPlanNumber: number;
+  rawBenchNumber: number;
   invertColors?: boolean;
-  unit?: string;
   desc?: string;
 }) {
-  const pctStr = pct > 0 ? `+${pct.toFixed(0)}%` : `${pct.toFixed(0)}%`;
-  
-  // Decide positive color behavior
-  const isPositiveBetter = invertColors ? !better : better;
-  
-  let labelColor = "text-yellow-400 border-yellow-500/20 bg-yellow-500/5";
+  const comp = evaluateBenchmarkComparison(rawPlanNumber, rawBenchNumber, invertColors);
+
   let Icon = AlertTriangle;
-  
-  if (better) {
-    labelColor = "text-emerald-400 border-emerald-500/20 bg-emerald-500/5";
-    Icon = ShieldCheck;
-  } else if (pct === 0) {
-    labelColor = "text-slate-400 border-slate-800 bg-slate-900/50";
-    Icon = HelpCircle;
-  } else {
-    labelColor = "text-red-400 border-red-500/20 bg-red-500/5";
-    Icon = AlertTriangle;
-  }
+  if (comp.status === 'outperforming') Icon = ShieldCheck;
+  else if (comp.status === 'in_line') Icon = ShieldCheck;
+  else if (comp.status === 'no_data') Icon = HelpCircle;
+  else Icon = AlertTriangle;
 
   return (
     <div className="border border-border/40 bg-slate-950/30 rounded-xl p-4 flex flex-col justify-between hover:border-slate-700/50 transition-colors">
       <div>
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="font-semibold text-slate-200 text-sm">{title}</span>
-          <Badge variant="outline" className={cn("text-[10px] font-bold px-2 py-0.5", labelColor)}>
+          <Badge variant={comp.badgeVariant} className={cn("text-[10px] font-bold px-2 py-0.5", comp.badgeColorClass)}>
             <Icon className="h-3 w-3 mr-1" />
-            {pct === 0 ? "No plan data" : better ? "Outperforming" : "Needs Optimization"}
+            {comp.badgeText}
           </Badge>
         </div>
 
@@ -340,14 +330,22 @@ function BenchmarkCard({
           </div>
         </div>
 
-        {pct !== 0 && (
+        {comp.status !== 'no_data' && (
           <div className="flex items-center gap-1.5 text-xs mt-3 text-slate-400 font-medium">
-            <TrendingUp className={cn("h-3.5 w-3.5", better ? "text-emerald-500" : "text-red-500")} />
-            <span>Plan is</span>
-            <span className={cn("font-bold font-mono", better ? "text-emerald-400" : "text-red-400")}>
-              {Math.abs(pct).toFixed(0)}% {better ? "better" : "worse"}
-            </span>
-            <span>than benchmark.</span>
+            <TrendingUp className={cn("h-3.5 w-3.5", comp.status === 'outperforming' ? "text-emerald-500" : comp.status === 'in_line' ? "text-blue-400" : comp.status === 'unrealistic' ? "text-amber-400" : "text-red-500")} />
+            {comp.status === 'in_line' ? (
+              <span>Plan is <strong className="text-blue-400 font-mono">in line (±2%)</strong> with benchmark.</span>
+            ) : comp.status === 'unrealistic' ? (
+              <span>Plan CPA is <strong className="text-amber-400 font-mono">{Math.abs(comp.pctDiff).toFixed(0)}% below average</strong> — verify data assumptions.</span>
+            ) : (
+              <>
+                <span>Plan is</span>
+                <span className={cn("font-bold font-mono", comp.pctDiff > 0 ? "text-emerald-400" : "text-red-400")}>
+                  {Math.abs(comp.pctDiff).toFixed(0)}% {comp.pctDiff > 0 ? "better" : "worse"}
+                </span>
+                <span>than benchmark.</span>
+              </>
+            )}
           </div>
         )}
       </div>

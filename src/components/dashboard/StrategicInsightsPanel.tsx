@@ -7,6 +7,7 @@ import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { calculateArbitrageConfidence, selectArbitrageCandidates } from '@/lib/plan-math';
 
 export const StrategicInsightsPanel = () => {
     const { toast } = useToast();
@@ -47,41 +48,31 @@ export const StrategicInsightsPanel = () => {
     // 2. --- CALCULATIONS: CARD 2 (Arbitrage Opportunity) ---
     const targetRoas = globalMultipliers.roasTarget || 2.5;
 
-    // Only consider active, variable, unlocked channels
+    // Use pure selector that prevents recommending saturated channels as winner
+    const { loser, winner, arbitragePossible } = selectArbitrageCandidates(channels, targetRoas);
+    let expectedAddedRevenue = 0;
+    let deductionPct = 0;
+    let siphonSpend = 0;
+
+    if (loser && winner && arbitragePossible) {
+        const roasRatio = loser.metrics.roas / targetRoas;
+        const failingSpendRatio = Math.max(0, 1 - roasRatio);
+        const maxSiphonRatio = 0.20;
+        // Siphon up to 20% of allocation, or less if performance is close to target
+        const exactSiphonRatio = Math.min(failingSpendRatio || maxSiphonRatio, maxSiphonRatio);
+
+        deductionPct = loser.allocationPct * exactSiphonRatio;
+        siphonSpend = (deductionPct / 100) * totalBudget;
+        expectedAddedRevenue = siphonSpend * (winner.metrics.roas - loser.metrics.roas);
+    }
+
+    // Arbitrage candidates for fallback best channel
     const arbitrageCandidates = channels.filter(ch =>
         ch.isActive &&
         !ch.locked &&
         ch.metrics.spend > 0 &&
         (ch.buyingModel === 'CPM' || ch.buyingModel === 'CPC' || ch.buyingModel === 'CPA')
     );
-
-    let loser = null;
-    let winner = null;
-    let arbitragePossible = false;
-    let expectedAddedRevenue = 0;
-    let deductionPct = 0;
-    let siphonSpend = 0;
-
-    if (arbitrageCandidates.length >= 2) {
-        const sortedByRoas = [...arbitrageCandidates].sort((a, b) => a.metrics.roas - b.metrics.roas);
-        loser = sortedByRoas[0];
-        winner = sortedByRoas[sortedByRoas.length - 1];
-
-        // Arbitrage makes sense if winner ROAS is higher than loser ROAS
-        if (loser.id !== winner.id && winner.metrics.roas > loser.metrics.roas && loser.metrics.roas < targetRoas) {
-            arbitragePossible = true;
-
-            const roasRatio = loser.metrics.roas / targetRoas;
-            const failingSpendRatio = Math.max(0, 1 - roasRatio);
-            const maxSiphonRatio = 0.20;
-            // Siphon up to 20% of allocation, or less if performance is close to target
-            const exactSiphonRatio = Math.min(failingSpendRatio || maxSiphonRatio, maxSiphonRatio);
-
-            deductionPct = loser.allocationPct * exactSiphonRatio;
-            siphonSpend = (deductionPct / 100) * totalBudget;
-            expectedAddedRevenue = siphonSpend * (winner.metrics.roas - loser.metrics.roas);
-        }
-    }
 
     // Find the winner to receive worst CPA channel siphon if needed
     const bestRoasChannel = arbitrageCandidates.length > 0
@@ -267,15 +258,21 @@ export const StrategicInsightsPanel = () => {
                                     <div className="p-2 bg-slate-500/10 rounded-lg">
                                         <HelpCircle className="w-5 h-5 text-slate-400" />
                                     </div>
-                                    <span className="text-sm font-semibold text-slate-400">No CPA Violations</span>
+                                    <span className="text-sm font-semibold text-slate-400">
+                                        {activeVariableChannels.length === 0 ? "No Active Spend" : "CPA Within Limits"}
+                                    </span>
                                 </div>
                                 <Badge variant="outline" className="text-[10px] bg-slate-500/10 border-slate-700 text-slate-400 font-mono">
-                                    No Active Spend
+                                    {activeVariableChannels.length === 0 ? "No Active Spend" : hasCpaTarget ? "Target Met" : "Target Not Set"}
                                 </Badge>
                             </div>
 
                             <h4 className="text-slate-400 font-medium leading-snug mb-4">
-                                No active campaigns with spend to evaluate CPA compliance.
+                                {activeVariableChannels.length === 0
+                                    ? "No active campaigns with spend to evaluate CPA compliance."
+                                    : hasCpaTarget
+                                    ? "All active campaigns are running within your specified target CPA."
+                                    : "Active campaigns are running within default thresholds (€150). Set a custom target in Multipliers to customize."}
                             </h4>
                         </div>
 
@@ -286,7 +283,7 @@ export const StrategicInsightsPanel = () => {
                                 className="w-full border-slate-800 text-slate-500 pointer-events-none"
                                 disabled
                             >
-                                No Data Available
+                                {activeVariableChannels.length === 0 ? "No Data Available" : "All Compliant"}
                             </Button>
                         </div>
                     </div>
@@ -402,7 +399,7 @@ export const StrategicInsightsPanel = () => {
                                     <span className="text-sm font-semibold text-green-400">Arbitrage Opportunity</span>
                                 </div>
                                 <Badge variant="outline" className="text-[10px] bg-green-500/10 border-green-500/30 text-green-400 font-mono">
-                                    {Math.round((winner.metrics.roas / (loser.metrics.roas || 1)) * 20 + 60)}% Confidence
+                                    {calculateArbitrageConfidence(winner.metrics.roas, loser.metrics.roas)}% Confidence
                                 </Badge>
                             </div>
 
@@ -489,13 +486,18 @@ export const StrategicInsightsPanel = () => {
                                     </div>
                                     <span className="text-sm font-semibold text-amber-400">Market Saturation</span>
                                 </div>
-                                <Badge variant="outline" className="text-[10px] bg-amber-500/10 border-amber-500/30 text-amber-400 font-mono">
-                                    {Math.round(highestSaturationRatio * 100)}% Saturation
+                                <Badge variant="outline" className={cn(
+                                    "text-[10px] font-mono",
+                                    highestSaturationRatio >= 1.0
+                                        ? "bg-red-500/10 border-red-500/30 text-red-400 font-bold"
+                                        : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                )}>
+                                    {highestSaturationRatio >= 1.0 ? `OVER CEILING (${Math.round(highestSaturationRatio * 100)}%)` : `${Math.round(highestSaturationRatio * 100)}% Saturation`}
                                 </Badge>
                             </div>
 
                             <h4 className="text-slate-200 font-medium leading-snug mb-4">
-                                {saturatedChannel.name} is hitting diminishing returns. Spend is at <span className="text-amber-400 font-bold">{Math.round(highestSaturationRatio * 100)}% of ceiling</span>.
+                                {saturatedChannel.name} is hitting diminishing returns. Spend is at <span className={cn("font-bold", highestSaturationRatio >= 1.0 ? "text-red-400" : "text-amber-400")}>{Math.round(highestSaturationRatio * 100)}% of ceiling</span>.
                             </h4>
 
                             {/* Pulse Visual */}
@@ -507,8 +509,8 @@ export const StrategicInsightsPanel = () => {
                                     <div className="w-1 h-5 bg-amber-500/50 rounded-full" />
                                     <div className="w-1 h-3 bg-amber-500/30 rounded-full" />
                                 </div>
-                                <span className="ml-3 text-xs text-amber-300 font-mono">
-                                    {highestSaturationRatio >= 1.0 ? 'SATURATION REACHED' : 'SATURATION APPROACHING'}
+                                <span className={cn("ml-3 text-xs font-mono", highestSaturationRatio >= 1.0 ? "text-red-400 font-bold" : "text-amber-300")}>
+                                    {highestSaturationRatio >= 1.0 ? `OVER CEILING (${Math.round(highestSaturationRatio * 100)}%)` : 'SATURATION APPROACHING'}
                                 </span>
                             </div>
                         </div>

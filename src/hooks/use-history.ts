@@ -25,17 +25,13 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
     isUndoing: false,
 
     record: (snapshot) => {
-        const { isUndoing, past } = get();
+        const { isUndoing } = get();
         if (isUndoing) return;
 
-        // Optional: Deep compare or just crude check to avoid duplicates?
-        // For now, simple push.
-
-        // Check if new snapshot is identical to last past (if strict)
-        // But object refs change in Zustand.
+        const deepClonedSnapshot = JSON.parse(JSON.stringify(snapshot));
 
         set((state) => {
-            const newPast = [...state.past, snapshot].slice(-HISTORY_LIMIT);
+            const newPast = [...state.past, deepClonedSnapshot].slice(-HISTORY_LIMIT);
             return {
                 past: newPast,
                 future: [],
@@ -51,11 +47,11 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
         // We need the CURRENT state to put into future
         const currentState = useMediaPlanStore.getState();
-        const currentSnapshot = {
+        const currentSnapshot = JSON.parse(JSON.stringify({
             totalBudget: currentState.totalBudget,
             channels: currentState.channels,
             globalMultipliers: currentState.globalMultipliers,
-        };
+        }));
 
         const previous = past[past.length - 1];
         const newPast = past.slice(0, past.length - 1);
@@ -68,8 +64,8 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
             isUndoing: true
         });
 
-        // Restore
-        useMediaPlanStore.getState().restoreState(previous);
+        // Restore with deep clone
+        useMediaPlanStore.getState().restoreState(JSON.parse(JSON.stringify(previous)));
 
         // Reset flag
         setTimeout(() => set({ isUndoing: false }), 0);
@@ -81,11 +77,11 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
 
         // Current state to past
         const currentState = useMediaPlanStore.getState();
-        const currentSnapshot = {
+        const currentSnapshot = JSON.parse(JSON.stringify({
             totalBudget: currentState.totalBudget,
             channels: currentState.channels,
             globalMultipliers: currentState.globalMultipliers,
-        };
+        }));
 
         const next = future[0];
         const newFuture = future.slice(1);
@@ -98,7 +94,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
             isUndoing: true
         });
 
-        useMediaPlanStore.getState().restoreState(next);
+        useMediaPlanStore.getState().restoreState(JSON.parse(JSON.stringify(next)));
 
         setTimeout(() => set({ isUndoing: false }), 0);
     },

@@ -13,6 +13,7 @@ import {
   AlertTriangle, Info, CheckCircle, Activity, Layers, ArrowRight, Sparkles 
 } from 'lucide-react';
 import { ListingPackagesEvaluator } from './ListingPackagesEvaluator';
+import { calculateLifetimeGgrWithChurn } from '@/lib/plan-math';
 
 interface Preset {
   name: string;
@@ -224,10 +225,10 @@ export const AffiliateDealEvaluator: React.FC = () => {
     return effectiveBonusPct + adminFeePct + payFeePct + taxPct;
   }, [effectiveBonusPct, adminFeePct, payFeePct, taxPct]);
 
-  // Net Gaming Revenue (NGR) per player over their lifetime
+  // Net Gaming Revenue (NGR) per player over their lifetime (churn-decayed)
   const lifetimeGgrPerPlayer = useMemo(() => {
-    return monthlyGgrPerPlayer * avgLifespanMonths;
-  }, [monthlyGgrPerPlayer, avgLifespanMonths]);
+    return calculateLifetimeGgrWithChurn(monthlyGgrPerPlayer, churnRate, avgLifespanMonths);
+  }, [monthlyGgrPerPlayer, churnRate, avgLifespanMonths]);
 
   const lifetimeNgrPerPlayer = useMemo(() => {
     const leakageFactor = (100 - marginLeakagePct) / 100;
@@ -537,7 +538,8 @@ export const AffiliateDealEvaluator: React.FC = () => {
       insights.cashflowRisk = 'high';
       insights.operatorStatus = 'error';
       insights.operatorText += ` CPA (${formatCurrency(cpaAmount)}) exceeds Player lifetime NGR (${formatCurrency(playerLtvNgr)}). You are buying players at a loss. Immediate adjustments needed!`;
-    } else if (customAffEarning > 0 && customOpProfit < 0) {
+    } else if (customOpProfit < 0) {
+      insights.cashflowRisk = 'high';
       insights.operatorStatus = 'error';
       insights.operatorText = "CRITICAL: The current deal terms result in a net loss for the Operator over 12 months. Affiliate payouts and deductions exceed total NGR.";
     } else if (cohortProjections.customDeal.operatorRoi > 150) {
@@ -553,7 +555,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
     } else if (playerLtvNgr < cpaAmount || marginLeakagePct > 50) {
       insights.recommendation = "Affiliate: Secure CPA or Upfront Tenancy. Operator: Push for RevShare to transfer performance risk.";
     } else {
-      insights.recommendation = "A balanced Hybrid deal (e.g. $100 CPA + 20% RevShare) satisfies both parties' cashflow and margin requirements.";
+      insights.recommendation = `A balanced Hybrid deal (e.g. ${formatCurrency(100)} CPA + 20% RevShare) satisfies both parties' cashflow and margin requirements.`;
     }
 
     return insights;
@@ -644,7 +646,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
             <div>
               <p className="text-xs text-slate-400">GGR-to-NGR Leakage</p>
               <h3 className="text-xl font-bold text-white font-mono mt-0.5">{marginLeakagePct}%</h3>
-              <p className="text-[10px] text-red-400/80 font-mono">Net NGR: {(100 - marginLeakagePct)}% of wagers</p>
+              <p className="text-[10px] text-red-400/80 font-mono">Net NGR: {(100 - marginLeakagePct)}% of GGR</p>
             </div>
           </CardContent>
         </Card>
@@ -1251,9 +1253,9 @@ export const AffiliateDealEvaluator: React.FC = () => {
           {/* STATS MATRIX & DEAL COMPARISONS */}
           <Card className="bg-slate-950 border border-slate-800">
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-semibold text-slate-200">12-Month Deal Comparison Matrix</CardTitle>
+              <CardTitle className="text-sm font-semibold text-slate-200">12-Month Calendar Window Comparison Matrix</CardTitle>
               <CardDescription className="text-xs text-slate-400">
-                How your custom configured deal stacks up against standard iGaming contracts (based on the same player value inputs).
+                12-month calendar window projection (Note: Month 1 cohort captures 12 months tenure, while Month 12 captures 1 month; full cohort lifetime values continue into Year 2).
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -1282,7 +1284,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                     </tr>
                     {/* CPA BENCHMARK */}
                     <tr className="border-b border-slate-900 text-slate-300 hover:bg-slate-900/20">
-                      <td className="py-2.5 px-3">Pure CPA (Benchmark ${cpaAmount > 0 ? cpaAmount : 150})</td>
+                      <td className="py-2.5 px-3">Pure CPA (Benchmark {formatCurrency(cpaAmount > 0 ? cpaAmount : 150)})</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.cpaDeal.affiliateEarnings)}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-emerald-500">{formatCurrency(cohortProjections.cpaDeal.operatorProfit)}</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.cpaDeal.effectiveCpa)}</td>
@@ -1298,7 +1300,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                     </tr>
                     {/* HYBRID BENCHMARK */}
                     <tr className="border-b border-slate-900 text-slate-300 hover:bg-slate-900/20">
-                      <td className="py-2.5 px-3">Hybrid ($80 CPA + 20% RS)</td>
+                      <td className="py-2.5 px-3">Hybrid ({formatCurrency(80)} CPA + 20% RS)</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.hybridDeal.affiliateEarnings)}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-emerald-500">{formatCurrency(cohortProjections.hybridDeal.operatorProfit)}</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.hybridDeal.effectiveCpa)}</td>
@@ -1306,7 +1308,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                     </tr>
                     {/* FLAT TENANCY BENCHMARK */}
                     <tr className="border-b border-slate-900 text-slate-300 hover:bg-slate-900/20">
-                      <td className="py-2.5 px-3">Pure Flat Fee ($3,000/mo tenancy)</td>
+                      <td className="py-2.5 px-3">Pure Flat Fee ({formatCurrency(3000)}/mo tenancy)</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.tenancyDeal.affiliateEarnings)}</td>
                       <td className="py-2.5 px-3 text-right font-mono text-emerald-500">{formatCurrency(cohortProjections.tenancyDeal.operatorProfit)}</td>
                       <td className="py-2.5 px-3 text-right font-mono">{formatCurrency(cohortProjections.tenancyDeal.effectiveCpa)}</td>
@@ -1693,7 +1695,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                               fill="#020617" stroke="#10b981" strokeWidth="1.5" 
                               className="node-hover" fillOpacity="0.05"
                             />
-                            <text x="50" y="15" textAnchor="middle" fill="#10b981" fontSize="9" fontWeight="bold">NET NGR (100%)</text>
+                            <text x="50" y="15" textAnchor="middle" fill="#10b981" fontSize="9" fontWeight="bold">Retained Net Gaming Rev</text>
                             <text x="50" y="31" textAnchor="middle" fill="#94a3b8" fontSize="10" fontWeight="bold" className="font-mono">
                               {formatCurrency(ngrVal, true)}
                             </text>

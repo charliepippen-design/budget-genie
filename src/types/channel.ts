@@ -117,11 +117,13 @@ export interface ChannelTypeConfig {
 
   baselineMetrics: {
     ctr?: number;             // % Click Through Rate
-    conversionRate?: number;  // % Conversion Rate (or Lead -> FTD)
+    conversionRate?: number;  // % Overall Click-to-FTD (fallback)
+    clickToReg?: number;      // % Click-to-Registration (e.g. 5-10%)
+    regToFtd?: number;        // % Registration-to-FTD (e.g. 15-25%)
     aov?: number;             // Average Order Value / LTV / NGR per FTD
     expectedLtv?: number;     // Expected Lifetime Value per user (iGaming specific)
     trafficPerUnit?: number;  // Est. Traffic for Flat Fee / Retainer
-    saturationCeiling?: number; // Spend level where returns diminish significantly (Half-Efficiency point in Michaelis-Menten)
+    saturationCeiling?: number; // Spend level where returns diminish significantly
   };
 }
 
@@ -129,12 +131,15 @@ export interface ChannelTypeConfig {
 
 export interface UnifiedMetrics {
   spend: number;          // The final money out
-  ftds: number;           // The final conversions
-  revenue: number;        // FTDs * Player Value or Spend * ROAS
-  cpa: number | null;     // Spend / FTDs
-  roas: number;           // Revenue / Spend
-  impressions: number;    // For display channels
+  impressions: number;    // Impressions
   clicks: number;         // Calculated clicks
+  registrations: number;  // Registrations (Leads)
+  ftds: number;           // The final conversions (FTDs)
+  cpl: number | null;     // Cost Per Lead / Registration
+  cpa: number | null;     // Cost Per Acquisition (Spend / FTDs)
+  revenue: number;        // FTDs * Player Value or Spend * ROAS
+  roas: number;           // Revenue / Spend
+  effectiveCr: number;    // Click-to-FTD CR %
 }
 
 // ========== CALCULATION HELPER ==========
@@ -146,67 +151,52 @@ export function calculateUnifiedMetrics(
 ): UnifiedMetrics {
   const { buyingModel, price, secondaryPrice, baselineMetrics } = config;
 
-  // Defaults
+  // Defaults & Funnel Rates
   const ctr = baselineMetrics.ctr || 1;
-  const cr = baselineMetrics.conversionRate || 2.5;
-  const aov = baselineMetrics.aov || playerValue;
+  const clickToReg = baselineMetrics.clickToReg ?? (baselineMetrics.conversionRate ? Math.min(100, baselineMetrics.conversionRate * 3.5) : 6);
+  const regToFtd = baselineMetrics.regToFtd ?? (baselineMetrics.conversionRate ? (baselineMetrics.conversionRate / (clickToReg / 100)) : 15);
+  const effectiveCr = (clickToReg / 100) * (regToFtd / 100) * 100;
+  const effectiveLtv = baselineMetrics.expectedLtv || baselineMetrics.aov || playerValue;
 
   let ftds = 0;
+  let registrations = 0;
   let impressions = 0;
   let clicks = 0;
-  let finalSpend = spend; // Default to input spend for budget-based models
+  let finalSpend = spend;
 
   switch (buyingModel) {
     case 'CPM': // price = CPM
-      // Math: Budget -> Impr -> Clicks -> Conv
-      // Impressions = (Spend / CPM) * 1000
+      // Math: Budget -> Impr -> Clicks -> Regs -> FTDs
       impressions = price > 0 ? (spend / price) * 1000 : 0;
       clicks = impressions * (ctr / 100);
-      ftds = clicks * (cr / 100);
+      registrations = clicks * (clickToReg / 100);
+      ftds = registrations * (regToFtd / 100);
       break;
 
     case 'CPC': // price = CPC
-      // Math: Budget -> Clicks -> Conv
+      // Math: Budget -> Clicks -> Regs -> FTDs
       clicks = price > 0 ? spend / price : 0;
-      ftds = clicks * (cr / 100);
-      impressions = clicks * 100; // Estimate
+      registrations = clicks * (clickToReg / 100);
+      ftds = registrations * (regToFtd / 100);
+      impressions = ctr > 0 ? (clicks / (ctr / 100)) : clicks * 100;
       break;
 
     case 'CPA': // price = Target CPA
-      // Math: Budget / CPA = Conv
+      // Math: Budget / CPA = FTDs
       ftds = price > 0 ? spend / price : 0;
-      // Reverse calculate impressions for reference
-      clicks = cr > 0 ? (ftds / (cr / 100)) : 0;
-      impressions = ctr > 0 ? (clicks / (ctr / 100)) : 0;
+      registrations = regToFtd > 0 ? ftds / (regToFtd / 100) : ftds * 5;
+      clicks = clickToReg > 0 ? registrations / (clickToReg / 100) : registrations * 15;
+      impressions = ctr > 0 ? clicks / (ctr / 100) : clicks * 100;
       break;
 
-    case 'REV_SHARE': // price = % (Wait, secondaryPrice is %) - Let's use price as dummy or 0? 
-      // The user spec said "secondaryPrice: number (Used ONLY for Hybrid RevShare %)".
-      // But for Pure RevShare, we need a percentage. 
-      // Let's assume price is the percentage if model is REV_SHARE? 
-      // Or maybe secondaryPrice is widely used for percentage.
-      // User Spec: "Add secondaryPrice: number (Used ONLY for Hybrid RevShare %)."
-      // Re-reading user Step 1: "Add price: number (Acts as the CPA, CPM, CPC, or Monthly Fee...)"
-      // For RevShare, usually there is no fixed price, just %. 
-      // Maybe price = 0? And secondaryPrice = %. 
-      // OR price = %. Let's use secondaryPrice for % as per spec for Hybrid.
-      // PROPOSAL: For pure RevShare, stick to secondaryPrice for consistency or use price as the %.
-      // Let's us price as % for purity if secondaryPrice is ONLY for hybrid.
-      // Actually, let's use secondaryPrice for consistency of "Revenue Share %".
-      // But wait, "price" is required.
-      // Let's set price = 0 for Rev Share? 
-      // And use secondaryPrice for the %.
-      // Calculation: Est Revenue -> Cost.
-      // For RevShare, Spend depends on performance. It's usually output driven.
-      // But here we likely input Budget = Estimated Spend.
-      // ftds = (Spend / (AOV * RevShare%)) ? 
-      // Spend = FTDs * AOV * RevShare%
-      // ftds = Spend / (AOV * (secondaryPrice/100))
+    case 'REV_SHARE':
       {
-        const rs = (secondaryPrice || 0) / 100;
-        const revenuePerFtd = aov;
-        const costPerFtd = revenuePerFtd * rs;
+        const rs = (secondaryPrice || price || 25) / 100;
+        const costPerFtd = effectiveLtv * rs;
         ftds = costPerFtd > 0 ? spend / costPerFtd : 0;
+        registrations = regToFtd > 0 ? ftds / (regToFtd / 100) : ftds * 5;
+        clicks = clickToReg > 0 ? registrations / (clickToReg / 100) : registrations * 15;
+        impressions = ctr > 0 ? clicks / (ctr / 100) : clicks * 100;
       }
       break;
 
@@ -214,64 +204,57 @@ export function calculateUnifiedMetrics(
       {
         const baseCpa = price;
         const rs = (secondaryPrice || 0) / 100;
-        const revenuePerFtd = aov;
-        const totalCostPerFtd = baseCpa + (revenuePerFtd * rs);
+        const totalCostPerFtd = baseCpa + (effectiveLtv * rs);
 
         ftds = totalCostPerFtd > 0 ? spend / totalCostPerFtd : 0;
+        registrations = regToFtd > 0 ? ftds / (regToFtd / 100) : ftds * 5;
+        clicks = clickToReg > 0 ? registrations / (clickToReg / 100) : registrations * 15;
+        impressions = ctr > 0 ? clicks / (ctr / 100) : clicks * 100;
       }
       break;
 
-    case 'FLAT_FEE': // price = Monthly Cost. 
-      // Budget is FIXED to this amount. 
-      // logic: spend = price.
-      // But here we take 'spend' as arg. 
-      // Usually the store will force spend = price. 
-      // So here we assume spend IS price.
-      finalSpend = price;
-      // Traffic ? baselineMetris.trafficPerUnit?
-      {
-        const traffic = baselineMetrics.trafficPerUnit || 1000;
-        clicks = traffic; // Visits
-        ftds = clicks * (cr / 100);
-      }
-      break;
-
+    case 'FLAT_FEE':
     case 'RETAINER':
-      // Same as Flat Fee
       finalSpend = price;
       {
-        const traffic = baselineMetrics.trafficPerUnit || 1000;
+        const traffic = baselineMetrics.trafficPerUnit ?? (price > 0 ? Math.round(price * 1.5) : 1000);
         clicks = traffic;
-        ftds = clicks * (cr / 100);
+        impressions = clicks * 20;
+        registrations = clicks * (clickToReg / 100);
+        ftds = registrations * (regToFtd / 100);
       }
       break;
   }
 
-  // 1. Calculate Linear Revenue (Pre-Saturation)
-  let revenue = ftds * playerValue;
-
-  // 2. Apply Diminishing Returns (Saturation)
-  // Formula: Revenue = LinearRevenue * (1 / (1 + (Spend / Saturation)))
-  // Ideally, SaturationCeiling is the point where efficiency is halved.
+  // 1. Calculate Diminishing Returns (Saturation)
+  let effectiveFtds = ftds;
+  let effectiveRegs = registrations;
   const saturation = baselineMetrics.saturationCeiling;
 
   if (saturation && saturation > 0 && finalSpend > 0) {
     const decayFactor = 1 / (1 + (finalSpend / saturation));
-    revenue = revenue * decayFactor;
+    effectiveFtds = ftds * decayFactor;
+    effectiveRegs = registrations * Math.sqrt(decayFactor);
   }
 
-  const cpa = ftds > 0 ? finalSpend / ftds : null;
-  // Recalculate ROAS based on decayed revenue
+  // 2. Revenue derives directly from effective conversions * player LTV
+  const revenue = effectiveFtds * effectiveLtv;
+
+  const cpl = effectiveRegs > 0 ? finalSpend / effectiveRegs : null;
+  const cpa = effectiveFtds > 0 ? finalSpend / effectiveFtds : null;
   const roas = finalSpend > 0 ? revenue / finalSpend : 0;
 
   return {
     spend: finalSpend,
-    ftds,
-    revenue,
-    cpa,
-    roas,
     impressions,
     clicks,
+    registrations: effectiveRegs,
+    ftds: effectiveFtds,
+    cpl,
+    cpa,
+    revenue,
+    roas,
+    effectiveCr,
   };
 }
 
@@ -292,7 +275,7 @@ export function inferChannelFamily(name: string): ChannelFamily {
 export function inferBuyingModel(name: string, family: ChannelFamily): BuyingModel {
   const lower = name.toLowerCase();
 
-  if (lower.includes('revshare') || lower.includes('rs')) return 'REV_SHARE';
+  if (/\b(rev_?share|revshare|rs)\b/i.test(lower) || lower.includes('rev share') || lower.includes('revenue share')) return 'REV_SHARE';
   if (lower.includes('hybrid')) return 'HYBRID';
   if (lower.includes('fixed') || lower.includes('listing')) return 'FLAT_FEE';
   if (lower.includes('retainer')) return 'RETAINER';

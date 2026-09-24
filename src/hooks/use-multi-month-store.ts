@@ -280,6 +280,19 @@ function createMonth(
   };
 }
 
+export function createInitialMonthsList(): MonthData[] {
+  const totalMonths = 6 + 1; // 6 planning months + 1 soft launch
+  const startDate = new Date();
+  const totalBudget = DEFAULT_GLOBAL_SETTINGS.baseMonthlyBudget * totalMonths;
+  const budgets = calculateDistribution('linear', totalBudget, totalMonths, { growthRate: 10 });
+  const months: MonthData[] = [];
+  for (let i = 0; i < totalMonths; i++) {
+    const isSoftLaunch = i === 0;
+    months.push(createMonth(i, startDate, isSoftLaunch, budgets[i], DEFAULT_CHANNELS));
+  }
+  return months;
+}
+
 // ========== METRICS CALCULATION ==========
 
 export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPlanSettings): {
@@ -313,8 +326,18 @@ export function calculateMonthMetrics(month: MonthData, globalSettings: GlobalPl
     }
 
     const clicks = impressions * (Math.max(0.01, ctr) / 100);
-    const conversions = clicks * (ch.cr / 100);
-    const revenue = spend * ch.roas;
+
+    // SEO ramp-up curve: Starts near zero in Month 1/Soft Launch and compounds across the plan
+    let rampMultiplier = 1.0;
+    const isSeo = ch.category === 'SEO/Content' || ch.channelId.includes('seo') || ch.name.toLowerCase().includes('seo');
+    if (isSeo) {
+      const idx = month.monthIndex; // 0-based
+      // M0 (soft launch): 0.15, M1: 0.35, M2: 0.60, M3: 0.85, M4: 1.10, M5: 1.35, M6: 1.60
+      rampMultiplier = Math.min(2.0, 0.15 + (idx * 0.25));
+    }
+
+    const conversions = clicks * (ch.cr / 100) * rampMultiplier;
+    const revenue = spend * ch.roas * rampMultiplier;
 
     totalSpend += spend;
     totalImpressions += impressions;
@@ -492,7 +515,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       progressionPattern: 'linear',
       patternParams: { growthRate: 10 },
       globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
-      months: [],
+      months: createInitialMonthsList(),
       scenarios: [],
       activeScenarioId: null,
       comparisonScenarioId: null,
@@ -941,7 +964,8 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
 export function useMultiMonthMetrics() {
   const { months, globalSettings } = useMultiMonthStore();
-  return calculatePlanMetrics(months, globalSettings);
+  const safeMonths = months && months.length > 0 ? months : createInitialMonthsList();
+  return calculatePlanMetrics(safeMonths, globalSettings);
 }
 
 export function useScenarioMetrics(scenarioId: string | null) {

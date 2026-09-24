@@ -24,7 +24,7 @@ export const ForecastCard = () => {
                 {/* Est. Revenue */}
                 <div className="relative group p-4 rounded-xl bg-slate-900/50 border border-slate-700/50 hover:border-emerald-500/30 transition-all">
                     <div className="flex items-center justify-between mb-1">
-                        <span className="text-slate-400 text-sm font-medium">Est. Revenue</span>
+                        <span className="text-slate-400 text-sm font-medium">Est. Net Revenue (NGR)</span>
                         <DollarSign className="w-4 h-4 text-emerald-500" />
                     </div>
                     <div className="text-3xl font-bold text-white tracking-tight">
@@ -36,7 +36,7 @@ export const ForecastCard = () => {
                 <div className="grid grid-cols-3 gap-4">
                     {/* Blended CPA */}
                     <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-700/50 flex flex-col justify-center">
-                        <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">Blended CPA</div>
+                        <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">Blended CPA (FTD)</div>
                         <div className={cn(
                             "text-xl font-bold",
                             (blendedCpa || 0) < 50 ? "text-emerald-400" : "text-white"
@@ -58,7 +58,7 @@ export const ForecastCard = () => {
 
                     {/* Total Conversions */}
                     <div className="p-3 rounded-xl bg-slate-900/50 border border-slate-700/50 flex flex-col justify-center">
-                        <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">Conversions</div>
+                        <div className="text-slate-500 text-xs uppercase tracking-wider mb-1">FTDs (Conv.)</div>
                         <div className="text-xl font-bold text-white">
                             {totalConversions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
                         </div>

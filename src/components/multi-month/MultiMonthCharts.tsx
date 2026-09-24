@@ -15,7 +15,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
+import { useMultiMonthMetrics, useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 const CHANNEL_COLORS = [
@@ -81,8 +81,14 @@ export function MultiMonthCharts() {
 
   if (months.length === 0) {
     return (
-      <div className="text-center py-12 text-muted-foreground">
-        Generate months to see charts
+      <div className="text-center py-12 flex flex-col items-center justify-center gap-3">
+        <p className="text-muted-foreground text-sm">No multi-month data currently loaded.</p>
+        <button
+          onClick={() => useMultiMonthStore.getState().generateMonths()}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg text-xs font-semibold"
+        >
+          Initialize Plan Months
+        </button>
       </div>
     );
   }

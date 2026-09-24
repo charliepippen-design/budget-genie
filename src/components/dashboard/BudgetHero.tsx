@@ -108,6 +108,7 @@ export const BudgetHero = () => {
 
                     {/* MASSIVE BUDGET DISPLAY */}
                     <div className="relative text-center">
+                        <div className="text-xs uppercase tracking-widest text-slate-400 font-mono mb-1">Monthly Planned Budget</div>
                         <h1 className="text-6xl md:text-7xl font-black text-white tracking-tighter drop-shadow-2xl transition-all duration-300 relative">
                             {symbol}{localBudget.toLocaleString()}
                         </h1>
