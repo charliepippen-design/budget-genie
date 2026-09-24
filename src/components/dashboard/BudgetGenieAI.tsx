@@ -9,14 +9,13 @@ import { ScenarioSidebar } from './ScenarioSidebar';
 import { MonthConfigPanel } from '../multi-month/MonthConfigPanel';
 import { WizardLauncherCard } from './WizardLauncherCard';
 import { StrategicInsightsPanel } from './StrategicInsightsPanel';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
 import { PLTable } from '../multi-month/PLTable';
 import { ProgressionPatternSelector } from '../multi-month/ProgressionPatternSelector';
 import { ProjectManager } from './ProjectManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BudgetWizard } from './BudgetWizard';
 import { BudgetPresetKey } from '@/lib/mediaplan-data';
-import { GenieAssistant } from './GenieAssistant';
+import { PlannerChat } from '../planner/PlannerChat';
 import { ImportWizard } from '../multi-month/ImportWizard';
 import { AffiliateDealEvaluator } from './AffiliateDealEvaluator';
 import { QuickTour } from './QuickTour';
@@ -64,7 +63,6 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
 }
 
 export const BudgetGenieAI = () => {
-    console.log("Rendering BudgetGenieAI..."); // Trace log
 
 
     // 1. VIEW MODEL (The Brain)
@@ -147,9 +145,6 @@ export const BudgetGenieAI = () => {
                                     {/* CHARTS (The Visuals) */}
                                     {/* Data passed from ViewModel ensuring consistency */}
                                     <ChartSection
-                                        blendedMetrics={vm.blendedMetrics}
-                                        currentAllocations={vm.currentAllocations}
-                                        totalBudget={vm.totalBudget}
                                         channels={vm.channels}
                                         categoryTotals={vm.categoryTotals}
                                     />
@@ -226,23 +221,24 @@ export const BudgetGenieAI = () => {
 
                         </div>
                     </main>
+
+                    {/* Floating Add Channel FAB */}
+                    <div className="absolute bottom-4 right-4 z-40 hidden sm:block">
+                        <AddChannelDialog
+                            trigger={
+                                <Button className="h-12 w-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl flex items-center justify-center border border-indigo-500/20">
+                                    <Plus className="h-6 w-6" />
+                                </Button>
+                            }
+                        />
+                    </div>
                 </div>
 
                 {/* MODALS & FLOATS */}
-                <GenieAssistant />
+                <PlannerChat />
                 <ImportWizard open={isImportOpen} onOpenChange={setIsImportOpen} />
                 <QuickTour />
                 
-                {/* Floating Add Channel FAB */}
-                <div className="fixed bottom-4 right-4 z-40 hidden sm:block">
-                    <AddChannelDialog
-                        trigger={
-                            <Button className="h-12 w-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl flex items-center justify-center border border-indigo-500/20">
-                                <Plus className="h-6 w-6" />
-                            </Button>
-                        }
-                    />
-                </div>
 
             </div>
         </ErrorBoundary>

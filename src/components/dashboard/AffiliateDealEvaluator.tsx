@@ -544,9 +544,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
       insights.operatorText = "CRITICAL: The current deal terms result in a net loss for the Operator over 12 months. Affiliate payouts and deductions exceed total NGR.";
     } else if (cohortProjections.customDeal.operatorRoi > 150) {
       insights.operatorStatus = 'success';
-      if (insights.operatorStatus !== 'error') {
-        insights.operatorText = `Excellent deal profitability! Projected 12-month Operator ROI is ${cohortProjections.customDeal.operatorRoi.toFixed(0)}%. Highly sustainable.`;
-      }
+      insights.operatorText = `Excellent deal profitability! Projected 12-month Operator ROI is ${cohortProjections.customDeal.operatorRoi.toFixed(0)}%. Highly sustainable.`;
     }
 
     // Recommendation synthesis
@@ -802,7 +800,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-300 flex items-center gap-1.5">
                       Player Bonus/Promos % of GGR
-                      <Info className="h-3 w-3 text-slate-500" title="Includes free spins, deposit matches, cashbacks. Subtracted before NGR." />
+                      <span title="Includes free spins, deposit matches, cashbacks. Subtracted before NGR."><Info className="h-3 w-3 text-slate-500" /></span>
                     </span>
                     <span className="font-mono text-red-400">{bonusPct}%</span>
                   </div>
@@ -817,7 +815,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-300 flex items-center gap-1.5">
                       Negotiated Bonus Cap
-                      <Info className="h-3 w-3 text-slate-500" title="Caps the maximum player bonus deductions the operator can deduct from GGR. 100% = Uncapped." />
+                      <span title="Caps the maximum player bonus deductions the operator can deduct from GGR. 100% = Uncapped."><Info className="h-3 w-3 text-slate-500" /></span>
                     </span>
                     <span className="font-mono text-indigo-400">
                       {bonusCapPct === 100 ? 'Uncapped' : `${bonusCapPct}%`}
@@ -840,7 +838,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-300 flex items-center gap-1.5">
                       Admin / Platform Royalties
-                      <Info className="h-3 w-3 text-slate-500" title="Platform royalties paid to suppliers (EveryMatrix, Evolution, etc.) deducted from wagers." />
+                      <span title="Platform royalties paid to suppliers (EveryMatrix, Evolution, etc.) deducted from wagers."><Info className="h-3 w-3 text-slate-500" /></span>
                     </span>
                     <span className="font-mono text-red-400">{adminFeePct}%</span>
                   </div>
@@ -949,7 +947,7 @@ export const AffiliateDealEvaluator: React.FC = () => {
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-slate-300 flex items-center gap-1.5">
                       CPL (Cost Per Lead / Registration)
-                      <Info className="h-3 w-3 text-slate-500" title="Payout per registration, regardless of deposit status." />
+                      <span title="Payout per registration, regardless of deposit status."><Info className="h-3 w-3 text-slate-500" /></span>
                     </span>
                     <span className="font-mono text-indigo-400">{formatCurrency(cplAmount)}</span>
                   </div>

@@ -245,7 +245,9 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               secondaryPrice: 0 // Optional
             },
 
+            tier: 'scalable' as const,
             locked: false,
+            isActive: true,
           };
         });
 

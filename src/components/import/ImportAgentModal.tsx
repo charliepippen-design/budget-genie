@@ -4,8 +4,9 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Bot, FileText, Send, User, X, Loader2, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { generateText, CoreMessage } from 'ai';
+import { useAI } from '@/lib/ai-client';
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string };
 
 interface ImportAgentModalProps {
     open: boolean;
@@ -17,10 +18,11 @@ interface ImportAgentModalProps {
 
 export function ImportAgentModal({ open, onClose, fileContent, fileName, onSuccess }: ImportAgentModalProps) {
     // Manual State for Client-Side AI
-    const [messages, setMessages] = useState<CoreMessage[]>([]);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const scrollRef = useRef<HTMLDivElement>(null);
+    const callAI = useAI();
 
     // Initial System Message
     useEffect(() => {
@@ -53,72 +55,11 @@ export function ImportAgentModal({ open, onClose, fileContent, fileName, onSucce
         setIsLoading(true);
 
         try {
-            const apiKey = import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY;
-
-            if (!apiKey) {
-                throw new Error("Missing Google API Key");
-            }
-
-            const google = createGoogleGenerativeAI({ apiKey });
-
-            const systemPrompt = `
-                You are an "Import Agent" for Budget Genie.
-                
-                USER CONTEXT:
-                File Name: "${fileName}"
-                File Preview (First 50 lines):
-                \`\`\`
-                ${fileContent?.split('\n').slice(0, 50).join('\n')}
-                \`\`\`
-
-                GOAL: 
-                Help the user map this CSV/Text data to our internal schema:
-                - Channel Name (String)
-                - Spend (Number)
-                - Impressions (Number, optional)
-                - Revenue (Number, optional)
-
-                INSTRUCTIONS:
-                1. Chat with the user to clarify columns if needed.
-                2. If the user confirms the mapping or says "Go ahead" / "Extract", you MUST output a special JSON block at the END of your response.
-                
-                SPECIAL JSON FORMAT (Only when extracting):
-                \`\`\`json
-                {
-                    "action": "extract",
-                    "data": [
-                        { "Channel Name": "...", "Spend": 100, ... }
-                    ]
-                }
-                \`\`\`
-            `;
-
-            // Use generateText with model failover loop (Stable)
-            const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-            let lastError = null;
-            let success = false;
-            let text = "";
-
-            for (const modelId of modelsToTry) {
-                try {
-                    const result = await generateText({
-                        model: google(modelId),
-                        system: systemPrompt,
-                        messages: newMessages,
-                    });
-                    text = result.text;
-                    success = true;
-                    break;
-                } catch (err: any) {
-                    console.warn(`ImportAgentModal: ${modelId} failed:`, err.message);
-                    lastError = err;
-                    if (err.message?.includes("401") || err.message?.includes("API key")) throw err;
-                }
-            }
-
-            if (!success) {
-                throw lastError || new Error("All models failed");
-            }
+            const { text } = await callAI('import_chat', {
+                fileName,
+                preview: fileContent?.split('\n').slice(0, 50).join('\n') ?? '',
+                messages: newMessages.map(m => ({ role: m.role, text: String(m.content) })),
+            });
 
             // Check for Extraction JSON
             const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);
@@ -147,9 +88,7 @@ export function ImportAgentModal({ open, onClose, fileContent, fileName, onSucce
         } catch (error: any) {
             console.error("Import Agent Error:", error);
             let errorMessage = "Sorry, I encountered an error analyzing the file.";
-            if (error.message?.includes("Missing Google API Key")) {
-                errorMessage = "Configuration Error: Missing API Key. I cannot analyze files without it.";
-            }
+            if (error.message) errorMessage += ` (${error.message})`;
             setMessages(prev => [...prev, { role: 'assistant', content: errorMessage }]);
         } finally {
             setIsLoading(false);
@@ -199,7 +138,7 @@ export function ImportAgentModal({ open, onClose, fileContent, fileName, onSucce
 
                     <ScrollArea className="flex-1 p-4">
                         <div className="space-y-4 pb-4">
-                            {messages.filter(m => m.role !== 'system').map((m, i) => (
+                            {messages.map((m, i) => (
                                 <div
                                     key={i}
                                     className={cn(

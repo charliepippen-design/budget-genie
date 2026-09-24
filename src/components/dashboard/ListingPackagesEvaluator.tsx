@@ -1,7 +1,6 @@
 import React, { useState, useMemo, useRef } from 'react';
 import Papa from 'papaparse';
-import { generateText } from 'ai';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
+import { useAI } from '@/lib/ai-client';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Label } from '@/components/ui/label';
@@ -160,6 +159,7 @@ export const ListingPackagesEvaluator: React.FC<ListingPackagesEvaluatorProps> =
   
   // OCR Parsing States
   const [isParsingImage, setIsParsingImage] = useState<boolean>(false);
+  const callAI = useAI();
   const [imageParseError, setImageParseError] = useState<string | null>(null);
   const [imagePreviews, setImagePreviews] = useState<string[]>([]);
   const [activeFileCount, setActiveFileCount] = useState<number>(0);
@@ -302,75 +302,15 @@ export const ListingPackagesEvaluator: React.FC<ListingPackagesEvaluatorProps> =
           const mimeType = file.type;
 
           try {
-            const apiKey = (import.meta.env.VITE_GOOGLE_GENERATIVE_AI_API_KEY || "").trim();
-            if (!apiKey) {
-              throw new Error("Missing Google API Key. Please configure VITE_GOOGLE_GENERATIVE_AI_API_KEY in your .env.local file to enable image parsing.");
+            const { text } = await callAI('extract_report', { images: [{ mimeType, data: base64Data }] });
+
+            try {
+              resolve(JSON.parse(text.trim()));
+              return;
+            } catch {
+              // fall through to fenced/embedded JSON extraction
             }
-
-            const google = createGoogleGenerativeAI({ apiKey });
-
-            const prompt = `
-              You are an expert iGaming data analyst.
-              Your task is to scan this screenshot of an affiliate performance report table and extract all metrics.
-              Identify:
-              - Unique Visitors or Unique Clicks (we refer to these as 'clicks')
-              - Registrations or Registration Count (we refer to these as 'regs')
-              - First Time Depositors (FTDs or FTD Count)
-              - Deposit amounts (parse currency symbols like €, $, £ and extract numbers)
-              
-              Also extract the breakdown by individual tracking codes or marketing sources (e.g. chipy, nsb, lists, freak, glab, etc.).
-              
-              You MUST output your response as a single, valid JSON block in this exact structure:
-              \`\`\`json
-              {
-                "clicks": 13237,
-                "regs": 5696,
-                "ftds": 105,
-                "deposits": 24903.09,
-                "sources": [
-                  { "source": "chipy", "clicks": 5376, "regs": 2648, "ftds": 41, "deposits": 12854.89 },
-                  ...
-                ]
-              }
-              \`\`\`
-              
-              Do not add any text outside of the JSON block. Output ONLY the JSON block.
-            `;
-
-            const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
-            let lastError = null;
-            let success = false;
-            let text = "";
-
-            for (const modelId of modelsToTry) {
-              try {
-                const result = await generateText({
-                  model: google(modelId),
-                  messages: [
-                    {
-                      role: 'user',
-                      content: [
-                        { type: 'text', text: prompt },
-                        { type: 'image', image: base64Data, mimeType }
-                      ]
-                    }
-                  ]
-                });
-                text = result.text;
-                success = true;
-                break;
-              } catch (err: any) {
-                console.warn(`ListingPackagesEvaluator OCR: ${modelId} failed:`, err.message);
-                lastError = err;
-                if (err.message?.includes("401") || err.message?.includes("API key")) throw err;
-              }
-            }
-
-            if (!success) {
-              throw lastError || new Error("All models failed");
-            }
-
-            const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*?}/);
+            const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/) || text.match(/{[\s\S]*}/);
             if (jsonMatch) {
               const rawJson = jsonMatch[1] || jsonMatch[0];
               const parsed = JSON.parse(rawJson.trim());

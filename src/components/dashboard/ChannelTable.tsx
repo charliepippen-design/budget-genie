@@ -336,7 +336,8 @@ export function ChannelTable() {
                               </span>
                               
                               {/* SPARKLINE PERFORMANCE TREND */}
-                              <svg className="w-12 h-6 overflow-visible opacity-60 hidden xl:inline-block ml-1" viewBox="0 0 50 20" title="Monthly ROAS Trend (Multi-Month Planning)">
+                              <svg className="w-12 h-6 overflow-visible opacity-60 hidden xl:inline-block ml-1" viewBox="0 0 50 20">
+                                <title>Monthly ROAS Trend (Multi-Month Planning)</title>
                                 <path
                                   d={getDynamicSparklinePath(channel.id)}
                                   fill="none"

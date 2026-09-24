@@ -14,6 +14,7 @@ import {
 import { normalizeAllocations as normalizeAllocationsUtil } from '@/lib/math-utils';
 import { calculateScoredAllocation } from '@/lib/distribution-logic';
 import { calculatePlanMetrics, calculateSingleChannelMetrics, PlanAllocationResult } from '@/lib/plan-math';
+import type { PlanBrief, GeneratedPlan, ChannelRationale } from '@/lib/plan-generator';
 
 // ========== DATA MODEL ==========
 
@@ -346,12 +347,18 @@ export function calculateChannelMetrics(
 
 // ========== STORE DEFINITION ==========
 
-interface MediaPlanState {
+export interface MediaPlanState {
   // Core data
   totalBudget: number;
   channels: ChannelData[];
   globalMultipliers: GlobalMultipliers;
   presets: Preset[];
+
+  // AI planner output
+  brief: PlanBrief | null;
+  planRationale: ChannelRationale[];
+  planWarnings: string[];
+  applyGeneratedPlan: (plan: GeneratedPlan) => void;
   projectName: string;
   setProjectName: (name: string) => void;
 
@@ -415,10 +422,22 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       channels: createInitialChannels(),
       globalMultipliers: { ...DEFAULT_MULTIPLIERS },
       presets: [],
+      brief: null,
+      planRationale: [],
+      planWarnings: [],
       projectName: "New Media Plan",
       devDeityMode: true,
 
       setProjectName: (name) => set({ projectName: name }),
+
+      applyGeneratedPlan: (plan) => set((state) => ({
+        brief: plan.brief,
+        totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, plan.totalBudget)),
+        channels: JSON.parse(JSON.stringify(plan.channels)),
+        globalMultipliers: { ...state.globalMultipliers, ...plan.multipliers },
+        planRationale: plan.rationale,
+        planWarnings: plan.warnings,
+      })),
       toggleDevDeityMode: () => set(state => ({ devDeityMode: !state.devDeityMode })),
       setDevDeityMode: (val) => set({ devDeityMode: val }),
 
@@ -763,6 +782,9 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         channels: state.channels,
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
+        brief: state.brief,
+        planRationale: state.planRationale,
+        planWarnings: state.planWarnings,
       }),
       version: 3, // Increment version to force migration/reset
       migrate: (persistedState: any, version) => {
