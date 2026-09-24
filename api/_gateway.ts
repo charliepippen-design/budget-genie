@@ -1,18 +1,15 @@
-// AI gateway: the only place that holds the LLM key.
+// AI gateway: the only place that holds the LLM key (runs as a Vercel Function).
 // Tasks are allow-listed; prompts live here, the browser only sends data.
 //
-// Secrets: GEMINI_API_KEY (required), GEMINI_MODEL (optional), ALLOW_ANON=true (dev only)
+// Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional),
+//      VITE_CLERK_PUBLISHABLE_KEY (used to verify signed-in users), ALLOW_ANON=true (local dev only)
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+const env = (k: string) => process.env[k];
 
-const MODEL = Deno.env.get("GEMINI_MODEL") ?? "gemini-2.5-flash";
-const FALLBACK_MODEL = "gemini-2.5-flash-lite";
+const MODEL = env("GEMINI_MODEL") || "gemini-3.5-flash";
+const FALLBACK_MODEL = "gemini-flash-latest"; // alias, survives model retirements
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 6000;
 const MAX_IMAGES = 4;
@@ -22,19 +19,35 @@ type Part = Record<string, unknown>;
 type AgentMessage =
   | { role: "user"; text: string }
   | { role: "assistant"; text?: string; raw?: Part[] }
-  | { role: "tool"; results: { name: string; response: Record<string, unknown> }[] };
+  | { role: "tool"; results: { id?: string; name: string; response: Record<string, unknown> }[] };
 
 const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
+  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // ---------- Auth ----------
-// Supabase already verified the JWT signature (verify_jwt). Here we only refuse the public anon key.
-function isSignedInUser(req: Request): boolean {
-  if (Deno.env.get("ALLOW_ANON") === "true") return true;
+// Clerk session tokens are verified against Clerk's public JWKS (no secret needed).
+// The frontend API host is encoded in the publishable key: pk_live_<base64(host$)>.
+
+let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
+
+function clerkJwks() {
+  if (jwks) return jwks;
+  const pk = env("CLERK_PUBLISHABLE_KEY") ?? env("VITE_CLERK_PUBLISHABLE_KEY") ?? "";
+  const encoded = pk.replace(/^pk_(live|test)_/, "");
+  if (!encoded || encoded === pk) return null;
+  const host = Buffer.from(encoded, "base64").toString("utf8").replace(/\$$/, "");
+  jwks = createRemoteJWKSet(new URL(`https://${host}/.well-known/jwks.json`));
+  return jwks;
+}
+
+async function isSignedInUser(req: Request): Promise<boolean> {
+  if (env("ALLOW_ANON") === "true") return true;
+  const keySet = clerkJwks();
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  if (!keySet || !token) return false;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
-    return !!payload.sub && payload.role !== "anon";
+    const { payload } = await jwtVerify(token, keySet);
+    return !!payload.sub;
   } catch {
     return false;
   }
@@ -42,31 +55,38 @@ function isSignedInUser(req: Request): boolean {
 
 // ---------- Gemini ----------
 async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
-  const key = Deno.env.get("GEMINI_API_KEY");
+  const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
-  let lastError = "";
+  const errors: string[] = [];
+  // Retry transient overloads (429/503) once per model, then fall back to the next model.
   for (const model of [MODEL, FALLBACK_MODEL]) {
-    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-      body: JSON.stringify(body),
-    });
-    if (res.ok) {
-      const data = await res.json();
-      return { parts: data?.candidates?.[0]?.content?.parts ?? [] };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return { parts: data?.candidates?.[0]?.content?.parts ?? [] };
+      }
+      const detail = await res.text();
+      errors.push(`${model}: ${res.status} ${detail.slice(0, 300)}`);
+      if (res.status === 401 || res.status === 403) throw new Error(errors.join(" | "));
+      if (res.status !== 429 && res.status !== 503) break;
+      await new Promise((r) => setTimeout(r, 1500));
     }
-    lastError = `${model}: ${res.status} ${await res.text()}`;
-    if (res.status === 400 || res.status === 401 || res.status === 403) break; // not transient
   }
-  throw new Error(lastError);
+  console.error("Gemini failed:", errors);
+  throw new Error("The AI model is busy or unavailable right now. Please try again in a minute.");
 }
 
 function toContents(messages: AgentMessage[]) {
   return messages.map((m) => {
     if (m.role === "user") return { role: "user", parts: [{ text: String(m.text).slice(0, MAX_TEXT) }] };
     if (m.role === "tool") {
-      return { role: "user", parts: m.results.map((r) => ({ functionResponse: { name: r.name, response: r.response } })) };
+      return { role: "user", parts: m.results.map((r) => ({ functionResponse: { ...(r.id ? { id: r.id } : {}), name: r.name, response: r.response } })) };
     }
     // Echo raw model parts back so function-call signatures stay valid.
     return { role: "model", parts: m.raw?.length ? m.raw : [{ text: m.text ?? "" }] };
@@ -78,8 +98,8 @@ function splitParts(parts: Part[]) {
   const toolCalls = parts
     .filter((p) => p.functionCall)
     .map((p) => {
-      const fc = p.functionCall as { name: string; args?: Record<string, unknown> };
-      return { name: fc.name, args: fc.args ?? {} };
+      const fc = p.functionCall as { id?: string; name: string; args?: Record<string, unknown> };
+      return { id: fc.id, name: fc.name, args: fc.args ?? {} };
     });
   return { text, toolCalls, raw: parts };
 }
@@ -214,10 +234,9 @@ clicks = unique visitors/clicks, regs = registrations/sign-ups, ftds = first-tim
 
 // ---------- Router ----------
 
-serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+export async function handleAIRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!isSignedInUser(req)) return json({ error: "Sign in to use the AI planner." }, 401);
+  if (!(await isSignedInUser(req))) return json({ error: "Sign in to use the AI planner." }, 401);
 
   try {
     const body = await req.json();
@@ -237,4 +256,4 @@ serve(async (req) => {
     console.error("ai-gateway error:", err);
     return json({ error: err instanceof Error ? err.message : "AI request failed" }, 500);
   }
-});
+}

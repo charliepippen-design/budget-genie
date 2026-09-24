@@ -28,3 +28,6 @@ dist-ssr
 .env.*
 !.env.example
 vite.config.ts.timestamp-*
+
+.vercel
+.env*

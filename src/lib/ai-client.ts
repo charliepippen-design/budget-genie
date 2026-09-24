@@ -1,17 +1,18 @@
 import { useCallback } from 'react';
 import { useAuth } from '@/lib/auth';
 
-// Browser side of the AI gateway (supabase/functions/ai-gateway).
-// No LLM key ever reaches the browser: requests go through the Supabase Edge Function.
+// Browser side of the AI gateway (api/ai-gateway.ts, a Vercel Function).
+// No LLM key ever reaches the browser: requests go through our own server.
 
 export type AIPart = Record<string, unknown>;
 
 export type AgentMessage =
   | { role: 'user'; text: string }
   | { role: 'assistant'; text?: string; raw?: AIPart[] }
-  | { role: 'tool'; results: { name: string; response: Record<string, unknown> }[] };
+  | { role: 'tool'; results: { id?: string; name: string; response: Record<string, unknown> }[] };
 
 export interface AIToolCall {
+  id?: string;
   name: string;
   args: Record<string, unknown>;
 }
@@ -24,22 +25,14 @@ export interface AIResponse {
 
 type AITask = 'planner' | 'import_chat' | 'extract_report';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-const ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-
-export const AI_CONFIGURED = !!SUPABASE_URL && !!ANON_KEY && !SUPABASE_URL.includes('placeholder');
-
 export async function callAI(task: AITask, body: Record<string, unknown>, userToken: string | null): Promise<AIResponse> {
-  if (!AI_CONFIGURED) throw new Error('AI is not configured (missing Supabase URL/key).');
-
   let res: Response;
   try {
-    res = await fetch(`${SUPABASE_URL}/functions/v1/ai-gateway`, {
+    res = await fetch('/api/ai-gateway', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        apikey: ANON_KEY!,
-        Authorization: `Bearer ${userToken ?? ANON_KEY}`,
+        ...(userToken ? { Authorization: `Bearer ${userToken}` } : {}),
       },
       body: JSON.stringify({ task, ...body }),
     });
@@ -59,7 +52,7 @@ export function useAI() {
     async (task: AITask, body: Record<string, unknown>) => {
       let token: string | null = null;
       try {
-        token = (await getToken?.({ template: 'supabase' })) ?? null;
+        token = (await getToken?.()) ?? null;
       } catch {
         token = null;
       }

@@ -3,7 +3,7 @@ import { Bot, Loader2, MessageSquare, RotateCcw, Send, Sparkles, X } from 'lucid
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { useAI, AI_CONFIGURED, type AgentMessage, type AIPart } from '@/lib/ai-client';
+import { useAI, type AgentMessage, type AIPart } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
@@ -14,7 +14,7 @@ import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
 type ChatItem =
   | { kind: 'user'; text: string }
   | { kind: 'assistant'; text: string; raw?: AIPart[] }
-  | { kind: 'tool'; name: string; response: Record<string, unknown> }
+  | { kind: 'tool'; id?: string; name: string; response: Record<string, unknown> }
   | { kind: 'error'; text: string };
 
 const STORAGE_KEY = 'mediaplan-planner-chat-v1';
@@ -48,8 +48,9 @@ function toAgentMessages(items: ChatItem[]): AgentMessage[] {
     else if (it.kind === 'assistant') out.push({ role: 'assistant', text: it.text, raw: it.raw });
     else if (it.kind === 'tool') {
       const last = out[out.length - 1];
-      if (last?.role === 'tool') last.results.push({ name: it.name, response: it.response });
-      else out.push({ role: 'tool', results: [{ name: it.name, response: it.response }] });
+      const result = { id: it.id, name: it.name, response: it.response };
+      if (last?.role === 'tool') last.results.push(result);
+      else out.push({ role: 'tool', results: [result] });
     }
   }
   return out;
@@ -130,7 +131,7 @@ export function PlannerChat() {
 
         // Engine applies each tool call; results go back to the model so it can explain them.
         for (const call of res.toolCalls) {
-          convo = [...convo, { kind: 'tool', name: call.name, response: applyPlannerToolCall(call) }];
+          convo = [...convo, { kind: 'tool', id: call.id, name: call.name, response: applyPlannerToolCall(call) }];
         }
         setItems(convo);
       }
@@ -219,7 +220,14 @@ export function PlannerChat() {
             ) : null;
           }
           if (it.kind === 'tool') return <ToolCard key={i} name={it.name} response={it.response} />;
-          return <div key={i} className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-300">⚠ {it.text}</div>;
+          return (
+            <div key={i} className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-300">
+              ⚠ {it.text}
+              {/sign in/i.test(it.text) && (
+                <a href="/auth" className="ml-2 font-semibold text-indigo-300 underline">Sign in</a>
+              )}
+            </div>
+          );
         })}
 
         {busy && (
@@ -229,12 +237,6 @@ export function PlannerChat() {
         )}
         <div ref={endRef} />
       </div>
-
-      {!AI_CONFIGURED && (
-        <div className="border-t border-amber-500/20 bg-amber-950/30 px-4 py-2 text-[11px] text-amber-300">
-          AI server not configured yet — quick-start plans and sliders still work.
-        </div>
-      )}
 
       <form
         className="flex gap-2 border-t border-slate-800 p-3"
