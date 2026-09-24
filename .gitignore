@@ -31,3 +31,4 @@ vite.config.ts.timestamp-*
 
 .vercel
 .env*
+supabase/.temp
