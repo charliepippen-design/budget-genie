@@ -93,12 +93,32 @@ export function ImportAgentModal({ open, onClose, fileContent, fileName, onSucce
                 \`\`\`
             `;
 
-            // Use generateText (Stable)
-            const { text } = await generateText({
-                model: google('gemini-1.5-flash'), // Use the stable model
-                system: systemPrompt,
-                messages: newMessages,
-            });
+            // Use generateText with model failover loop (Stable)
+            const modelsToTry = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+            let lastError = null;
+            let success = false;
+            let text = "";
+
+            for (const modelId of modelsToTry) {
+                try {
+                    const result = await generateText({
+                        model: google(modelId),
+                        system: systemPrompt,
+                        messages: newMessages,
+                    });
+                    text = result.text;
+                    success = true;
+                    break;
+                } catch (err: any) {
+                    console.warn(`ImportAgentModal: ${modelId} failed:`, err.message);
+                    lastError = err;
+                    if (err.message?.includes("401") || err.message?.includes("API key")) throw err;
+                }
+            }
+
+            if (!success) {
+                throw lastError || new Error("All models failed");
+            }
 
             // Check for Extraction JSON
             const jsonMatch = text.match(/```json\n([\s\S]*?)\n```/);

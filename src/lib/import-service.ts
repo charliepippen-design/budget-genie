@@ -155,16 +155,16 @@ export interface ImportResult {
 
 const CHANNEL_ALIASES: Record<string, string[]> = {
   'seo-tech': ['tech audit', 'tech', 'on-page', 'seo audit', 'technical seo', 'on page'],
-  'seo-content': ['content', 'content production', 'content creation', 'blog', 'articles'],
+  'seo-content': ['content', 'content production', 'content creation', 'blog', 'articles', 'seo & content'],
   'seo-backlinks': ['backlinks', 'guest posts', 'link building', 'outreach', 'links'],
-  'paid-native': ['native ads', 'native', 'crypto ads', 'adult/crypto', 'native advertising', 'adult ads'],
+  'paid-native': ['native ads', 'native', 'crypto ads', 'adult/crypto', 'native advertising', 'adult ads', 'crypto media buying', 'media buying'],
   'paid-push': ['push', 'push notifications', 'push notif', 'push notify'],
   'paid-programmatic': ['display', 'display ads', 'programmatic', 'banners', 'programmatic display'],
   'paid-retargeting': ['retargeting', 'retarget', 'remarketing', 'pixel', 'remarket'],
   'affiliate-listing': ['listing fees', 'affiliate listing', 'fixed fees', 'listing', 'fixed listing'],
-  'affiliate-cpa': ['cpa', 'affiliate commission', 'cpa commission', 'affiliate cpa', 'commission'],
-  'influencer-retainers': ['retainers', 'monthly retainers', 'influencer retainers', 'influencer monthly'],
-  'influencer-funds': ['play funds', 'play funds balance', 'bonus balance', 'play money', 'influencer funds'],
+  'affiliate-cpa': ['cpa', 'affiliate commission', 'cpa commission', 'affiliate cpa', 'commission', 'affiliate networks', 'affiliates'],
+  'influencer-retainers': ['retainers', 'monthly retainers', 'influencer retainers', 'influencer monthly', 'crypto streamers', 'streamers', 'pr & sponsorships', 'sponsorships'],
+  'influencer-funds': ['play funds', 'play funds balance', 'bonus balance', 'play money', 'influencer funds', 'clip economy bounties', 'clip economy', 'bounties'],
 };
 
 const CHANNEL_DEFAULTS: Record<string, { category: ChannelCategory; cpm: number; ctr: number; cr: number; roas: number }> = {
@@ -261,7 +261,7 @@ function fuzzyMatch(input: string, targets: string[]): { match: string; confiden
     const maxLen = Math.max(normalized.length, targetNorm.length);
     const similarity = 1 - distance / maxLen;
 
-    if (similarity > bestScore && similarity > 0.5) {
+    if (similarity > bestScore && similarity > 0.75) {
       bestScore = similarity;
       bestMatch = target;
     }
@@ -273,20 +273,24 @@ function fuzzyMatch(input: string, targets: string[]): { match: string; confiden
 function matchChannel(input: string): { channelId: string; confidence: number } | null {
   const normalized = input.toLowerCase().trim().replace(/[^a-z0-9\s]/g, '');
 
+  let bestGlobalMatch: { channelId: string; confidence: number } | null = null;
+
   for (const [channelId, aliases] of Object.entries(CHANNEL_ALIASES)) {
     for (const alias of aliases) {
       if (normalized === alias || normalized.includes(alias) || alias.includes(normalized)) {
-        return { channelId, confidence: 1.0 };
+        return { channelId, confidence: 1.0 }; // Exact match is immediate win
       }
     }
 
     const fuzzy = fuzzyMatch(normalized, aliases);
-    if (fuzzy && fuzzy.confidence > 0.7) {
-      return { channelId, confidence: fuzzy.confidence };
+    if (fuzzy && fuzzy.confidence > 0.75) { // Strict threshold for long-form names
+      if (!bestGlobalMatch || fuzzy.confidence > bestGlobalMatch.confidence) {
+        bestGlobalMatch = { channelId, confidence: fuzzy.confidence };
+      }
     }
   }
 
-  return null;
+  return bestGlobalMatch;
 }
 
 function matchMetric(input: string): string | null {
@@ -579,6 +583,14 @@ function parseFlexibleDate(value: string): Date | null {
     'MMMM',         // January (implicit current year)
   ];
 
+  // Month N format
+  const monthMatch = clean.match(/^month\s*(\d+)$/i);
+  if (monthMatch) {
+    const monthNum = parseInt(monthMatch[1], 10);
+    // Arbitrary starting date for relative months
+    return new Date(2024, monthNum - 1, 1);
+  }
+
   for (const fmt of formats) {
     const datum = parse(clean, fmt, new Date());
     if (isValid(datum)) return startOfMonth(datum);
@@ -645,7 +657,8 @@ function fingerprintColumns(headerRow: string[], rawDataBelow: string[][]): Reco
 
     // Core
     if (!map['month'] && /month|date|period/.test(val)) { map['month'] = idx; return; }
-    if (!map['budget'] && /budget|planned|target/.test(val)) { map['budget'] = idx; return; }
+    if (!map['budget'] && /budget|planned|target/.test(val) && !val.includes('cpa')) { map['budget'] = idx; return; }
+    if (!map['channel_name'] && /channel|network|source|platform/.test(val)) { map['channel_name'] = idx; return; }
 
     // Metrics
     if (/spend|cost|actuals/.test(val)) { map['gross_spend'] = idx; return; }
@@ -710,6 +723,24 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
 
   let monthIndex = 0;
 
+  // Create a map to aggregate long-format data
+  const rawMonthsByLabel: Record<string, ParsedMonthData> = {};
+
+  const channelMappings: ChannelMapping[] = [];
+
+  // Add mappings for wide format
+  Object.entries(colMap).forEach(([key, colIdx]) => {
+    if (key.startsWith('channel_')) {
+      const channelId = key.replace('channel_', '');
+      channelMappings.push({
+        sourceColumn: headerRow[colIdx],
+        targetChannelId: channelId,
+        targetChannelName: CHANNEL_DISPLAY_NAMES[channelId],
+        confidence: 1.0 // We matched it
+      });
+    }
+  });
+
   dataRows.forEach((row, idx) => {
     // Basic validity check
     if (!row || row.length === 0) return;
@@ -725,51 +756,75 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
     const date = parseFlexibleDate(dateVal);
     if (!date) return; // Skip invalid dates
 
+    // Label Generation
+    let label = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
+    if (/^month\s*\d+/i.test(dateVal.trim())) {
+      label = dateVal.trim();
+    }
+
+    // Ensure bucket exists
+    if (!rawMonthsByLabel[label]) {
+      rawMonthsByLabel[label] = {
+        label,
+        monthIndex: monthIndex++,
+        isSoftLaunch: label.toLowerCase().includes('soft') || idx === 0 && parseNumber(row[colMap['budget']]) < 1000,
+        budget: 0,
+        channels: {},
+        metrics: { conversions: 0, ggr: 0, roas: 0 }
+      };
+    }
+    const monthData = rawMonthsByLabel[label];
+
     // Extract Core Metrics
-    const budget = colMap['budget'] !== undefined ? parseNumber(row[colMap['budget']]) : 0;
-    const spend = colMap['gross_spend'] !== undefined ? parseNumber(row[colMap['gross_spend']]) : 0;
-    const revenue = colMap['revenue'] !== undefined ? parseNumber(row[colMap['revenue']]) : 0;
-    const conversions = colMap['conversions'] !== undefined ? parseNumber(row[colMap['conversions']]) : 0;
+    const rowBudget = colMap['budget'] !== undefined ? parseNumber(row[colMap['budget']]) : 0;
+    const rowSpend = colMap['gross_spend'] !== undefined ? parseNumber(row[colMap['gross_spend']]) : 0;
+    const rowRevenue = colMap['revenue'] !== undefined ? parseNumber(row[colMap['revenue']]) : 0;
+    const rowConversions = colMap['conversions'] !== undefined ? parseNumber(row[colMap['conversions']]) : 0;
+
+    monthData.budget += rowBudget;
+    if (monthData.metrics) {
+      if (monthData.metrics.conversions !== undefined) monthData.metrics.conversions += rowConversions;
+      if (monthData.metrics.ggr !== undefined) monthData.metrics.ggr += rowRevenue;
+      // recalculate ROAS below broadly 
+    }
 
     // Extract Channels
-    const channels: Record<string, number> = {};
-    Object.entries(colMap).forEach(([key, colIdx]) => {
-      if (key.startsWith('channel_')) {
-        const channelId = key.replace('channel_', '');
-        channels[channelId] = parseNumber(row[colIdx]);
+    if (colMap['channel_name'] !== undefined) {
+      // Long format!
+      const channelDisplayName = String(row[colMap['channel_name']]);
+      const channelMatch = matchChannel(channelDisplayName);
+      if (channelMatch) {
+        monthData.channels[channelMatch.channelId] = (monthData.channels[channelMatch.channelId] || 0) + rowBudget;
+
+        // Add to channelMappings for UI if not already there
+        if (!channelMappings.some(m => m.targetChannelId === channelMatch.channelId)) {
+          channelMappings.push({
+            sourceColumn: channelDisplayName,
+            targetChannelId: channelMatch.channelId,
+            targetChannelName: CHANNEL_DISPLAY_NAMES[channelMatch.channelId],
+            confidence: channelMatch.confidence
+          });
+        }
       }
-    });
-
-    // Label Generation
-    const label = date.toLocaleString('en-US', { month: 'short', year: '2-digit' });
-
-    parsedMonths.push({
-      label,
-      monthIndex: monthIndex++,
-      isSoftLaunch: label.toLowerCase().includes('soft') || idx === 0 && budget < 1000, // Heuristic
-      budget,
-      channels,
-      metrics: {
-        conversions,
-        ggr: revenue,
-        roas: spend > 0 ? revenue / spend : 0,
-      }
-    });
-  });
-
-  // Re-construct Channel Mappings for UI
-  const channelMappings: ChannelMapping[] = [];
-  Object.entries(colMap).forEach(([key, colIdx]) => {
-    if (key.startsWith('channel_')) {
-      const channelId = key.replace('channel_', '');
-      channelMappings.push({
-        sourceColumn: headerRow[colIdx],
-        targetChannelId: channelId,
-        targetChannelName: CHANNEL_DISPLAY_NAMES[channelId],
-        confidence: 1.0 // We matched it
+    } else {
+      // Wide format!
+      Object.entries(colMap).forEach(([key, colIdx]) => {
+        if (key.startsWith('channel_')) {
+          const channelId = key.replace('channel_', '');
+          monthData.channels[channelId] = (monthData.channels[channelId] || 0) + parseNumber(row[colIdx]);
+        }
       });
     }
   });
+
+  // Calculate ROAS
+  Object.values(rawMonthsByLabel).forEach(md => {
+    if (md.metrics && md.budget > 0 && md.metrics.ggr && md.metrics.ggr > 0) {
+      md.metrics.roas = md.metrics.ggr / md.budget;
+    }
+  });
+
+  parsedMonths.push(...Object.values(rawMonthsByLabel).sort((a, b) => a.monthIndex - b.monthIndex));
 
   console.log(`[Import] Extracted ${parsedMonths.length} valid months.`);
 
@@ -788,7 +843,7 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
     parsedMonths,
     detectedCurrency: detectCurrencyFromData(rawData).detected,
     currencyConfidence: detectCurrencyFromData(rawData).confidence,
-    validationReport: buildValidationReport(rawData, headerRowIndex + 1, channelMappings)
+    validationReport: buildValidationReport(rawData, headerRowIndex + 1, channelMappings, colMap)
   };
 }
 // Currency detection helper
@@ -837,7 +892,8 @@ function detectCurrencyFromData(rawData: string[][]): { detected: string | null;
 function buildValidationReport(
   rawData: string[][],
   dataStartRow: number,
-  channelMappings: ChannelMapping[]
+  channelMappings: ChannelMapping[],
+  colMap: Record<string, number>
 ): ValidationReport {
   const dirtyRows: DirtyRow[] = [];
   const columnIssues: ColumnIssue[] = [];
@@ -864,7 +920,9 @@ function buildValidationReport(
     const issues: CellIssue[] = [];
 
     row.forEach((cell, colIdx) => {
-      if (colIdx === 0) return; // Skip first column (usually labels)
+      if (colIdx === colMap['month']) return;
+      if (colMap['channel_name'] !== undefined && colIdx === colMap['channel_name']) return;
+      if (colIdx === 0 && colMap['month'] === undefined) return; // Fallback assume col0 is label
 
       const cellStr = String(cell || '').trim();
 
@@ -968,21 +1026,19 @@ export function convertToMonthData(
       const channelName = CHANNEL_DISPLAY_NAMES[channelId] || channelId.replace(/[-_]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 
       // Infer family and buying model from channel name
+      // The old wizard code had some polymorphic properties that are out of date with the real ChannelTypeConfig
       const family = inferChannelFamily(channelName);
-      const buyingModel = inferBuyingModel(channelName, family);
+      const buyingModel = inferBuyingModel(channelName, family); // Returns RETAINER, FLAT_FEE, etc
 
-      // Build type config with appropriate defaults
+      // Build type config with appropriate defaults (strict ChannelTypeConfig structure)
       const typeConfig: ChannelTypeConfig = {
         family,
         buyingModel,
-        cpm: defaults.cpm,
-        ctr: defaults.ctr,
-        cr: defaults.cr,
-        // Set model-specific defaults
-        ...(buyingModel === 'flat_fee' && { fixedCost: spend || 1000, estFtds: 5 }),
-        ...(buyingModel === 'retainer' && { fixedCost: spend || 1000, estTraffic: 5000, cr: defaults.cr }),
-        ...(buyingModel === 'cpa' && { targetCpa: 50, targetFtds: 10 }),
-        ...(buyingModel === 'unit_based' && { unitCount: 4, costPerUnit: 500, estReachPerUnit: 50000, ctr: defaults.ctr, cr: defaults.cr }),
+        price: defaults.cpm, // Re-use CPM as baseline price here (can be overridden manually)
+        baselineMetrics: {
+          ctr: defaults.ctr,
+          conversionRate: defaults.cr,
+        }
       };
 
       return {
@@ -997,7 +1053,7 @@ export function convertToMonthData(
         impressionMode: channelId.includes('influencer') || channelId === 'affiliate-listing' ? 'FIXED' : 'CPM',
         fixedImpressions: 100000,
         locked: false,
-        // NEW: Polymorphic fields
+        // Polymorphic fields
         family,
         buyingModel,
         typeConfig,

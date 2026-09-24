@@ -119,6 +119,7 @@ export interface ChannelTypeConfig {
     ctr?: number;             // % Click Through Rate
     conversionRate?: number;  // % Conversion Rate (or Lead -> FTD)
     aov?: number;             // Average Order Value / LTV / NGR per FTD
+    expectedLtv?: number;     // Expected Lifetime Value per user (iGaming specific)
     trafficPerUnit?: number;  // Est. Traffic for Flat Fee / Retainer
     saturationCeiling?: number; // Spend level where returns diminish significantly (Half-Efficiency point in Michaelis-Menten)
   };

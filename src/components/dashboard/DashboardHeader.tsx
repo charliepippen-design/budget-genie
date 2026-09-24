@@ -1,7 +1,13 @@
-import { DollarSign, Download, FileText, Image, ChevronDown, Trash2, Settings, TrendingUp } from 'lucide-react';
+import { Download, FileText, Image, ChevronDown, Trash2, Settings, TrendingUp, PanelLeftClose, PanelLeft, Undo2, Redo2, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useHistoryStore } from '@/hooks/use-history';
+import { useState } from 'react';
+import { exportToCsv } from '@/lib/export-service';
+import { ReportBuilderModal } from './ReportBuilderModal';
+import { CollaborationDialog } from './CollaborationDialog';
+import { useToast } from '@/hooks/use-toast';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +24,7 @@ import {
 import { BUDGET_PRESETS, BudgetPresetKey } from '@/lib/mediaplan-data';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
 import { ProjectManager } from '@/components/dashboard/ProjectManager';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface DashboardHeaderProps {
   budgetPreset: BudgetPresetKey;
@@ -39,9 +46,15 @@ export function DashboardHeader({
   toggleSidebar
 }: DashboardHeaderProps) {
   const { totalBudget, globalMultipliers, setGlobalMultipliers } = useMediaPlanStore();
-  const { format } = useCurrency();
+  const { format, symbol } = useCurrency();
   const multiplier = globalMultipliers.spendMultiplier || 1;
   const effectiveBudget = totalBudget * multiplier;
+  const channelsWithMetrics = useChannelsWithMetrics();
+  const { toast } = useToast();
+
+  const historyStore = useHistoryStore();
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isShareOpen, setIsShareOpen] = useState(false);
 
   return (
     <header className="glass border-b border-border/50 sticky top-0 z-50">
@@ -50,17 +63,21 @@ export function DashboardHeader({
           {/* Logo & Title */}
           <div className="flex items-center gap-3">
             {toggleSidebar && (
-              <Button variant="ghost" size="icon" onClick={toggleSidebar} className="mr-2">
-                <Settings className={`h-5 w-5 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+              <Button variant="ghost" size="icon" onClick={toggleSidebar} className="mr-2" title={isOpen ? "Collapse Sidebar" : "Expand Sidebar"}>
+                {isOpen ? (
+                  <PanelLeftClose className="h-5 w-5 text-indigo-400" />
+                ) : (
+                  <PanelLeft className="h-5 w-5 text-slate-400" />
+                )}
               </Button>
             )}
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-primary">
-              <DollarSign className="h-5 w-5 text-primary-foreground" />
+              <span className="text-xl font-bold text-primary-foreground">{symbol}</span>
             </div>
           </div>
           <div>
             <h1 className="text-xl font-bold tracking-tight">
-              MediaPlanner <span className="gradient-text">Pro</span>
+              MediaPlan <span className="gradient-text">Pro</span>
             </h1>
             {multiplier !== 1 ? (
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
@@ -78,7 +95,7 @@ export function DashboardHeader({
         </div>
 
         {/* Controls */}
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3 mt-4">
           {/* Currency Selector */}
           <CurrencySelector compact />
 
@@ -87,27 +104,67 @@ export function DashboardHeader({
             value={budgetPreset}
             onValueChange={(value) => onPresetChange(value as BudgetPresetKey)}
           >
-            <SelectTrigger className="w-[160px] bg-card border-border">
+            <SelectTrigger className="w-[180px] bg-card border-border">
               <SelectValue placeholder="Budget Type" />
             </SelectTrigger>
-            <SelectContent className="bg-popover border-border">
+            <SelectContent className="bg-popover border-border max-w-[260px]">
               {Object.entries(BUDGET_PRESETS).map(([key, preset]) => (
                 <SelectItem key={key} value={key}>
-                  <div className="flex flex-col">
-                    <span>{preset.name}</span>
+                  <div className="flex flex-col text-left py-0.5">
+                    <span className="font-medium text-xs text-slate-200">{preset.name}</span>
+                    <span className="text-[10px] text-slate-400 leading-normal line-clamp-1">{preset.description}</span>
                   </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
 
+          {/* Undo/Redo Buttons */}
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => historyStore.undo()} 
+                  disabled={!historyStore.canUndo}
+                  className="h-9 w-9 bg-card border-border"
+                >
+                  <Undo2 className="h-4 w-4 text-slate-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-slate-950 border-slate-800 text-xs text-slate-300">
+                Undo edit (Ctrl+Z) — Navigates edit history in active session
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  size="icon" 
+                  onClick={() => historyStore.redo()} 
+                  disabled={!historyStore.canRedo}
+                  className="h-9 w-9 bg-card border-border"
+                >
+                  <Redo2 className="h-4 w-4 text-slate-400" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-slate-950 border-slate-800 text-xs text-slate-300">
+                Redo edit (Ctrl+Y) — Navigates edit history in active session
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Reset Button */}
-          <Button variant="outline" size="icon" onClick={onReset} title="Reset Plan">
+          <Button variant="outline" size="icon" onClick={onReset} title="Reset Plan" className="h-9 w-9 bg-card border-border">
             <Trash2 className="h-4 w-4 text-muted-foreground" />
           </Button>
 
           {/* Import Button */}
-          <Button variant="default" onClick={onImport} className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0">
+          <Button variant="default" onClick={onImport} className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 border-0 h-9">
             <span className="text-xs">✨</span>
             Import Genius
           </Button>
@@ -118,33 +175,51 @@ export function DashboardHeader({
           {/* Export Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" className="gap-2">
+              <Button variant="outline" className="gap-2 h-9">
                 <Download className="h-4 w-4" />
                 Export
                 <ChevronDown className="h-3 w-3 opacity-50" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="bg-popover border-border">
-              <DropdownMenuItem onClick={() => onExport('pdf')} className="gap-2 cursor-pointer">
+              <DropdownMenuItem onClick={() => setIsReportOpen(true)} className="gap-2 cursor-pointer">
                 <FileText className="h-4 w-4" />
                 Export as PDF
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport('csv')} className="gap-2 cursor-pointer">
+              <DropdownMenuItem onClick={() => exportToCsv(channelsWithMetrics, symbol)} className="gap-2 cursor-pointer">
                 <Download className="h-4 w-4" />
                 Export as CSV
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onExport('png')} className="gap-2 cursor-pointer">
+              <DropdownMenuItem onClick={() => {
+                toast({
+                  title: 'Print / Save Image',
+                  description: 'Use your browser print command (Ctrl+P) or screenshot tool to capture the plan visualization as a PNG.',
+                });
+              }} className="gap-2 cursor-pointer">
                 <Image className="h-4 w-4" />
                 Export as PNG
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+
+          {/* Share Button */}
+          <Button 
+            variant="outline" 
+            onClick={() => setIsShareOpen(true)} 
+            className="gap-2 h-9 border-indigo-500/20 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10"
+          >
+            <Share2 className="h-4 w-4" />
+            Share
+          </Button>
+
           {/* Settings Link */}
           <a href="/settings" className="inline-flex items-center justify-center p-2 rounded-md hover:bg-slate-800 transition-colors" title="Account Settings">
             <Settings className="h-5 w-5 text-slate-400 hover:text-white" />
           </a>
         </div>
       </div>
+      <ReportBuilderModal open={isReportOpen} onOpenChange={setIsReportOpen} />
+      <CollaborationDialog open={isShareOpen} onOpenChange={setIsShareOpen} />
     </header>
   );
 }

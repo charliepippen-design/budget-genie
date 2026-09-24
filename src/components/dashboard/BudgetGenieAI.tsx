@@ -18,6 +18,14 @@ import { BudgetWizard } from './BudgetWizard';
 import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { GenieAssistant } from './GenieAssistant';
 import { ImportWizard } from '../multi-month/ImportWizard';
+import { AffiliateDealEvaluator } from './AffiliateDealEvaluator';
+import { QuickTour } from './QuickTour';
+import { AddChannelDialog } from './AddChannelDialog';
+import { Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { IndustryBenchmarks } from './IndustryBenchmarks';
+import { MultiMonthCharts } from '../multi-month/MultiMonthCharts';
+import { ScenarioComparison } from '../multi-month/ScenarioComparison';
 
 // --- DEBUG: ERROR BOUNDARY ---
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
@@ -83,26 +91,30 @@ export const BudgetGenieAI = () => {
                 {/* LEFT SIDEBAR (SETTINGS) */}
                 <div
                     className={`
-                    fixed inset-y-0 left-0 z-50 w-80 bg-slate-950/95 backdrop-blur-xl border-r border-indigo-500/10 
-                    transform transition-transform duration-300 ease-in-out shadow-2xl
-                    ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
-                    lg:relative lg:translate-x-0
+                    fixed inset-y-0 left-0 z-50 bg-[#020617] backdrop-blur-xl border-r border-indigo-500/10 
+                    transform transition-all duration-300 ease-in-out shadow-2xl overflow-hidden
+                    lg:relative lg:inset-auto lg:z-0
+                    ${isSidebarOpen 
+                        ? 'w-80 translate-x-0 opacity-100 border-r' 
+                        : 'w-0 -translate-x-full opacity-0 border-r-0 pointer-events-none lg:translate-x-0 lg:w-0'
+                    }
                 `}
                 >
-                    <div className="h-full overflow-y-auto custom-scrollbar">
+                    <div className="h-full w-80 overflow-y-auto custom-scrollbar">
                         <SettingsConsole />
                     </div>
                 </div>
 
+                {/* MOBILE OVERLAY */}
+                {isSidebarOpen && (
+                    <div 
+                        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs lg:hidden"
+                        onClick={() => setIsSidebarOpen(false)}
+                    />
+                )}
+
                 {/* MAIN CONTENT AREA */}
-                <div style={{
-                    gridColumn: '2 / 3',
-                    overflowY: 'auto',
-                    position: 'relative',
-                    zIndex: 10,
-                    display: 'flex',
-                    flexDirection: 'column'
-                }}>
+                <div className="flex-1 flex flex-col h-full overflow-y-auto relative z-10 min-w-0">
                     <DashboardHeader
                         budgetPreset={preset}
                         onPresetChange={setPreset}
@@ -177,6 +189,15 @@ export const BudgetGenieAI = () => {
                                     <TabsTrigger value="multi" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
                                         Multi-Month Detailed View
                                     </TabsTrigger>
+                                    <TabsTrigger value="affiliate" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
+                                        Affiliate Deal Evaluator
+                                    </TabsTrigger>
+                                    <TabsTrigger value="benchmarks" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
+                                        Industry Benchmarks
+                                    </TabsTrigger>
+                                    <TabsTrigger value="comparison" className="data-[state=active]:bg-indigo-600 data-[state=active]:text-white transition-all">
+                                        Scenario Comparison
+                                    </TabsTrigger>
                                 </TabsList>
 
                                 <TabsContent value="single" className="mt-0">
@@ -185,8 +206,21 @@ export const BudgetGenieAI = () => {
                                     </div>
                                 </TabsContent>
 
-                                <TabsContent value="multi" className="mt-0">
+                                <TabsContent value="multi" className="mt-0 space-y-6">
+                                    <MultiMonthCharts />
                                     <PLTable />
+                                </TabsContent>
+
+                                <TabsContent value="affiliate" className="mt-0">
+                                    <AffiliateDealEvaluator />
+                                </TabsContent>
+
+                                <TabsContent value="benchmarks" className="mt-0">
+                                    <IndustryBenchmarks />
+                                </TabsContent>
+
+                                <TabsContent value="comparison" className="mt-0">
+                                    <ScenarioComparison />
                                 </TabsContent>
                             </Tabs>
 
@@ -194,9 +228,21 @@ export const BudgetGenieAI = () => {
                     </main>
                 </div>
 
-                {/* MODALS */}
+                {/* MODALS & FLOATS */}
                 <GenieAssistant />
                 <ImportWizard open={isImportOpen} onOpenChange={setIsImportOpen} />
+                <QuickTour />
+                
+                {/* Floating Add Channel FAB */}
+                <div className="fixed bottom-4 right-4 z-40 hidden sm:block">
+                    <AddChannelDialog
+                        trigger={
+                            <Button className="h-12 w-12 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xl flex items-center justify-center border border-indigo-500/20">
+                                <Plus className="h-6 w-6" />
+                            </Button>
+                        }
+                    />
+                </div>
 
             </div>
         </ErrorBoundary>

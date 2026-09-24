@@ -3,7 +3,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Use the requested relative import for the store
 import { useProjectStore } from '../../store/useProjectStore';
 import { useHistoryStore } from '@/hooks/use-history';
-import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
+import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; 
+import { AddChannelDialog } from './AddChannelDialog';
 
 // FIX: Use relative imports for UI components as requested
 import { Button } from '../../components/ui/button';
@@ -182,36 +183,7 @@ export const SettingsConsole: React.FC = () => {
   const channelsWithMetrics = useChannelsWithMetrics();
   const { toast } = useToast();
 
-  const [isAddOpen, setIsAddOpen] = useState(false);
-  const [newName, setNewName] = useState('');
-  const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
-  const [newModel, setNewModel] = useState<BuyingModel>('CPM');
-  const [newPrice, setNewPrice] = useState(5);
-
-  useEffect(() => {
-    setNewModel(getLikelyModel(newCat));
-  }, [newCat]);
-
-  const handleCreateChannel = () => {
-    // (Keep existing logic)
-    if (!newName.trim()) return;
-    const family = inferChannelFamily(newName);
-    addChannel({
-      name: newName,
-      category: newCat,
-      family,
-      buyingModel: newModel,
-      typeConfig: {
-        family,
-        buyingModel: newModel,
-        price: newPrice,
-        baselineMetrics: { ctr: 1.0, conversionRate: 1.5, aov: 100 }
-      }
-    });
-    setNewName('');
-    setIsAddOpen(false);
-    toast({ title: "Channel Added", description: `${newName} created successfully.` });
-  };
+  // (No local add channel states or custom creators here anymore, using reusable AddChannelDialog)
 
   return (
     // ROOT CONTAINER: Deep Blue Background
@@ -281,8 +253,8 @@ export const SettingsConsole: React.FC = () => {
           ))}
         </div>
 
-        <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-          <DialogTrigger asChild>
+        <AddChannelDialog
+          trigger={
             <Button
               variant="outline"
               className="w-full border-2 border-dashed border-slate-800 bg-transparent text-slate-500 hover:text-indigo-400 hover:border-indigo-500/50 hover:bg-indigo-500/5 h-12 rounded-xl transition-all"
@@ -290,33 +262,8 @@ export const SettingsConsole: React.FC = () => {
               <Plus className="w-4 h-4 mr-2" />
               Add Channel
             </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Add New Channel</DialogTitle></DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label>Name</Label>
-                <Input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Channel Name" className="bg-[#020617] border-slate-700" />
-              </div>
-              <div className="space-y-2">
-                <Label>Category</Label>
-                <Select value={newCat} onValueChange={(v) => setNewCat(v as ChannelCategory)}>
-                  <SelectTrigger className="bg-[#020617] border-slate-700"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(CATEGORY_INFO).map(([key, info]) => <SelectItem key={key} value={key}>{info.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>Price</Label>
-                <Input type="number" value={newPrice} onChange={e => setNewPrice(parseFloat(e.target.value))} className="bg-[#020617] border-slate-700" />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button onClick={handleCreateChannel}>Create Channel</Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+          }
+        />
 
       </div>
     </div>

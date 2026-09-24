@@ -40,11 +40,18 @@ export function normalizeAllocations(channels: ChannelData[]): ChannelData[] {
     const lockedTotal = lockedChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);
 
     // 4. Determine Remaining Pool for Unlocked
-    // If locked total > 100, we have a problem, but we'll clamp to 0.
-    // In a strict normalization, we might force locked channels down, 
-    // but standard UX is "Locked stays locked unless impossible".
-    // If Locked > 100, we scale them down? Or we just accept 100 and unlocked get 0.
-    const remainingPool = Math.max(0, 100 - lockedTotal);
+    // Strict Dynamic Anchor: Mathematically guarantee total does not exceed 100%.
+    // If locked total > 100, we MUST scale down the locked channels.
+    let remainingPool = 0;
+    if (lockedTotal > 100) {
+        const lockedScalar = 100 / lockedTotal;
+        lockedChannels.forEach(ch => {
+            ch.allocationPct = ch.allocationPct * lockedScalar;
+        });
+        remainingPool = 0;
+    } else {
+        remainingPool = 100 - lockedTotal;
+    }
 
     // 5. Calculate Scalar for Unlocked
     const currentUnlockedTotal = unlockedChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);

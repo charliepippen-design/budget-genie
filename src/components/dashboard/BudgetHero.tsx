@@ -6,13 +6,16 @@ import { cn } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { ForecastCard } from './ForecastCard';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 
 export const BudgetHero = () => {
     // Consolidate Store Access
     // We use useProjectStore for read access to state
-    const { totalBudget, channels } = useProjectStore();
+    const { totalBudget, channels, globalMultipliers } = useProjectStore();
     const { updateBudget } = useBudgetEngine();
     const { symbol } = useCurrency();
+    const channelsWithMetrics = useChannelsWithMetrics();
     const [localBudget, setLocalBudget] = useState(totalBudget);
     const [mood, setMood] = useState({ text: "Bootstrapping", color: "text-blue-400", bg: "bg-blue-500", icon: Zap });
 
@@ -32,6 +35,28 @@ export const BudgetHero = () => {
         else if (value < 200000) setMood({ text: "Aggressive Scaling", color: "text-purple-400", bg: "bg-purple-500", icon: Rocket });
         else setMood({ text: "Market Domination", color: "text-orange-500", bg: "bg-orange-500", icon: Crown });
     };
+
+    const { cpaTarget, roasTarget } = globalMultipliers || {};
+
+    const compliance = React.useMemo(() => {
+        const activeChannels = channelsWithMetrics.filter(ch => ch.isActive && ch.metrics.spend > 0);
+        const totalActiveSpend = activeChannels.reduce((sum, ch) => sum + ch.metrics.spend, 0);
+
+        if (totalActiveSpend === 0) return { cpaPct: 100, roasPct: 100 };
+
+        const cpaCompliantSpend = activeChannels
+            .filter(ch => !ch.aboveCpaTarget)
+            .reduce((sum, ch) => sum + ch.metrics.spend, 0);
+
+        const roasCompliantSpend = activeChannels
+            .filter(ch => !ch.belowRoasTarget)
+            .reduce((sum, ch) => sum + ch.metrics.spend, 0);
+
+        return {
+            cpaPct: Math.round((cpaCompliantSpend / totalActiveSpend) * 100),
+            roasPct: Math.round((roasCompliantSpend / totalActiveSpend) * 100),
+        };
+    }, [channelsWithMetrics, cpaTarget, roasTarget]);
 
     const handleSlide = (val: number[]) => {
         let value = val[0];
@@ -63,10 +88,23 @@ export const BudgetHero = () => {
                 <div className="bg-slate-900/80 backdrop-blur-md border border-slate-700/50 rounded-2xl p-8 shadow-2xl flex flex-col items-center justify-between gap-8 h-full">
 
                     {/* Dynamic Header */}
-                    <div className={cn("flex items-center gap-2 font-mono text-sm uppercase tracking-widest animate-pulse transition-colors duration-300", mood.color)}>
-                        <mood.icon className="w-4 h-4" />
-                        {mood.text}
-                    </div>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <div className={cn("flex items-center gap-2 font-mono text-sm uppercase tracking-widest animate-pulse transition-colors duration-300 cursor-help border-b border-dashed border-slate-700 pb-0.5", mood.color)}>
+                                <mood.icon className="w-4 h-4" />
+                                {mood.text}
+                            </div>
+                        </TooltipTrigger>
+                        <TooltipContent className="bg-slate-950 border-slate-800 text-slate-200 p-3 max-w-[280px]">
+                            <p className="text-xs font-semibold mb-1 text-white">{mood.text}</p>
+                            <p className="text-[11px] leading-relaxed text-slate-400">
+                                {mood.text === "Bootstrapping" && "Budget under €10k. Focuses on proof of concept, high efficiency, and minimized risk."}
+                                {mood.text === "High Growth Velocity" && "Budget €10k to €50k. Accelerates acquisition across main channels with balanced performance."}
+                                {mood.text === "Aggressive Scaling" && "Budget €50k to €200k. Maximizes acquisition volume and expands marketing channel mix."}
+                                {mood.text === "Market Domination" && "Budget over €200k. Heavy brand presence, high volume, and capturing maximum market share."}
+                            </p>
+                        </TooltipContent>
+                    </Tooltip>
 
                     {/* MASSIVE BUDGET DISPLAY */}
                     <div className="relative text-center">
@@ -90,6 +128,47 @@ export const BudgetHero = () => {
                             <span>Max: {symbol}1M+</span>
                         </div>
                     </div>
+
+                    {/* TARGET CONSTRAINTS COMPLIANCE */}
+                    {(cpaTarget || roasTarget) ? (
+                        <div className="w-full bg-slate-950/40 border border-slate-800/80 rounded-xl p-3 flex flex-col gap-2">
+                            <div className="text-[10px] font-mono text-slate-500 uppercase tracking-widest text-left">
+                                Target Constraints Compliance
+                            </div>
+                            <div className="flex flex-wrap gap-2 w-full">
+                                {cpaTarget && (
+                                    <div className={cn(
+                                        "flex-1 min-w-[130px] rounded-lg p-2 border flex flex-col items-start gap-0.5",
+                                        compliance.cpaPct === 100 
+                                            ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" 
+                                            : compliance.cpaPct > 50 
+                                                ? "border-yellow-500/20 bg-yellow-500/5 text-yellow-400" 
+                                                : "border-red-500/20 bg-red-500/5 text-red-400"
+                                    )}>
+                                        <span className="text-[10px] text-slate-400 font-medium">Target CPA: {symbol}{cpaTarget}</span>
+                                        <span className="text-xs font-bold font-mono">{compliance.cpaPct}% Budget Compliant</span>
+                                    </div>
+                                )}
+                                {roasTarget && (
+                                    <div className={cn(
+                                        "flex-1 min-w-[130px] rounded-lg p-2 border flex flex-col items-start gap-0.5",
+                                        compliance.roasPct === 100 
+                                            ? "border-emerald-500/20 bg-emerald-500/5 text-emerald-400" 
+                                            : compliance.roasPct > 50 
+                                                ? "border-yellow-500/20 bg-yellow-500/5 text-yellow-400" 
+                                                : "border-red-500/20 bg-red-500/5 text-red-400"
+                                    )}>
+                                        <span className="text-[10px] text-slate-400 font-medium">Target ROAS: {roasTarget}x</span>
+                                        <span className="text-xs font-bold font-mono">{compliance.roasPct}% Budget Compliant</span>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="text-xs text-slate-500 italic text-center w-full">
+                            No active constraints. Define CPA/ROAS targets in the sidebar.
+                        </div>
+                    )}
 
                     {/* PRESET TRIGGERS */}
                     <div className="flex flex-wrap justify-center gap-2">

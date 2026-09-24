@@ -105,6 +105,9 @@ const BASE_CHANNELS_DATA = [
   { id: 'influencer-funds', name: 'Influencer - Play Funds (Bal)', category: 'Paid Social' as ChannelCategory, baseSpend: 1500, cpm: 10.0, ctr: 2.0, roas: 3.0 },
 ];
 
+export const GLOBAL_BUDGET_CAP = 1000000;
+export const MIN_BUDGET_CAP = 5000;
+
 const DEFAULT_MULTIPLIERS: GlobalMultipliers = {
   spendMultiplier: 1.0,
   defaultCpmOverride: null,
@@ -230,7 +233,8 @@ export function calculateChannelMetrics(
     }
   };
 
-  const unified = calculateUnifiedMetrics(effectiveConfig, spend, multipliers.playerValue);
+  const effectiveLtv = channel.typeConfig.baselineMetrics.expectedLtv || multipliers.playerValue;
+  const unified = calculateUnifiedMetrics(effectiveConfig, spend, effectiveLtv);
 
   return {
     spend: unified.spend,
@@ -254,6 +258,13 @@ interface MediaPlanState {
   channels: ChannelData[];
   globalMultipliers: GlobalMultipliers;
   presets: Preset[];
+  projectName: string;
+  setProjectName: (name: string) => void;
+
+  // Auth / Tier Faking for Local Dev Check
+  devDeityMode: boolean;
+  toggleDevDeityMode: () => void;
+  setDevDeityMode: (val: boolean) => void;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
@@ -277,7 +288,7 @@ interface MediaPlanState {
   updateChannelTypeConfig: (channelId: string, config: Partial<ChannelTypeConfig>) => void;
 
   // New Action for polymorphic updates
-  updateChannelConfigField: (channelId: string, field: keyof ChannelTypeConfig | 'baselineMetrics', value: any) => void;
+  updateChannelConfigField: (channelId: string, field: keyof ChannelTypeConfig | 'baselineMetrics', value: string | number | boolean | Record<string, any>) => void;
 
   // Actions - Multipliers
   setGlobalMultipliers: (updates: Partial<GlobalMultipliers>) => void;
@@ -285,6 +296,7 @@ interface MediaPlanState {
 
   // Actions - Rebalance
   rebalanceToTargets: () => void;
+  applyArbitrageRebalance: () => void;
 
   // Actions - Presets
   savePreset: (name: string) => void;
@@ -296,6 +308,9 @@ interface MediaPlanState {
 
   // Actions - Bulk
   applyCategoryMultipliers: (multipliers: Record<string, number>) => void;
+
+  // Actions - DB Sync
+  hydrateFromDB: (configData: Partial<MediaPlanState>) => void;
 }
 
 export const useMediaPlanStore = create<MediaPlanState>()(
@@ -306,9 +321,20 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       channels: createInitialChannels(),
       globalMultipliers: { ...DEFAULT_MULTIPLIERS },
       presets: [],
+      projectName: "New Media Plan",
+      devDeityMode: true,
+
+      setProjectName: (name) => set({ projectName: name }),
+      toggleDevDeityMode: () => set(state => ({ devDeityMode: !state.devDeityMode })),
+      setDevDeityMode: (val) => set({ devDeityMode: val }),
+
+      // DB Sync
+      hydrateFromDB: (configData) => {
+        set((state) => ({ ...state, ...configData }));
+      },
 
       // Budget
-      setTotalBudget: (value) => set({ totalBudget: Math.max(0, Math.min(10000000, value)) }),
+      setTotalBudget: (value) => set({ totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, value)) }),
 
       // Channel allocation
       setChannelAllocation: (channelId, percentage) => {
@@ -375,7 +401,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
                 ...ch,
                 typeConfig: {
                   ...ch.typeConfig,
-                  baselineMetrics: { ...ch.typeConfig.baselineMetrics, ...value }
+                  baselineMetrics: { ...ch.typeConfig.baselineMetrics, ...(value as any) }
                 }
               };
             }
@@ -496,6 +522,53 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         });
 
         // Ensure normalization maintains 100% total
+        get().normalizeAllocations();
+      },
+
+      // iGaming arbitrage: drain bleeding (lowest ROAS) by up to 20% and reallocate to highest ROAS
+      applyArbitrageRebalance: () => {
+        const state = get();
+        const activeCandidates = state.channels
+          .filter((ch) => ch.isActive && !ch.locked)
+          .map((ch) => ({
+            ...ch,
+            metrics: calculateChannelMetrics(ch, state.totalBudget, state.globalMultipliers),
+          }));
+
+        if (activeCandidates.length < 2) return;
+
+        const bleeding = activeCandidates.reduce((worst, current) =>
+          current.metrics.roas < worst.metrics.roas ? current : worst
+        );
+
+        const best = activeCandidates.reduce((top, current) =>
+          current.metrics.roas > top.metrics.roas ? current : top
+        );
+
+        if (bleeding.id === best.id) return;
+
+        const siphonPct = Math.min(bleeding.allocationPct * 0.2, bleeding.allocationPct);
+        if (siphonPct <= 0) return;
+
+        set({
+          channels: state.channels.map((ch) => {
+            if (ch.id === bleeding.id) {
+              return {
+                ...ch,
+                allocationPct: Math.max(0, ch.allocationPct - siphonPct),
+              };
+            }
+            if (ch.id === best.id) {
+              return {
+                ...ch,
+                allocationPct: Math.min(100, ch.allocationPct + siphonPct),
+              };
+            }
+            return ch;
+          }),
+        });
+
+        // Keep total normalized after rebalance.
         get().normalizeAllocations();
       },
 

@@ -1,241 +1,251 @@
-import jsPDF from 'jspdf';
+import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
-import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
+import { ChannelWithMetrics, BlendedMetrics } from '@/hooks/use-media-plan-store';
 
-// ========== TYPES ==========
-
-interface ExportOptions {
-  currencySymbol: string;
-  formatCurrency: (value: number) => string;
+interface ExportPdfOptions {
+  projectName: string;
+  channels: ChannelWithMetrics[];
+  blended: BlendedMetrics;
+  symbol: string;
+  brandName?: string;
+  brandColor?: string;
+  notes?: string;
+  includeSummary: boolean;
+  includeChannels: boolean;
 }
 
-interface BlendedMetricsData {
-  totalSpend: number;
-  totalConversions: number;
-  blendedCpa: number | null;
-  projectedRevenue: number;
-  blendedRoas: number;
+export function exportToCsv(channels: ChannelWithMetrics[], symbol: string) {
+  const headers = [
+    'Channel Name',
+    'Category',
+    'Buying Model',
+    'Allocation %',
+    `Spend (${symbol})`,
+    'Price',
+    'Impressions',
+    'Clicks',
+    'CTR %',
+    'Conversions (FTD)',
+    `CPA (${symbol})`,
+    `Revenue (${symbol})`,
+    'ROAS'
+  ];
+
+  const rows = channels.map(ch => [
+    ch.name,
+    ch.category,
+    ch.buyingModel,
+    `${ch.allocationPct.toFixed(1)}%`,
+    ch.metrics.spend.toFixed(0),
+    ch.metrics.effectivePrice.toFixed(2),
+    ch.metrics.impressions.toFixed(0),
+    ch.metrics.clicks.toFixed(0),
+    `${ch.metrics.effectiveCtr.toFixed(2)}%`,
+    ch.metrics.conversions.toFixed(0),
+    ch.metrics.cpa ? ch.metrics.cpa.toFixed(0) : 'N/A',
+    ch.metrics.revenue.toFixed(0),
+    `${ch.metrics.roas.toFixed(2)}x`
+  ]);
+
+  const csvContent = [
+    headers.join(','),
+    ...rows.map(row => row.map(val => `"${val.replace(/"/g, '""')}"`).join(','))
+  ].join('\n');
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.setAttribute('href', url);
+  link.setAttribute('download', `MediaPlan_Export_${Date.now()}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 
-// ========== HELPERS ==========
+export function exportToPdf(options: ExportPdfOptions) {
+  const {
+    projectName,
+    channels,
+    blended,
+    symbol,
+    brandName = 'MediaPlan Pro',
+    brandColor = '#4f46e5',
+    notes = '',
+    includeSummary,
+    includeChannels
+  } = options;
 
-function safeFamilyName(family?: string): string {
-  if (!family) return 'Paid Media';
-  return FAMILY_INFO[family as keyof typeof FAMILY_INFO]?.name || family;
-}
+  const doc = new jsPDF();
+  let currentY = 15;
 
-function safeBuyingModelName(buyingModel?: string): string {
-  if (!buyingModel) return 'CPM';
-  return BUYING_MODEL_INFO[buyingModel as keyof typeof BUYING_MODEL_INFO]?.name || buyingModel;
-}
+  // Primary color helper
+  const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16),
+      g: parseInt(result[2], 16),
+      b: parseInt(result[3], 16)
+    } : { r: 79, g: 70, b: 229 }; // default indigo
+  };
+  const rgb = hexToRgb(brandColor);
 
-function safeNumber(value: number | null | undefined, fallback = 0): number {
-  if (value === null || value === undefined || isNaN(value)) return fallback;
-  return value;
-}
+  // 1. BRAND HEADER BAND
+  doc.setFillColor(rgb.r, rgb.g, rgb.b);
+  doc.rect(0, 0, 210, 25, 'F');
 
-// ========== PDF EXPORT ==========
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(255, 255, 255);
+  doc.text(brandName.toUpperCase(), 15, 16);
 
-export function exportToPdf(
-  channels: ChannelWithMetrics[],
-  totalBudget: number,
-  blendedMetrics: BlendedMetricsData,
-  options: ExportOptions
-): void {
-  try {
-    const { formatCurrency } = options;
-    const doc = new jsPDF();
-    
-    // Title
-    doc.setFontSize(20);
-    doc.setTextColor(40, 40, 40);
-    doc.text('MediaPlan Pro - Budget Report', 14, 20);
-    
-    // Date
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(10);
+  doc.text('MEDIA ACQUISITION BUDGET SCALER REPORT', 210 - 15, 16, { align: 'right' });
+
+  currentY = 38;
+
+  // 2. PROJECT META
+  doc.setTextColor(50, 50, 50);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text(projectName, 15, currentY);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9);
+  doc.setTextColor(120, 120, 120);
+  doc.text(`Generated: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`, 210 - 15, currentY, { align: 'right' });
+
+  currentY += 12;
+
+  // 3. EXECUTIVE SUMMARY
+  if (includeSummary) {
+    doc.setDrawColor(220, 220, 220);
+    doc.setFillColor(248, 250, 252);
+    doc.rect(15, currentY, 180, 28, 'FD');
+
+    doc.setFont('helvetica', 'bold');
     doc.setFontSize(10);
-    doc.setTextColor(100, 100, 100);
-    doc.text(`Generated: ${new Date().toLocaleDateString()}`, 14, 28);
+    doc.setTextColor(rgb.r, rgb.g, rgb.b);
+    doc.text('EXECUTIVE PLAN METRICS Summary', 20, currentY + 6);
+
+    // Summary columns
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+
+    doc.text('TOTAL SPEND', 22, currentY + 14);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`${symbol}${blended.totalSpend.toLocaleString(undefined, { maximumFractionDigits: 0 })}`, 22, currentY + 22);
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('PROJECTED FTDs', 70, currentY + 14);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text(blended.totalConversions.toLocaleString(undefined, { maximumFractionDigits: 0 }), 70, currentY + 22);
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('BLENDED CPA', 115, currentY + 14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(blended.blendedCpa ? `${symbol}${blended.blendedCpa.toFixed(0)}` : 'N/A', 115, currentY + 22);
+
+    doc.setTextColor(80, 80, 80);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('PROJECTED ROAS', 158, currentY + 14);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`${blended.blendedRoas.toFixed(2)}x`, 158, currentY + 22);
+
+    currentY += 38;
+  }
+
+  // 4. NOTES / CUSTOM COMMENTS
+  if (notes.trim()) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('PLAN NOTES & ASSUMPTIONS', 15, currentY);
     
-    // Summary Section
-    doc.setFontSize(14);
-    doc.setTextColor(40, 40, 40);
-    doc.text('Summary', 14, 40);
+    currentY += 4;
     
-    const summaryData = [
-      ['Total Budget', formatCurrency(totalBudget)],
-      ['Blended CPA', blendedMetrics.blendedCpa ? formatCurrency(blendedMetrics.blendedCpa) : 'N/A'],
-      ['Total FTDs', Math.round(safeNumber(blendedMetrics.totalConversions)).toLocaleString()],
-      ['Projected Revenue', formatCurrency(safeNumber(blendedMetrics.projectedRevenue))],
-      ['Blended ROAS', `${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x`],
-    ];
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(9);
+    doc.setTextColor(70, 70, 70);
+    const splitNotes = doc.splitTextToSize(notes, 180);
+    doc.text(splitNotes, 15, currentY);
     
-    autoTable(doc, {
-      startY: 45,
-      head: [['Metric', 'Value']],
-      body: summaryData,
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] },
-      margin: { left: 14 },
-      tableWidth: 80,
-    });
+    currentY += (splitNotes.length * 4) + 8;
+  }
+
+  // 5. DETAILED CHANNELS TABLE
+  if (includeChannels) {
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text('CHANNEL BUDGET ALLOCATION & FORECASTS', 15, currentY);
     
-    // Channel Details Table
-    doc.setFontSize(14);
-    doc.text('Channel Breakdown', 14, (doc as any).lastAutoTable.finalY + 15);
-    
-    const channelHeaders = [
-      'Channel',
-      'Type',
+    currentY += 4;
+
+    const tableHeaders = [
+      'Channel Name',
+      'Category',
       'Model',
       'Alloc %',
-      'Spend',
-      'FTDs',
-      'CPA',
-      'ROAS',
-    ];
-    
-    const channelRows = channels.map((ch) => {
-      // Safely get metrics - use calculated unified metrics if available
-      const spend = safeNumber(ch.metrics?.spend);
-      const conversions = safeNumber(ch.metrics?.conversions);
-      const cpa = ch.metrics?.cpa;
-      const roas = safeNumber(ch.metrics?.roas);
-      
-      return [
-        ch.name || 'Unknown Channel',
-        safeFamilyName(ch.family),
-        safeBuyingModelName(ch.buyingModel),
-        `${safeNumber(ch.allocationPct).toFixed(1)}%`,
-        formatCurrency(spend),
-        Math.round(conversions).toLocaleString(),
-        cpa ? formatCurrency(cpa) : 'N/A',
-        `${roas.toFixed(2)}x`,
-      ];
-    });
-    
-    autoTable(doc, {
-      startY: (doc as any).lastAutoTable.finalY + 20,
-      head: [channelHeaders],
-      body: channelRows,
-      theme: 'striped',
-      headStyles: { fillColor: [59, 130, 246] },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 45 },
-        1: { cellWidth: 22 },
-        2: { cellWidth: 18 },
-        3: { cellWidth: 16 },
-        4: { cellWidth: 22 },
-        5: { cellWidth: 16 },
-        6: { cellWidth: 20 },
-        7: { cellWidth: 16 },
-      },
-    });
-    
-    // Footer
-    const pageCount = doc.getNumberOfPages();
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i);
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(
-        `Page ${i} of ${pageCount} | MediaPlan Pro`,
-        doc.internal.pageSize.width / 2,
-        doc.internal.pageSize.height - 10,
-        { align: 'center' }
-      );
-    }
-    
-    // Save
-    doc.save(`mediaplan-${new Date().toISOString().split('T')[0]}.pdf`);
-  } catch (error) {
-    console.error('PDF Export Error:', error);
-    throw new Error('Failed to generate PDF. Please try again.');
-  }
-}
-
-// ========== CSV EXPORT ==========
-
-export function exportToCsv(
-  channels: ChannelWithMetrics[],
-  totalBudget: number,
-  blendedMetrics: BlendedMetricsData,
-  options: ExportOptions
-): void {
-  try {
-    const { formatCurrency } = options;
-    
-    const headers = [
-      'Channel',
-      'Family',
-      'Buying Model',
-      'Category',
-      'Allocation %',
-      'Spend',
+      `Spend (${symbol})`,
       'Impressions',
-      'Clicks',
-      'FTDs',
-      'CPA',
-      'Revenue',
-      'ROAS',
+      'Conversions',
+      `CPA (${symbol})`,
+      'ROAS'
     ];
-    
-    const rows = channels.map((ch) => {
-      const spend = safeNumber(ch.metrics?.spend);
-      const impressions = safeNumber(ch.metrics?.impressions);
-      const clicks = safeNumber(ch.metrics?.clicks);
-      const conversions = safeNumber(ch.metrics?.conversions);
-      const cpa = ch.metrics?.cpa;
-      const revenue = safeNumber(ch.metrics?.revenue);
-      const roas = safeNumber(ch.metrics?.roas);
-      
-      return [
-        ch.name || 'Unknown',
-        safeFamilyName(ch.family),
-        safeBuyingModelName(ch.buyingModel),
-        ch.category || 'other',
-        safeNumber(ch.allocationPct).toFixed(2),
-        spend.toFixed(2),
-        Math.round(impressions).toString(),
-        Math.round(clicks).toString(),
-        Math.round(conversions).toString(),
-        cpa ? cpa.toFixed(2) : 'N/A',
-        revenue.toFixed(2),
-        roas.toFixed(2),
-      ];
+
+    const activeChannels = channels.filter(ch => ch.isActive && ch.allocationPct > 0);
+
+    const tableRows = activeChannels.map(ch => [
+      ch.name,
+      ch.category,
+      ch.buyingModel,
+      `${ch.allocationPct.toFixed(1)}%`,
+      ch.metrics.spend.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      ch.metrics.impressions > 0 ? ch.metrics.impressions.toLocaleString(undefined, { maximumFractionDigits: 0 }) : '--',
+      ch.metrics.conversions.toLocaleString(undefined, { maximumFractionDigits: 0 }),
+      ch.metrics.cpa ? ch.metrics.cpa.toFixed(0) : 'N/A',
+      `${ch.metrics.roas.toFixed(1)}x`
+    ]);
+
+    autoTable(doc, {
+      startY: currentY,
+      head: [tableHeaders],
+      body: tableRows,
+      theme: 'striped',
+      headStyles: {
+        fillColor: [rgb.r, rgb.g, rgb.b],
+        textColor: [255, 255, 255],
+        fontSize: 8,
+        fontStyle: 'bold'
+      },
+      bodyStyles: {
+        fontSize: 8,
+        textColor: [50, 50, 50]
+      },
+      columnStyles: {
+        0: { cellWidth: 40 },
+        1: { cellWidth: 28 },
+        2: { cellWidth: 15 },
+        3: { cellWidth: 15, halign: 'right' },
+        4: { cellWidth: 20, halign: 'right' },
+        5: { cellWidth: 22, halign: 'right' },
+        6: { cellWidth: 18, halign: 'right' },
+        7: { cellWidth: 14, halign: 'right' },
+        8: { cellWidth: 14, halign: 'right' }
+      },
+      margin: { left: 15, right: 15 }
     });
-    
-    const csvContent = [
-      headers.join(','),
-      ...rows.map((row) => row.map(cell => `"${cell}"`).join(',')),
-      '',
-      `"Total Budget","${formatCurrency(totalBudget)}"`,
-      `"Blended CPA","${blendedMetrics.blendedCpa ? formatCurrency(blendedMetrics.blendedCpa) : 'N/A'}"`,
-      `"Total FTDs","${Math.round(safeNumber(blendedMetrics.totalConversions))}"`,
-      `"Projected Revenue","${formatCurrency(safeNumber(blendedMetrics.projectedRevenue))}"`,
-      `"Blended ROAS","${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x"`,
-    ].join('\n');
-    
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `mediaplan-${new Date().toISOString().split('T')[0]}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-  } catch (error) {
-    console.error('CSV Export Error:', error);
-    throw new Error('Failed to generate CSV. Please try again.');
   }
-}
 
-// ========== PNG EXPORT ==========
-
-export async function exportToPng(): Promise<void> {
-  // PNG export requires html2canvas which captures the DOM
-  // For now, prompt user to use browser print
-  throw new Error('PNG export requires manual capture. Use Ctrl/Cmd + Shift + S to save as image.');
+  doc.save(`MediaPlan_Report_${Date.now()}.pdf`);
 }

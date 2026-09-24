@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { Slider } from '@/components/ui/slider';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -22,13 +22,27 @@ import {
   useMediaPlanStore,
   useChannelsWithMetrics,
 } from '@/hooks/use-media-plan-store';
-// import { useBudgetEngine } from '@/hooks/use-budget-engine';
+import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
-import { Search, Megaphone, Users, Star, Edit2, Settings2, Lock, Unlock } from 'lucide-react';
+import { Search, Megaphone, Users, Star, Edit2, Settings2, Lock, Unlock, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ChannelEditor } from './ChannelEditor';
 import { BUYING_MODEL_INFO } from '@/types/channel';
+import { AddChannelDialog } from './AddChannelDialog';
+
+const getSparklinePath = (id: string) => {
+  if (id.includes('seo')) {
+    return "M 0 16 C 10 14, 20 10, 30 8 C 40 6, 45 3, 50 1";
+  }
+  if (id.includes('native') || id.includes('push') || id.includes('programmatic')) {
+    return "M 0 16 Q 12 2 24 12 T 50 8";
+  }
+  if (id.includes('affiliate')) {
+    return "M 0 15 L 12 12 L 25 10 L 38 6 L 50 5";
+  }
+  return "M 0 15 Q 12 15 25 10 T 50 5";
+};
 
 const CategoryIcon = ({ category }: { category: ChannelCategory }) => {
   const icons: Partial<Record<ChannelCategory, any>> = {
@@ -126,10 +140,42 @@ function EditableCell({
 
 export function ChannelTable() {
   const { setChannelAllocation, updateChannelConfigField } = useMediaPlanStore();
-  // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
   const categoryTotals = useCategoryTotals();
   const { symbol, format: formatCurrency } = useCurrency();
+  const [hideUnallocated, setHideUnallocated] = useState(false);
+
+  const { months: multiMonths } = useMultiMonthStore();
+
+  const getDynamicSparklinePath = useCallback((channelId: string) => {
+    if (!multiMonths || multiMonths.length < 2) {
+      return getSparklinePath(channelId);
+    }
+
+    const roasValues = multiMonths.map(m => {
+      const ch = m.channels?.find(c => c.channelId === channelId);
+      return ch ? ch.roas : 0;
+    });
+
+    const min = Math.min(...roasValues);
+    const max = Math.max(...roasValues);
+    const range = max - min;
+
+    const points = roasValues.map((roas, i) => {
+      const x = (i / (roasValues.length - 1)) * 50;
+      const y = range > 0.01 ? 18 - ((roas - min) / range) * 16 : 10;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    });
+
+    return `M ${points.join(" L ")}`;
+  }, [multiMonths]);
+
+  const filteredChannels = useMemo(() => {
+    if (hideUnallocated) {
+      return channels.filter(ch => ch.allocationPct > 0);
+    }
+    return channels;
+  }, [channels, hideUnallocated]);
 
   // Group channels by category
   const groupedChannels = useMemo(() => {
@@ -141,7 +187,7 @@ export function ChannelTable() {
       groups[cat] = [];
     });
 
-    channels.forEach((ch) => {
+    filteredChannels.forEach((ch) => {
       // Defensive check for invalid/legacy categories
       if (!ch.category || !groups[ch.category]) {
         console.warn(`Channel ${ch.id} has invalid category: ${ch.category}`);
@@ -154,7 +200,7 @@ export function ChannelTable() {
     });
 
     return groups as Record<ChannelCategory, ChannelWithMetrics[]>;
-  }, [channels]);
+  }, [filteredChannels]);
 
   const handleSliderChange = useCallback(
     (channelId: string, values: number[]) => {
@@ -169,12 +215,28 @@ export function ChannelTable() {
     [channels]
   );
 
+  const overrideSummary = useMemo(() => {
+    const active = channels.filter(ch => ch.isActive);
+    const lockedCount = active.filter(ch => ch.locked || ch.tier === 'fixed').length;
+    const scalableCount = active.filter(ch => !ch.locked && ch.tier !== 'fixed').length;
+    return { lockedCount, scalableCount };
+  }, [channels]);
+
   return (
     <div className="rounded-xl border border-border/50 bg-card overflow-hidden card-shadow">
       {/* Header with total indicator */}
-      <div className="flex items-center justify-between p-4 border-b border-border/50 bg-muted/30">
+      <div className="flex flex-wrap items-center justify-between p-4 border-b border-border/50 bg-muted/30 gap-4">
         <h3 className="font-semibold">Channel Allocation</h3>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none hover:text-white transition-colors">
+            <input 
+              type="checkbox" 
+              checked={hideUnallocated} 
+              onChange={(e) => setHideUnallocated(e.target.checked)}
+              className="rounded border-slate-700 bg-slate-950 text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5"
+            />
+            <span>Hide Unallocated</span>
+          </label>
           <span className="text-sm text-muted-foreground">Total:</span>
           <Badge
             variant={Math.abs(totalAllocation - 100) < 0.1 ? 'default' : 'destructive'}
@@ -182,12 +244,27 @@ export function ChannelTable() {
           >
             {formatPercentage(totalAllocation)}
           </Badge>
+          <AddChannelDialog
+            trigger={
+              <Button size="sm" variant="outline" className="h-8 gap-1 border-indigo-500/30 text-indigo-400 hover:text-indigo-300 hover:bg-indigo-500/10">
+                <Plus className="h-3.5 w-3.5" />
+                Add Channel
+              </Button>
+            }
+          />
+        </div>
+      </div>
+
+      {/* Override and optimization summary bar */}
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border/40 bg-slate-900/40 text-[11px] text-slate-400">
+        <div>
+          <span className="font-semibold text-slate-200">{overrideSummary.lockedCount}</span> locked (manual overrides) • <span className="font-semibold text-slate-200">{overrideSummary.scalableCount}</span> scalable (auto-optimized)
         </div>
       </div>
 
       {/* Desktop Table */}
       <div className="hidden md:block overflow-x-auto">
-        <Table>
+        <Table className="min-w-[1000px]">
           <TableHeader>
             <TableRow className="bg-muted/20 hover:bg-muted/20">
               <TableHead className="w-[250px]">Channel</TableHead>
@@ -198,57 +275,70 @@ export function ChannelTable() {
               <TableHead className="text-right">CTR %</TableHead>
               <TableHead className="text-right">Conversions</TableHead>
               <TableHead className="text-right">CPA</TableHead>
+              <TableHead className="text-right">Exp. LTV</TableHead>
               <TableHead className="text-right">ROAS</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {(Object.entries(groupedChannels) as [ChannelCategory, ChannelWithMetrics[]][]).map(
-              ([category, categoryChannels]) => (
-                <>
-                  {/* Category Header Row */}
-                  <TableRow
-                    key={`header-${category}`}
-                    className="bg-muted/40 hover:bg-muted/40"
-                  >
-                    <TableCell colSpan={9} className="py-2">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="flex h-6 w-6 items-center justify-center rounded-md"
-                          style={{ backgroundColor: (CATEGORY_INFO[category]?.color || '#888') + '20' }}
-                        >
-                          <CategoryIcon category={category} />
+              ([category, categoryChannels]) => {
+                if (categoryChannels.length === 0) return null;
+                return (
+                  <React.Fragment key={`group-${category}`}>
+                    {/* Category Header Row */}
+                    <TableRow
+                      className="bg-muted/40 hover:bg-muted/40"
+                    >
+                      <TableCell colSpan={10} className="py-2">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="flex h-6 w-6 items-center justify-center rounded-md"
+                            style={{ backgroundColor: (CATEGORY_INFO[category]?.color || '#888') + '20' }}
+                          >
+                            <CategoryIcon category={category} />
+                          </div>
+                          <span className="font-semibold text-sm">
+                            {CATEGORY_INFO[category]?.name || category}
+                          </span>
+                          <Badge variant="outline" className="ml-auto font-mono text-xs">
+                            {formatPercentage(categoryTotals[category]?.percentage || 0)} • {formatCurrency(categoryTotals[category]?.spend || 0)}
+                          </Badge>
                         </div>
-                        <span className="font-semibold text-sm">
-                          {CATEGORY_INFO[category]?.name || category}
-                        </span>
-                        <Badge variant="outline" className="ml-auto font-mono text-xs">
-                          {formatPercentage(categoryTotals[category]?.percentage || 0)} • {formatCurrency(categoryTotals[category]?.spend || 0)}
-                        </Badge>
-                      </div>
-                    </TableCell>
-                  </TableRow>
+                      </TableCell>
+                    </TableRow>
 
-                  {/* Channel Rows */}
-                  {categoryChannels.map((channel) => {
-                    const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
+                    {/* Channel Rows */}
+                    {categoryChannels.map((channel) => {
+                      const isWarning = channel.aboveCpaTarget || channel.belowRoasTarget;
 
-                    return (
-                      <TableRow
-                        key={channel.id}
-                        className={cn(
-                          "group transition-colors hover:bg-muted/20",
-                          isWarning && "bg-destructive/5 hover:bg-destructive/10"
-                        )}
-                        title={isWarning ? "Constraint Violation: Channel metrics exceed Target CPA/ROAS" : undefined}
-                      >
-                        <TableCell className="font-medium">
-                          <div className="flex items-center gap-2">
-                            <span className={cn(
-                              "text-sm",
-                              isWarning && "text-destructive"
-                            )}>
-                              {channel.name}
-                            </span>
+                      return (
+                        <TableRow
+                          key={channel.id}
+                          className={cn(
+                            "group transition-colors hover:bg-muted/20",
+                            isWarning && "bg-destructive/5 hover:bg-destructive/10"
+                          )}
+                          title={isWarning ? "Constraint Violation: Channel metrics exceed Target CPA/ROAS" : undefined}
+                        >
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                              <span className={cn(
+                                "text-sm",
+                                isWarning && "text-destructive"
+                              )}>
+                                {channel.name}
+                              </span>
+                              
+                              {/* SPARKLINE PERFORMANCE TREND */}
+                              <svg className="w-12 h-6 overflow-visible opacity-60 hidden xl:inline-block ml-1" viewBox="0 0 50 20" title="Monthly ROAS Trend (Multi-Month Planning)">
+                                <path
+                                  d={getDynamicSparklinePath(channel.id)}
+                                  fill="none"
+                                  stroke={channel.metrics.roas >= 3 ? "#10b981" : channel.metrics.roas >= 2 ? "#f59e0b" : "#ef4444"}
+                                  strokeWidth="1.5"
+                                  strokeLinecap="round"
+                                />
+                              </svg>
                             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4">
                               {(channel.buyingModel && BUYING_MODEL_INFO[channel.buyingModel]?.name) || 'CPM'}
                             </Badge>
@@ -339,6 +429,14 @@ export function ChannelTable() {
                           {channel.metrics.cpa ? formatCurrency(channel.metrics.cpa) : 'N/A'}
                         </TableCell>
                         <TableCell className="text-right">
+                          <EditableCell
+                            value={channel.typeConfig.baselineMetrics.expectedLtv || useMediaPlanStore.getState().globalMultipliers.playerValue}
+                            onSave={(v) => updateChannelConfigField(channel.id, 'baselineMetrics', { expectedLtv: v })}
+                            prefix={symbol}
+                            className="justify-end text-muted-foreground"
+                          />
+                        </TableCell>
+                        <TableCell className="text-right">
                           <Badge
                             variant="outline"
                             className={cn(
@@ -351,11 +449,12 @@ export function ChannelTable() {
                             {channel.metrics.roas.toFixed(1)}x
                           </Badge>
                         </TableCell>
-                      </TableRow >
+                      </TableRow>
                     );
                   })}
-                </>
-              )
+                  </React.Fragment>
+                );
+              }
             )}
           </TableBody>
         </Table>

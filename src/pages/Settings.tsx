@@ -9,9 +9,13 @@ import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 
+import { useMediaPlanStore } from "@/hooks/use-media-plan-store";
+import { Switch } from "@/components/ui/switch";
+
 export default function Settings() {
     const navigate = useNavigate();
     const [user, setUser] = useState<any>(null);
+    const { devDeityMode, toggleDevDeityMode } = useMediaPlanStore();
     const [projectCount, setProjectCount] = useState<number | null>(null);
     const [loading, setLoading] = useState(true);
 
@@ -109,6 +113,16 @@ export default function Settings() {
                                     </Badge>
                                 </div>
                             </div>
+                            
+                            <Separator className="bg-slate-700" />
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <label className="text-xs font-medium text-amber-400 uppercase tracking-wider flex items-center gap-1"><ShieldCheck className="w-3 h-3"/> Dev Mode</label>
+                                    <div className="text-xs text-slate-400 mt-0.5 max-w-[200px]">Force Deity Tier for local testing without Stripe.</div>
+                                </div>
+                                <Switch checked={devDeityMode} onCheckedChange={toggleDevDeityMode} className="data-[state=checked]:bg-amber-500" />
+                            </div>
+
                             <Separator className="bg-slate-700" />
                             <Button
                                 variant="outline"

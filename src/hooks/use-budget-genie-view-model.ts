@@ -72,14 +72,14 @@ export function useBudgetGenieViewModel() {
                 }
 
                 // Calculate metrics using the shared library
-                const metrics = calculateChannelMetrics(channel, spend);
+                const metrics = calculateChannelMetrics(channel as any, spend);
 
                 return {
                     ...channel,
                     metrics
                 };
-            } catch (error) {
-                console.error(`Error calculating metrics for channel ${channel.id}:`, error);
+            } catch (error: any) {
+                console.error(`Error calculating metrics for channel ${channel.id}:`, error instanceof Error ? error.message : String(error));
 
                 // Fallback to zero-safe object to prevent UI crashes
                 return {
@@ -136,10 +136,10 @@ export function useBudgetGenieViewModel() {
                 totalClicks: 0,
                 blendedRoas: 0,
                 blendedCpa: 0
-            });
+            } as any);
 
-        } catch (error) {
-            console.error("Critical: Error calculating blended metrics", error);
+        } catch (error: any) {
+            console.error("Critical: Error calculating blended metrics", error instanceof Error ? error.message : String(error));
             return { totalSpend: 0, totalRevenue: 0, blendedRoas: 0, blendedCpa: 0, totalConversions: 0 };
         }
     }, [channelsWithMetrics]);

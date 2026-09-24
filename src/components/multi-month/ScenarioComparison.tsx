@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useMemo, useState, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   Select,
@@ -27,6 +27,10 @@ import {
   calculatePlanMetrics,
 } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Save } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ComparisonMetric {
   label: string;
@@ -45,7 +49,21 @@ export function ScenarioComparison() {
     setComparisonScenario,
     globalSettings,
     months,
+    saveScenario,
   } = useMultiMonthStore();
+
+  const { toast } = useToast();
+  const [newScenarioName, setNewScenarioName] = useState('');
+
+  const handleSaveScenario = useCallback(() => {
+    if (!newScenarioName.trim()) return;
+    saveScenario(newScenarioName.trim());
+    toast({
+      title: 'Scenario Saved',
+      description: `"${newScenarioName}" has been saved as a comparison candidate.`,
+    });
+    setNewScenarioName('');
+  }, [newScenarioName, saveScenario, toast]);
 
   const { symbol } = useCurrency();
   const currentMetrics = useMultiMonthMetrics();
@@ -164,9 +182,31 @@ export function ScenarioComparison() {
 
   if (scenarios.length === 0) {
     return (
-      <Card className="border-border">
-        <CardContent className="py-12 text-center text-muted-foreground">
-          Save at least one scenario to enable comparison.
+      <Card className="border-slate-800 bg-slate-900/60 backdrop-blur-md max-w-lg mx-auto">
+        <CardHeader>
+          <CardTitle className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+            <Save className="h-4 w-4 text-indigo-400" /> Save Scenario for A/B Comparison
+          </CardTitle>
+          <CardDescription className="text-xs text-slate-400">
+            You must save at least one plan configuration to compare scenarios. Save your current plan settings (e.g. "Plan A - Baseline" or "Aggressive Launch").
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Input
+              placeholder="e.g. Baseline Configuration"
+              value={newScenarioName}
+              onChange={(e) => setNewScenarioName(e.target.value)}
+              className="bg-[#020617] border-slate-700 text-xs h-9 text-white"
+            />
+            <Button
+              onClick={handleSaveScenario}
+              disabled={!newScenarioName.trim()}
+              className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1.5 h-9"
+            >
+              <Save className="h-3.5 w-3.5" /> Save Plan
+            </Button>
+          </div>
         </CardContent>
       </Card>
     );
@@ -177,29 +217,49 @@ export function ScenarioComparison() {
       {/* Scenario Selector */}
       <Card className="border-border">
         <CardContent className="p-4">
-          <div className="flex items-center gap-4">
-            <div className="flex-1">
-              <div className="text-sm font-medium mb-1">Current Plan (Scenario A)</div>
-              <Badge variant="secondary">Active Configuration</Badge>
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex items-center gap-4 flex-1">
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-1">Current Plan (Scenario A)</div>
+                <Badge variant="secondary">Active Configuration</Badge>
+              </div>
+              <div className="text-muted-foreground">vs</div>
+              <div className="flex-1">
+                <div className="text-sm font-medium mb-1">Compare With (Scenario B)</div>
+                <Select
+                  value={comparisonScenarioId || ''}
+                  onValueChange={(v) => setComparisonScenario(v || null)}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder="Select scenario..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {scenarios.map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="text-muted-foreground">vs</div>
-            <div className="flex-1">
-              <div className="text-sm font-medium mb-1">Compare With (Scenario B)</div>
-              <Select
-                value={comparisonScenarioId || ''}
-                onValueChange={(v) => setComparisonScenario(v || null)}
+
+            {/* Inline Save Form */}
+            <div className="flex items-center gap-2 border-t md:border-t-0 pt-3 md:pt-0 border-slate-800">
+              <Input
+                placeholder="Save current plan as..."
+                value={newScenarioName}
+                onChange={(e) => setNewScenarioName(e.target.value)}
+                className="bg-[#020617] border-slate-700 text-xs h-8 w-44 text-white"
+              />
+              <Button
+                onClick={handleSaveScenario}
+                disabled={!newScenarioName.trim()}
+                size="sm"
+                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs gap-1 h-8 shrink-0"
               >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select scenario..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {scenarios.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                <Save className="h-3 w-3" /> Save
+              </Button>
             </div>
           </div>
         </CardContent>

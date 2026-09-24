@@ -15,6 +15,7 @@ import { useStoreSync } from "./hooks/use-store-sync";
 import { useHistoryRecorder } from "@/hooks/use-history";
 import { KeyboardManager } from "@/components/common/KeyboardManager";
 import UnderConstruction from "./pages/UnderConstruction";
+import { DbHydrator } from "./components/auth/DbHydrator";
 
 const queryClient = new QueryClient();
 
@@ -37,6 +38,7 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <DbHydrator />
         <Toaster />
         <Sonner />
         <KeyboardManager />

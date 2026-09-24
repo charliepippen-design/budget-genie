@@ -9,7 +9,7 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>MediaPlanner Pro - Interactive Budget Scaler | iGaming Media Planning</title>
+        <title>MediaPlan Pro - Interactive Budget Scaler | iGaming Media Planning</title>
         <meta name="description" content="Professional media plan budget calibrator for iGaming and digital marketing." />
       </Helmet>
 
