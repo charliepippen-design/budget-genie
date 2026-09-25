@@ -1,3 +1,4 @@
+import { getIndustryPack } from '@/lib/industries';
 import {
   Download,
   FileText,
@@ -13,7 +14,7 @@ import {
   Share2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import {
   DropdownMenu,
@@ -64,12 +65,14 @@ export function DashboardHeader({
   const { totalBudget, globalMultipliers } = useMediaPlanStore();
   const vc = useVerticalConfig();
   const userStatus = useMediaPlanStore((state) => state.userStatus);
+  const brief = useMediaPlanStore((state) => state.brief);
   const { format } = useCurrency();
   const { theme, cycleTheme } = useTheme();
   const navigate = useNavigate();
   const [isExportHostageModalOpen, setIsExportHostageModalOpen] = useState(false);
   const multiplier = globalMultipliers.spendMultiplier || 1;
-  const effectiveBudget = totalBudget * multiplier;
+  // The multiplier scales variable channels only (fixed fees are contractual), so show real spend.
+  const effectiveBudget = useBlendedMetrics().totalSpend;
   const nextThemeLabel = theme === 'light' ? 'dark' : theme === 'dark' ? 'high-contrast' : 'light';
   const currentThemeLabel =
     theme === 'contrast' ? 'High Contrast' : theme === 'dark' ? 'Dark' : 'Light';
@@ -140,7 +143,7 @@ export function DashboardHeader({
                   </span>
                 </h1>
                 <span className="text-xs text-slate-400 border border-slate-700 rounded-full px-2 py-0.5 ml-2">
-                  {vc.emoji} {vc.label}
+                  {vc.emoji} {brief ? getIndustryPack(brief.industry).label : vc.label}
                 </span>
               </div>
               {multiplier !== 1 ? (
@@ -265,7 +268,9 @@ export function DashboardHeader({
 
           {/* Reset Button - FORCED CONTRAST */}
           <Button
-            onClick={onReset}
+            onClick={() => {
+              if (window.confirm('Reset the plan? This clears budget and channel settings (Ctrl+Z can undo).')) onReset();
+            }}
             title="Reset Plan"
             aria-label="Reset plan"
             className={cn(controlShellClass, 'w-10 px-0')}

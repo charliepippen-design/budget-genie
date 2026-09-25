@@ -7,7 +7,7 @@ import {
   normalizeIgamingRevenueInputs,
 } from '@/lib/igaming-revenue-model';
 import { ChannelFamily, BuyingModel, ChannelTypeConfig } from '@/types/channel';
-import { useMediaPlanStore } from './use-media-plan-store';
+import { computePlanSnapshot, useMediaPlanStore } from './use-media-plan-store';
 
 // ========== TYPES ==========
 
@@ -400,6 +400,46 @@ function generateMonthLabel(startDate: Date, monthOffset: number, isSoftLaunch: 
   return isSoftLaunch ? `${formatter.format(date)} (Soft Launch)` : formatter.format(date);
 }
 
+/** "YYYY-MM" in local time (toISOString would shift to the previous month east of UTC). */
+export function toMonthValue(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+}
+
+/**
+ * Month channels mirror the main plan: each channel's share and unit economics are read from
+ * the engine snapshot, so month totals reproduce the dashboard's numbers at the same budget.
+ */
+function channelsFromPlan(): ChannelMonthConfig[] {
+  const plan = useMediaPlanStore.getState();
+  const { channels } = computePlanSnapshot(plan);
+  const live = channels.filter((c) => c.isActive !== false && c.metrics.spend > 0);
+  const totalSpend = live.reduce((sum, c) => sum + c.metrics.spend, 0);
+  if (live.length === 0 || totalSpend <= 0) return JSON.parse(JSON.stringify(DEFAULT_CHANNELS));
+
+  return live.map((c) => {
+    const m = c.metrics;
+    const hasImpressions = m.impressions > 0;
+    const ctr = hasImpressions ? (m.clicks / m.impressions) * 100 : 1;
+    return {
+      channelId: c.id,
+      name: c.name,
+      category: c.category,
+      allocationPct: (m.spend / totalSpend) * 100,
+      cpm: hasImpressions ? (m.spend / m.impressions) * 1000 : 0,
+      ctr,
+      cr: m.clicks > 0 ? (m.conversions / m.clicks) * 100 : 0,
+      roas: m.spend > 0 ? m.revenue / m.spend : 0,
+      // Fixed-fee channels deliver a set volume regardless of the month's budget.
+      impressionMode: hasImpressions ? 'CPM' : 'FIXED',
+      fixedImpressions: hasImpressions ? 0 : m.clicks / (ctr / 100),
+      locked: c.locked,
+      family: c.family,
+      buyingModel: c.buyingModel,
+      typeConfig: c.typeConfig,
+    };
+  });
+}
+
 function createMonth(
   index: number,
   startDate: Date,
@@ -606,6 +646,8 @@ export interface MultiMonthState {
 
   // Months Data
   months: MonthData[];
+  /** True once the user edits a month by hand; plan changes then stop regenerating months. */
+  monthsCustomized: boolean;
 
   // Scenarios
   scenarios: PlanScenario[];
@@ -684,11 +726,12 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       // Initial State
       includeSoftLaunch: true,
       planningMonths: 6,
-      startMonth: new Date().toISOString().slice(0, 7),
+      startMonth: toMonthValue(new Date()),
       progressionPattern: 'linear',
       patternParams: { growthRate: 10 },
       globalSettings: { ...DEFAULT_GLOBAL_SETTINGS },
       months: [],
+      monthsCustomized: false,
       scenarios: [],
       activeScenarioId: null,
       comparisonScenarioId: null,
@@ -783,16 +826,10 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         const [yearStr, monthStr] = state.startMonth.split('-');
         const startDate = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1);
 
-        // Logic: Use passed budget, OR fetch from global store, OR fallback to base
+        // The plan budget is MONTHLY, so the period total is budget × months.
         let targetBudget = totalBudgetOverride;
-
         if (targetBudget === undefined) {
-          // Try to pull from global store if available
-          try {
-            targetBudget = useMediaPlanStore.getState().totalBudget;
-          } catch (e) {
-            console.warn('Could not access MediaPlanStore', e);
-          }
+          targetBudget = useMediaPlanStore.getState().totalBudget * totalMonths;
         }
 
         // Fallback to internal settings if still 0 or undefined
@@ -805,13 +842,14 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           growthRate: state.globalSettings.growthRate,
         });
 
+        const planChannels = channelsFromPlan();
         const newMonths: MonthData[] = [];
         for (let i = 0; i < totalMonths; i++) {
           const isSoftLaunch = state.includeSoftLaunch && i === 0;
-          newMonths.push(createMonth(i, startDate, isSoftLaunch, budgets[i], DEFAULT_CHANNELS));
+          newMonths.push(createMonth(i, startDate, isSoftLaunch, budgets[i], planChannels));
         }
 
-        set({ months: newMonths });
+        set({ months: newMonths, monthsCustomized: false });
       },
 
       applyPattern: () => {
@@ -839,12 +877,14 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
       updateMonth: (monthId, updates) => {
         set((state) => ({
+          monthsCustomized: true,
           months: state.months.map((m) => (m.id === monthId ? { ...m, ...updates } : m)),
         }));
       },
 
       updateMonthChannel: (monthId, channelId, updates) => {
         set((state) => ({
+          monthsCustomized: true,
           months: state.months.map((m) =>
             m.id === monthId
               ? {
@@ -890,7 +930,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
                   spendMultiplier: null,
                   cpmOverride: null,
                   ctrBump: null,
-                  channels: JSON.parse(JSON.stringify(DEFAULT_CHANNELS)),
+                  channels: channelsFromPlan(),
                   useGlobalChannels: true,
                 }
               : m
@@ -1112,7 +1152,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         set({
           includeSoftLaunch: true,
           planningMonths: 6,
-          startMonth: new Date().toISOString().slice(0, 7),
+          startMonth: toMonthValue(new Date()),
           progressionPattern: 'linear',
           patternParams: { growthRate: 10 },
           globalSettings: { ...DEFAULT_GLOBAL_SETTINGS, baseMonthlyBudget: 0 },
@@ -1133,6 +1173,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         patternParams: state.patternParams,
         globalSettings: state.globalSettings,
         months: state.months,
+        monthsCustomized: state.monthsCustomized,
         scenarios: state.scenarios,
         pdfSections: state.pdfSections,
         userNotes: state.userNotes,

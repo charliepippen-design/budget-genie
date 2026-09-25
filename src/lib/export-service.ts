@@ -1,3 +1,4 @@
+import { DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import ExcelJS from 'exceljs';
@@ -189,7 +190,7 @@ export function exportToCsv(
             conversions: blendedMetrics.totalConversions,
             cpa: blendedMetrics.blendedCpa ?? 0,
             assumptions: {
-              churnRate: 0.04,
+              churnRate: DEFAULT_CHURN_RATE,
               cpaMultiplier: 1,
               roasMultiplier: 1,
             },
@@ -379,7 +380,7 @@ export async function exportToExcel(
               : 0,
             conversions: blendedMetrics.totalConversions,
             cpa: blendedMetrics.blendedCpa ?? 0,
-            assumptions: { churnRate: 0.04, cpaMultiplier: 1, roasMultiplier: 1 },
+            assumptions: { churnRate: DEFAULT_CHURN_RATE, cpaMultiplier: 1, roasMultiplier: 1 },
           });
 
     const alerts =

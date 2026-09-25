@@ -1,3 +1,10 @@
+import {
+  applyObservedCalibration,
+  baselineLtvCurve,
+  buildLtvCurve,
+  clamp,
+  type DecayCurveArchitecture,
+} from '@/lib/ltv-model';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
@@ -38,17 +45,6 @@ import { SandboxSpendChart } from '@/components/dashboard/SandboxSpendChart';
 import { ScenarioChart } from '@/components/dashboard/ScenarioChart';
 import { useSandboxStore, type ChannelSandboxAdjustment } from '@/store/useSandboxStore';
 
-interface LtvCurvePoint {
-  month: number;
-  label: string;
-  cumulativeLtvPerUser: number;
-  monthlyLtvPerUser: number;
-  cohortValue: number;
-  netCohortValue: number;
-  ltvToCac: number;
-  cpaLine: number;
-}
-
 interface ScenarioPoint {
   scenario: 'Bear' | 'Base' | 'Bull';
   projectedLtvPerUser: number;
@@ -64,11 +60,6 @@ interface AggregateMetrics {
   blendedRoas: number;
   roi: number;
 }
-
-type DecayCurveArchitecture =
-  | 'standard-linear'
-  | 'front-loaded-dropoff'
-  | 'stable-long-term-retention';
 
 const SCENARIO_COLORS = {
   Bear: '#ef4444',
@@ -95,89 +86,6 @@ const SANDBOX_DEFAULT_ADJUSTMENT: ChannelSandboxAdjustment = {
 
 const CHANNEL_GROUPS: ChannelGroup[] = ['organic', 'paid', 'affiliate', 'influencer'];
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-type ObservedLtvPoints = {
-  m1: number | null;
-  m3: number | null;
-  m6: number | null;
-};
-
-function toAnchors(observed: ObservedLtvPoints): Array<{ month: number; value: number }> {
-  const candidates = [
-    { month: 1, value: observed.m1 },
-    { month: 3, value: observed.m3 },
-    { month: 6, value: observed.m6 },
-  ];
-
-  return candidates
-    .filter((entry): entry is { month: number; value: number } => {
-      return entry.value !== null && Number.isFinite(entry.value) && entry.value > 0;
-    })
-    .sort((a, b) => a.month - b.month);
-}
-
-function applyObservedCalibration(
-  baselineCumulative: number[],
-  observed: ObservedLtvPoints
-): { cumulative: number[]; multiplier: number; isCalibrated: boolean } {
-  const anchors = toAnchors(observed);
-  if (anchors.length === 0 || baselineCumulative.length === 0) {
-    return {
-      cumulative: baselineCumulative,
-      multiplier: 1,
-      isCalibrated: false,
-    };
-  }
-
-  const lastAnchor = anchors[anchors.length - 1];
-  const baselineAtLastAnchor = baselineCumulative[lastAnchor.month - 1] || 1;
-  const scaleAtLastAnchor = lastAnchor.value / Math.max(1, baselineAtLastAnchor);
-  const projectedMonth12 = Math.max(
-    lastAnchor.value,
-    baselineCumulative[11] * clamp(scaleAtLastAnchor, 0.25, 4)
-  );
-
-  const segmentAnchors = [{ month: 0, value: 0 }, ...anchors];
-  if (segmentAnchors[segmentAnchors.length - 1].month < 12) {
-    segmentAnchors.push({ month: 12, value: projectedMonth12 });
-  }
-
-  const calibrated = [...baselineCumulative];
-  for (let month = 1; month <= 12; month += 1) {
-    const right = segmentAnchors.find((anchor) => anchor.month >= month);
-    const left = [...segmentAnchors].reverse().find((anchor) => anchor.month <= month);
-
-    if (!left || !right) {
-      calibrated[month - 1] = baselineCumulative[month - 1];
-      continue;
-    }
-
-    if (left.month === right.month) {
-      calibrated[month - 1] = left.value;
-      continue;
-    }
-
-    const progress = (month - left.month) / (right.month - left.month);
-    const interpolated = left.value + (right.value - left.value) * progress;
-    calibrated[month - 1] = Math.max(0, interpolated);
-  }
-
-  for (let idx = 1; idx < calibrated.length; idx += 1) {
-    if (calibrated[idx] < calibrated[idx - 1]) {
-      calibrated[idx] = calibrated[idx - 1];
-    }
-  }
-
-  const baselineTerminal = Math.max(0.01, baselineCumulative[11]);
-  const multiplier = calibrated[11] / baselineTerminal;
-
-  return {
-    cumulative: calibrated,
-    multiplier: clamp(multiplier, 0.25, 4),
-    isCalibrated: true,
-  };
-}
 
 export function LtvForecastPanel() {
   const blended = useBlendedMetrics();
@@ -357,45 +265,14 @@ export function LtvForecastPanel() {
   const scenarioCalibration = useMemo(() => {
     const roasLift = 1 + roasLiftPct / 100;
 
-    const computeBaselineCumulative = (blendedRoas: number) => {
-      const monthlyChurnRate = assumptions.churnRate;
-      const baseExpansion = clamp(
-        0.008 + Math.max(0, blendedRoas * roasLift - 1) * 0.004,
-        0.008,
-        0.05
-      );
-      const monthlyExpansionRate =
-        decayCurve === 'front-loaded-dropoff'
-          ? clamp(baseExpansion * 0.85, 0.006, 0.05)
-          : decayCurve === 'stable-long-term-retention'
-            ? clamp(baseExpansion * 1.1, 0.008, 0.055)
-            : baseExpansion;
-
-      const initialMonetization = playerValue * 0.15 * roasLift;
-      let rollingRetention = 1;
-      let cumulative = 0;
-
-      return Array.from({ length: 12 }, (_, idx) => {
-        const month = idx + 1;
-        const dynamicChurnRate =
-          decayCurve === 'front-loaded-dropoff'
-            ? month <= 3
-              ? monthlyChurnRate * 1.7
-              : monthlyChurnRate * 0.72
-            : decayCurve === 'stable-long-term-retention'
-              ? month <= 3
-                ? monthlyChurnRate * 0.72
-                : monthlyChurnRate * 0.85
-              : monthlyChurnRate;
-
-        rollingRetention *= 1 - clamp(dynamicChurnRate, 0.003, 0.35);
-        const retention = rollingRetention;
-        const expansion = 1 + monthlyExpansionRate * idx;
-        const monthlyLtvPerUser = initialMonetization * retention * expansion;
-        cumulative += monthlyLtvPerUser;
-        return cumulative;
-      });
-    };
+    const computeBaselineCumulative = (blendedRoas: number) =>
+      baselineLtvCurve({
+        playerValue,
+        blendedRoas,
+        churnRate: assumptions.churnRate,
+        roasLiftPct,
+        decayCurve,
+      }).cumulative;
 
     const baselineCal = applyObservedCalibration(
       computeBaselineCumulative(Math.max(0, baselineMetrics.blendedRoas)),
@@ -615,88 +492,20 @@ export function LtvForecastPanel() {
   }, [adjustedScenarioRoiData, baselineScenarioRoiData]);
 
   const { curveData, monthlyChurn, monthlyExpansion, paybackMonth } = useMemo(() => {
-    const safeCpa = (activeMetrics.blendedCpa ?? 0) * (1 + cpaShockPct / 100);
-    const safeConversions = Math.max(0, activeMetrics.totalConversions);
-
-    const monthlyChurnRate = assumptions.churnRate;
-    const roasLift = 1 + roasLiftPct / 100;
-    const baseExpansion = clamp(
-      0.008 + Math.max(0, activeMetrics.blendedRoas * roasLift - 1) * 0.004,
-      0.008,
-      0.05
-    );
-    const monthlyExpansionRate =
-      decayCurve === 'front-loaded-dropoff'
-        ? clamp(baseExpansion * 0.85, 0.006, 0.05)
-        : decayCurve === 'stable-long-term-retention'
-          ? clamp(baseExpansion * 1.1, 0.008, 0.055)
-          : baseExpansion;
-
-    const initialMonetization = playerValue * 0.15 * roasLift;
-    let cumulativeLtvPerUser = 0;
-    let rollingRetention = 1;
-
-    const baselineCumulative: number[] = [];
-    const baselineMonthly: number[] = [];
-
-    Array.from({ length: 12 }, (_, idx) => {
-      const month = idx + 1;
-      const dynamicChurnRate =
-        decayCurve === 'front-loaded-dropoff'
-          ? month <= 3
-            ? monthlyChurnRate * 1.7
-            : monthlyChurnRate * 0.72
-          : decayCurve === 'stable-long-term-retention'
-            ? month <= 3
-              ? monthlyChurnRate * 0.72
-              : monthlyChurnRate * 0.85
-            : monthlyChurnRate;
-      rollingRetention *= 1 - clamp(dynamicChurnRate, 0.003, 0.35);
-      const retention = rollingRetention;
-      const expansion = 1 + monthlyExpansionRate * idx;
-      const monthlyLtvPerUser = initialMonetization * retention * expansion;
-
-      cumulativeLtvPerUser += monthlyLtvPerUser;
-
-      baselineMonthly.push(monthlyLtvPerUser);
-      baselineCumulative.push(cumulativeLtvPerUser);
+    const curve = buildLtvCurve(activeMetrics, {
+      playerValue,
+      blendedRoas: activeMetrics.blendedRoas,
+      churnRate: assumptions.churnRate,
+      roasLiftPct,
+      decayCurve,
+      cpaShockPct,
+      observedLtv,
     });
-
-    const calibratedCurve = applyObservedCalibration(baselineCumulative, observedLtv);
-
-    const points: LtvCurvePoint[] = Array.from({ length: 12 }, (_, idx) => {
-      const month = idx + 1;
-      const calibratedCumulative = calibratedCurve.cumulative[idx] ?? baselineCumulative[idx] ?? 0;
-      const previousCumulative =
-        idx === 0 ? 0 : (calibratedCurve.cumulative[idx - 1] ?? baselineCumulative[idx - 1] ?? 0);
-      const monthlyLtvPerUser = Math.max(
-        0,
-        calibratedCumulative - previousCumulative || baselineMonthly[idx] || 0
-      );
-
-      const cohortValue = calibratedCumulative * safeConversions;
-      const netCohortValue = cohortValue - activeMetrics.totalSpend;
-      const ltvToCac = safeCpa > 0 ? calibratedCumulative / safeCpa : 0;
-
-      return {
-        month,
-        label: `M${month}`,
-        cumulativeLtvPerUser: calibratedCumulative,
-        monthlyLtvPerUser,
-        cohortValue,
-        netCohortValue,
-        ltvToCac,
-        cpaLine: safeCpa,
-      };
-    });
-
-    const payback = points.find((point) => point.ltvToCac >= 1)?.month ?? null;
-
     return {
-      curveData: points,
-      monthlyChurn: monthlyChurnRate,
-      monthlyExpansion: monthlyExpansionRate,
-      paybackMonth: payback,
+      curveData: curve.points,
+      monthlyChurn: assumptions.churnRate,
+      monthlyExpansion: curve.monthlyExpansion,
+      paybackMonth: curve.paybackMonth,
     };
   }, [
     activeMetrics,
@@ -1610,7 +1419,7 @@ export function LtvForecastPanel() {
                       isDark ? 'text-emerald-300 dark:text-emerald-300' : 'text-emerald-600'
                     )}
                   />{' '}
-                  LTV:CAC Ratio
+                  LTV:CAC (12 months)
                   <button
                     type="button"
                     className={cn(

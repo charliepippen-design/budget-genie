@@ -33,9 +33,8 @@ import {
   BuyingModel,
   FAMILY_INFO,
   BUYING_MODEL_INFO,
-  calculateUnifiedMetrics,
 } from '@/types/channel';
-import { useMediaPlanStore, ChannelData } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, useChannelsWithMetrics, ChannelData } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -47,7 +46,7 @@ interface ChannelEditorProps {
 }
 
 export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
-  const { setChannelType, updateChannelConfigField, globalMultipliers } = useMediaPlanStore();
+  const { setChannelType, updateChannelConfigField } = useMediaPlanStore();
   const { format: formatCurrency, symbol } = useCurrency();
   const { theme } = useTheme();
   const vc = useVerticalConfig();
@@ -64,11 +63,14 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
 
   const allowedModels = useMemo(() => familyInfo?.allowedModels || ['CPM', 'CPC'], [familyInfo]);
 
-  const previewMetrics = useMemo(() => {
-    if (!config)
-      return { spend: 0, ftds: 0, revenue: 0, cpa: null, roas: 0, impressions: 0, clicks: 0 };
-    return calculateUnifiedMetrics(config, 10000, globalMultipliers.playerValue || 150);
-  }, [config, globalMultipliers.playerValue]);
+  // Preview the channel's real numbers from the engine (same as its table row).
+  const row = useChannelsWithMetrics().find((c) => c.id === channel.id);
+  const previewMetrics = {
+    spend: row?.metrics.spend ?? 0,
+    ftds: row?.metrics.conversions ?? 0,
+    cpa: row?.metrics.cpa ?? null,
+    roas: row?.metrics.roas ?? 0,
+  };
 
   if (!channel || !family || !buyingModel || !config) return null;
 
@@ -127,7 +129,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={0.1}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per 1K"
               isDark={isDark}
             />
@@ -174,7 +176,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={0.01}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per click"
               isDark={isDark}
             />
@@ -210,7 +212,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={1}
               icon={<Target className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per FTD"
               isDark={isDark}
             />
@@ -246,7 +248,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={1000000}
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
           </motion.div>
@@ -270,7 +272,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={1}
               icon={<Target className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
             <PremiumSlider
@@ -292,7 +294,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={1000000}
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
           </motion.div>
@@ -317,7 +319,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={50000}
               step={50}
               icon={<Wallet className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
             <PremiumSlider
@@ -356,7 +358,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                 max={1000000}
                 step={100}
                 icon={<Zap className="h-4 w-4" />}
-                prefix="€"
+                prefix={symbol}
                 isDark={isDark}
               />
             ) : null}

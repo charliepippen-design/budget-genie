@@ -15,6 +15,7 @@ export interface ReportNarratorInput {
   alertCount: number;
   vertical: string | null;
   geos: string[];
+  currency?: string; // ISO code the user plans in
 }
 
 const NarrativeSchema = z.object({
@@ -30,7 +31,7 @@ function buildPrompt(input: ReportNarratorInput): string {
   const $ = (n: number) =>
     new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: input.currency ?? 'EUR',
       maximumFractionDigits: 0,
     }).format(n);
 
