@@ -1,4 +1,4 @@
-# MediaPlan Pro: session handoff (updated 2026-09-25)
+# MediaPlan Pro: session handoff (updated 2026-09-25, evening)
 
 For whoever picks this up next (a new Claude session or a developer). The owner is not technical: explain in simple Italian, one step at a time. The owner only copies and pastes; you run the commands.
 
@@ -11,7 +11,7 @@ For whoever picks this up next (a new Claude session or a developer). The owner 
   - AI gateway on Vercel (`api/ai-gateway.ts`). The Gemini key is server-only and users are verified through Clerk.
   - Engine fixes.
   - The owner confirmed on the live site that the chat works.
-- **Waiting for the owner's OK, not merged: PR #2**, branch `qa/bugs`, https://github.com/charliepippen-design/budget-genie/pull/2. It contains wave-1 fixes from the browser QA pass (section 4). CI is green: tsc, eslint, 138 tests, build. The Vercel preview is ready.
+- **Waiting for the owner's OK, not merged: PR #2 (wave 1) and PR #3 (wave 2, stacked on #2)**, branch `qa/bugs`, https://github.com/charliepippen-design/budget-genie/pull/2. It contains wave-1 fixes from the browser QA pass (section 4). CI is green: tsc, eslint, 138 tests, build. The Vercel preview is ready.
   - Merging to `main` deploys production. Do it only after the owner writes "ok merge 2". Auto-mode blocks production deploys without explicit consent.
 - **Branches:**
   - `main` is the real codebase (April work plus PR #1).
@@ -50,35 +50,16 @@ For whoever picks this up next (a new Claude session or a developer). The owner 
 
 Wave 1 is fixed in PR #2 (demo lock, NaN, budget input, wizard lockout, undo in inputs, mobile/1280 layout, chat memory, target CPA, Italy ban, quota errors). Remaining:
 
-**Wave 2: numbers must agree everywhere**
-- `/report` and `/output` call "Projected NGR" what is really Est. Revenue (+218k), while the dashboard waterfall shows NGR −29k. They must use the iGaming revenue model (margin, bonus).
-- LTV:CAC, cohort value and payback differ between the dashboard LTV lab, report/output and XLSX. `Report.tsx`/`Output.tsx` use their own payback formula and a fixed churn of 0.042. Unify on one function.
-- Currency:
-  - The wizard is hardcoded in `$`, while the dashboard defaults to `€`.
-  - Switching currency only relabels (no conversion). Either convert, or label it as "display currency".
-  - Hardcoded `$` in the efficiency banner, the arbitrage card and the geo matrix; `€` in `ScenarioSidebar.tsx:112`.
-  - Mixed number locales (en-US vs de-DE) on the same screen.
-- Multi-month (`use-multi-month-store.ts`):
-  - Months are empty until a control is touched.
-  - `generateMonths` splits one month's budget across all months; it should be budget × months.
-  - It ignores the plan's channels (uses 11 `DEFAULT_CHANNELS`) and doesn't follow plan changes.
-  - Toggles wipe per-month edits without warning.
-  - Start month is off by one in UTC+ (`MonthConfigPanel.tsx` uses `toISOString`).
-  - P&L Net P/L ignores NGR for iGaming.
-- Spend multiplier: the header shows budget×mult, but only the variable pool is multiplied. Budget utilisation >100% (`planning-insights.ts:97`).
-- `useFtdVelocityMetrics` drops locked channels (`!ch.locked`, store ~:1509).
-- Fixed-fee channels break allocation %: fixed rows show 0% but still spend; a locked channel's spend moves when others change (`setChannelAllocation` + `computePoolAwareSpend`). Keyboard slider changes never renormalise.
-- Changing the budget flattens variable channels to equal shares.
-- ChannelEditor:
-  - Switching buying model keeps the old price (a €6 CPM becomes a €6 CPA).
-  - CTR 0 is treated as 1% (`ctr || 1`).
-  - The "Projected Yield" preview uses a hardcoded 10k spend.
-- CPA/Rev-share deals get a saturation curve (arguably shouldn't). Negative CPA/ROAS targets are accepted.
-- Insight actions (Reallocate, Auto-Fix) do something different from what their text says. The "CTR configured but impressions missing" alert fires on retainer/flat-fee channels.
-- Reset (trash icon): no confirmation, then an impossible state (0 budget but revenue). Undo does not restore geo/targets (`use-history.ts` `createSnapshot`).
-- Add Channel: accepts a negative price, shows `$` in EUR mode, has hardcoded AOV 100, and its model list differs from the editor's. No UI to activate/deactivate a channel.
-- Forex/Fintech show the "General Marketing" badge and generic labels; the pack `funnel` labels are unused. "Paid Social" sits under the "Influencers" header (`mediaplan-data.ts:246`).
-- The onboarding goal is ignored when the AI is down. Onboarding presets create plans that immediately flag themselves as broken. The geo list is iGaming-only (no US/FR/AU); the UK flag is broken (`code: 'UK'`).
+**Wave 2: done in PR #3** (branch `qa/wave2`, stacked on PR #2; merge #2 first, then retarget #3 to `main`).
+- Shared LTV model, unified currency formatting, multi-month sync, budget mix kept, spend multiplier, locked velocity, buying-model price conversion, validation, reset confirm, undo scope.
+- Still open from wave 2:
+  - Insight actions (Reallocate, Auto-Fix) do something different from what their text says.
+  - Keyboard slider changes don't renormalise.
+  - Fixed-fee rows show 0% in the table.
+  - The P&L "Net P/L" ignores NGR for iGaming.
+  - Onboarding: the goal is ignored without AI; the geo list is iGaming-only; the UK flag is broken.
+  - Rev-share/hybrid rows show odd CTR/impressions.
+  - No UI to activate/deactivate a channel.
 
 **Wave 3: data in/out, saving, settings**
 - Import (`import-service.ts`, `ImportWizard.tsx`):
