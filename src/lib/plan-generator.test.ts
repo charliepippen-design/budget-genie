@@ -86,7 +86,7 @@ describe('Plan generator', () => {
   it('never exceeds saturation ceilings and holds back the excess', () => {
     const plan = generatePlan({ industry: 'saas', monthlyBudget: 900000 });
     for (const ch of plan.channels.filter((c) => c.tier !== 'fixed')) {
-      const spend = (ch.allocationPct / 100) * 900000;
+      const spend = (ch.allocationPct / 100) * plan.totalBudget;
       expect(spend).toBeLessThanOrEqual((ch.typeConfig.baselineMetrics.saturationCeiling ?? Infinity) + 1);
     }
     expect(plan.unallocated).toBeGreaterThan(0);
@@ -96,5 +96,17 @@ describe('Plan generator', () => {
   it('conservative risk drops experimental channels at small budgets', () => {
     const plan = generatePlan({ industry: 'fintech', monthlyBudget: 12000, riskProfile: 'conservative' });
     expect(plan.channels.map((c) => c.id)).not.toContain('fintech-tiktok');
+  });
+
+  it('target CPA shifts budget toward cheaper channels, or warns when unreachable', () => {
+    const base = snapshot(generatePlan({ industry: 'ecommerce', monthlyBudget: 60000 })).blended.blendedCpa!;
+    const targeted = generatePlan({ industry: 'ecommerce', monthlyBudget: 60000, targetCpa: base * 0.9 });
+    expect(snapshot(targeted).blended.blendedCpa!).toBeLessThanOrEqual(base * 0.9);
+    const impossible = generatePlan({ industry: 'igaming', monthlyBudget: 60000, targetCpa: 5 });
+    expect(impossible.warnings.join(' ')).toMatch(/not reachable/);
+  });
+
+  it('does not set a CPA target unless the user gave one', () => {
+    expect(generatePlan({ industry: 'saas' }).multipliers).not.toHaveProperty('cpaTarget');
   });
 });

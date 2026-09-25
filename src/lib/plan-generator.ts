@@ -1,4 +1,10 @@
-import { getGeoMarketProfile, type ChannelData, type GlobalMultipliers } from '@/hooks/use-media-plan-store';
+import {
+  computePlanSnapshot,
+  getGeoMarketProfile,
+  type ChannelData,
+  type GlobalMultipliers,
+} from '@/hooks/use-media-plan-store';
+import { DEFAULT_IGAMING_REVENUE_INPUTS } from '@/lib/igaming-revenue-model';
 import { marketsToGeoSelection, TIER1_REFERENCE, type GeoTierKey } from '@/lib/geo-market-data';
 import {
   getIndustryPack,
@@ -21,6 +27,8 @@ export interface PlanBrief {
   excludeChannels: string[];                      // template keys the user refuses
   excludeTags: ChannelTag[];                      // e.g. ['restricted'] when no ad licence
   targetCpa?: number | null;
+  shareOverrides: Record<string, number>;         // template key -> % of placed budget pinned by the user
+  lockedChannels: string[];                       // template keys the user locked
   notes: string[];                                // free-text peculiarities captured in chat
 }
 
@@ -35,6 +43,8 @@ export const DEFAULT_BRIEF: PlanBrief = {
   excludeChannels: [],
   excludeTags: [],
   targetCpa: null,
+  shareOverrides: {},
+  lockedChannels: [],
   notes: [],
 };
 
@@ -57,6 +67,16 @@ export interface GeneratedPlan {
 }
 
 const OBJECTIVES: Objective[] = ['acquisition', 'retention', 'branding'];
+
+const PLAN_MULTIPLIERS: GlobalMultipliers = {
+  spendMultiplier: 1,
+  defaultCpmOverride: null,
+  ctrBump: 0,
+  cpaTarget: null,
+  roasTarget: null,
+  playerValue: 150,
+  ...DEFAULT_IGAMING_REVENUE_INPUTS,
+};
 const MAX_FIXED_SHARE = 0.4;
 
 const isFixedModel = (t: ChannelTemplate) => t.buyingModel === 'FLAT_FEE' || t.buyingModel === 'RETAINER';
@@ -89,7 +109,14 @@ function maxChannelsForBudget(budget: number): number {
   return 12;
 }
 
-function toChannelData(t: ChannelTemplate, industry: IndustryId, costIndex: number, spend: number, budget: number): ChannelData {
+function toChannelData(
+  t: ChannelTemplate,
+  industry: IndustryId,
+  costIndex: number,
+  spend: number,
+  budget: number,
+  locked = false
+): ChannelData {
   const fixed = isFixedModel(t);
   // The engine scales variable media prices by market; fixed fees are contract amounts set here.
   const price = fixed ? Math.round(t.price * costIndex) : t.price;
@@ -115,7 +142,7 @@ function toChannelData(t: ChannelTemplate, industry: IndustryId, costIndex: numb
     },
     tier: fixed ? 'fixed' : 'scalable',
     maxSpendLimit: 0,
-    locked: false,
+    locked,
     isActive: true,
   };
 }
@@ -139,7 +166,8 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
   const geoProfile = getGeoMarketProfile(geo.activeTiers, geo.activeGeos);
   // Cheaper markets reach saturation at lower spend and have cheaper fixed fees.
   const costIndex = geoProfile.blendedCpa > 0 ? geoProfile.blendedCpa / TIER1_REFERENCE.cpa : 1;
-  const include = new Set(brief.includeChannels);
+  const overrides = brief.shareOverrides ?? {};
+  const include = new Set([...brief.includeChannels, ...Object.keys(overrides), ...(brief.lockedChannels ?? [])]);
   const exclude = new Set(brief.excludeChannels);
   const excludeTags = new Set(brief.excludeTags);
 
@@ -192,10 +220,21 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
   }
   if (fixedTotal > budget) warnings.push('Fixed fees exceed the total budget.');
 
-  // 4. Split the variable pool by score, respecting saturation ceilings
+  // 4. User-pinned shares come first, then the rest of the variable pool is split
+  //    by score, respecting saturation ceilings
   const variable = selected.filter(s => !isFixedModel(s.t));
   let pool = Math.max(0, budget - fixedTotal);
-  let open = [...variable];
+  for (const s of variable) {
+    const pct = overrides[s.t.key];
+    if (typeof pct !== 'number') continue;
+    const pinned = Math.min(pool, Math.max(0, (pct / 100) * budget));
+    spend.set(s.t.key, pinned);
+    pool -= pinned;
+    if (pinned > s.t.saturationCeiling * costIndex) {
+      warnings.push(`${s.t.name} is pinned above its saturation point: extra spend there buys few conversions.`);
+    }
+  }
+  let open = variable.filter(s => typeof overrides[s.t.key] !== 'number');
   for (let pass = 0; pass < 6 && pool > 0.01 && open.length > 0; pass++) {
     const weight = open.reduce((sum, s) => sum + s.score, 0);
     const next: typeof open = [];
@@ -221,9 +260,58 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
     warnings.push(`${unallocated.toLocaleString('en-US')} could not be placed without saturating channels. Add channels or markets, or lower the budget.`);
   }
 
-  // 5. Build store channels
+  // 5. Build store channels. Percentages are of the budget actually placed, so the
+  //    table always sums to 100% and matches what the AI reports.
+  const placed = budget - unallocated;
   const kept = selected.filter(s => (spend.get(s.t.key) ?? 0) > 0);
-  const channels = kept.map(s => toChannelData(s.t, pack.id, costIndex, spend.get(s.t.key) ?? 0, budget));
+  const locked = new Set(brief.lockedChannels ?? []);
+  const build = () =>
+    kept.map(s => toChannelData(s.t, pack.id, costIndex, spend.get(s.t.key) ?? 0, placed, locked.has(s.t.key)));
+
+  // 6. Target CPA: move budget from channels above target to channels below it.
+  if (brief.targetCpa && brief.targetCpa > 0 && kept.length > 1) {
+    const target = brief.targetCpa;
+    const measure = () =>
+      computePlanSnapshot({
+        totalBudget: placed,
+        channels: build(),
+        globalMultipliers: { ...PLAN_MULTIPLIERS, playerValue: pack.defaultLtv },
+        activeGeos: geo.activeGeos,
+        activeTiers: geo.activeTiers,
+        geoOverrides: {},
+      });
+    let best = { cpa: Infinity, spend: new Map(spend) };
+    for (let pass = 0; pass < 8; pass++) {
+      const snap = measure();
+      const cpa = snap.blended.blendedCpa ?? Infinity;
+      if (cpa < best.cpa) best = { cpa, spend: new Map(spend) };
+      if (cpa <= target) break;
+      const movable = kept.filter(s => !isFixedModel(s.t) && typeof overrides[s.t.key] !== 'number' && !locked.has(s.t.key));
+      const cpaOf = (key: string) => snap.channels.find(c => c.id === `${pack.id}-${key}`)?.metrics.cpa ?? Infinity;
+      const donors = movable.filter(s => cpaOf(s.t.key) > target);
+      const receivers = movable.filter(s => cpaOf(s.t.key) <= target && (spend.get(s.t.key) ?? 0) < s.t.saturationCeiling * costIndex);
+      if (donors.length === 0 || receivers.length === 0) break;
+      let freed = 0;
+      donors.forEach(s => {
+        const cut = (spend.get(s.t.key) ?? 0) * 0.25;
+        spend.set(s.t.key, (spend.get(s.t.key) ?? 0) - cut);
+        freed += cut;
+      });
+      const weight = receivers.reduce((sum, s) => sum + s.score, 0);
+      receivers.forEach(s => spend.set(s.t.key, (spend.get(s.t.key) ?? 0) + freed * (s.score / weight)));
+    }
+    // Shifting can overshoot; keep the cheapest mix seen.
+    const lastCpa = measure().blended.blendedCpa ?? Infinity;
+    if (best.cpa < lastCpa) best.spend.forEach((v, k) => spend.set(k, v));
+    const finalCpa = Math.min(best.cpa, lastCpa);
+    if (finalCpa > target) {
+      warnings.push(
+        `Target CPA ${Math.round(target)} is not reachable with these channels (best mix ≈ ${Math.round(finalCpa)}). Lower the budget, add cheaper channels, or raise the target.`
+      );
+    }
+  }
+
+  const channels = build();
   const rationale = kept.map(s => ({ channelId: `${pack.id}-${s.t.key}`, name: s.t.name, reason: describeReason(s.t, objectives) }));
 
   if (channels.length === 0) warnings.push('No channel fits this brief. Loosen the exclusions or raise the budget.');
@@ -232,11 +320,12 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
     brief,
     // plan-math spends the whole budget across variable channels, so budget that
     // would only saturate channels is held back instead of silently wasted.
-    totalBudget: budget - unallocated,
+    totalBudget: placed,
     channels,
     multipliers: {
       playerValue: pack.defaultLtv,
-      cpaTarget: brief.targetCpa ?? null,
+      // Only set a target when the user gave one; never wipe one set in the sidebar.
+      ...(brief.targetCpa ? { cpaTarget: brief.targetCpa } : {}),
     },
     geo,
     rationale,

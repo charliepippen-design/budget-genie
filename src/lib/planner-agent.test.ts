@@ -52,4 +52,44 @@ describe('Planner agent tool bridge', () => {
     expect(applyPlannerToolCall({ name: 'adjust_channel', args: { channelId: 'nope', action: 'lock' } }).ok).toBe(false);
     expect(applyPlannerToolCall({ name: 'hack', args: {} }).ok).toBe(false);
   });
+
+  it('keeps chat locks, removals and pinned shares across rebuilds', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 60000 } });
+    applyPlannerToolCall({ name: 'adjust_channel', args: { channelId: 'igaming-affiliate-cpa', action: 'set_share', sharePct: 40 } });
+    applyPlannerToolCall({ name: 'adjust_channel', args: { channelId: 'igaming-affiliate-cpa', action: 'lock' } });
+    applyPlannerToolCall({ name: 'adjust_channel', args: { channelId: 'igaming-native', action: 'remove' } });
+    applyPlannerToolCall({ name: 'update_brief', args: { monthlyBudget: 120000 } });
+
+    const chs = useMediaPlanStore.getState().channels;
+    const aff = chs.find(c => c.id === 'igaming-affiliate-cpa');
+    expect(aff?.locked).toBe(true);
+    expect(summarizePlan().channels.find(c => c.id === 'igaming-affiliate-cpa')?.sharePct).toBeCloseTo(40, 0);
+    expect(chs.find(c => c.id === 'igaming-native')).toBeUndefined();
+  });
+
+  it('reports when a requested share cannot be reached', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'ecommerce', monthlyBudget: 50000 } });
+    const res = applyPlannerToolCall({ name: 'adjust_channel', args: { channelId: 'ecommerce-meta-social', action: 'set_share', sharePct: 120 } });
+    expect(res.ok).toBe(true);
+    expect(String(res.note)).toMatch(/maximum possible/);
+  });
+
+  it('drops ad restrictions and pins when the industry changes', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 50000, excludeTags: ['restricted'] } });
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'forex' } });
+    const brief = useMediaPlanStore.getState().brief!;
+    expect(brief.excludeTags).toEqual([]);
+    expect(useMediaPlanStore.getState().channels.map(c => c.id)).toContain('forex-google-search');
+  });
+
+  it('replaces objectives instead of merging them', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'saas', monthlyBudget: 50000, objectives: { branding: 1 } } });
+    expect(useMediaPlanStore.getState().brief?.objectives).toEqual({ acquisition: 0, retention: 0, branding: 1 });
+  });
+
+  it('table shares sum to 100% even when budget is held back', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 900000, markets: ['IT'] } });
+    const total = summarizePlan().channels.reduce((sum, c) => sum + (c.sharePct ?? 0), 0);
+    expect(total).toBeCloseTo(100, 0);
+  });
 });

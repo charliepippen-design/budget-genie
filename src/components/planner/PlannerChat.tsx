@@ -3,6 +3,7 @@ import { Bot, Loader2, MessageSquare, RotateCcw, Send, Sparkles, X } from 'lucid
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAI, type AgentMessage, type AIPart } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
@@ -34,7 +35,10 @@ function loadChat(): ChatItem[] {
 
 function saveChat(items: ChatItem[]) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-60)));
+    // Cut at a user turn so the saved history never starts with an orphan tool result.
+    const recent = items.slice(-60);
+    const firstUser = recent.findIndex(it => it.kind === 'user');
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(firstUser > 0 ? recent.slice(firstUser) : recent));
   } catch {
     // storage unavailable: chat just won't survive a reload
   }
@@ -56,32 +60,44 @@ function toAgentMessages(items: ChatItem[]): AgentMessage[] {
   return out;
 }
 
+// Minimal markdown for model replies: **bold**, *italic*, `code`.
 function renderInline(text: string): ReactNode[] {
-  return text.split('**').map((part, i) => (i % 2 === 1 ? <strong key={i} className="text-indigo-200">{part}</strong> : part));
+  return text.split(/(\*\*[^*]+\*\*|\*[^*\s][^*]*\*|`[^`]+`)/g).map((part, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(part)) {
+      return <strong key={i} className="text-indigo-700 dark:text-indigo-200">{part.slice(2, -2)}</strong>;
+    }
+    if (/^\*[^*]+\*$/.test(part)) return <em key={i}>{part.slice(1, -1)}</em>;
+    if (/^`[^`]+`$/.test(part)) return <code key={i} className="rounded bg-black/10 px-1">{part.slice(1, -1)}</code>;
+    return part;
+  });
 }
 
 function RichText({ text }: { text: string }) {
   const lines = text.split('\n').filter(l => l.trim() !== '');
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 break-words">
       {lines.map((line, i) => {
+        const heading = line.match(/^\s*#{1,6}\s+(.*)$/);
+        if (heading) return <p key={i} className="font-semibold">{renderInline(heading[1])}</p>;
         const bullet = line.match(/^\s*[-*•]\s+(.*)$/);
-        return bullet ? (
-          <div key={i} className="flex gap-2">
-            <span className="text-indigo-400">•</span>
-            <span>{renderInline(bullet[1])}</span>
-          </div>
-        ) : (
-          <p key={i}>{renderInline(line)}</p>
-        );
+        const numbered = line.match(/^\s*(\d+)[.)]\s+(.*)$/);
+        if (bullet || numbered) {
+          return (
+            <div key={i} className="flex gap-2">
+              <span className="shrink-0 text-indigo-500 dark:text-indigo-400">{numbered ? `${numbered[1]}.` : '•'}</span>
+              <span>{renderInline(bullet ? bullet[1] : numbered![2])}</span>
+            </div>
+          );
+        }
+        return <p key={i}>{renderInline(line)}</p>;
       })}
     </div>
   );
 }
 
-const fmt = (n: unknown) => (typeof n === 'number' ? n.toLocaleString('en-US', { maximumFractionDigits: 0 }) : '—');
-
 function ToolCard({ name, response }: { name: string; response: Record<string, unknown> }) {
+  const { format } = useCurrency();
+  const money = (n: unknown) => (typeof n === 'number' ? format(n) : '—');
   if (!response.ok) {
     return <div className="text-[11px] text-amber-400 px-3">⚠ {String(response.error ?? 'Action failed')}</div>;
   }
@@ -94,10 +110,28 @@ function ToolCard({ name, response }: { name: string; response: Record<string, u
         {name === 'update_brief' ? 'Plan rebuilt' : 'Plan adjusted'}
       </div>
       <div className="grid grid-cols-3 gap-2">
-        <div><div className="text-slate-500">Budget</div>{fmt(plan.totalBudget)}</div>
+        <div><div className="text-slate-500">Budget</div>{money(plan.totalBudget)}</div>
         <div><div className="text-slate-500">Channels</div>{plan.channels.filter(c => c.active).length}</div>
-        <div><div className="text-slate-500">Cost/conv.</div>{fmt(plan.blended.costPerConversion)}</div>
+        <div><div className="text-slate-500">Cost/conv.</div>{money(plan.blended.costPerConversion)}</div>
       </div>
+      {/* Numbers come straight from the engine, so the chat can never misquote them. */}
+      <div className="mt-2 space-y-0.5">
+        {[...plan.channels]
+          .filter(c => c.active && (c.spend ?? 0) > 0)
+          .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0))
+          .slice(0, 5)
+          .map(c => (
+            <div key={c.id} className="flex justify-between gap-2">
+              <span className="truncate">{c.locked ? '🔒 ' : ''}{c.name}</span>
+              <span className="shrink-0 tabular-nums">{c.sharePct}% · {money(c.spend)}</span>
+            </div>
+          ))}
+      </div>
+      {typeof response.note === 'string' && <div className="mt-2 text-amber-500">{response.note}</div>}
+      {Array.isArray((response as { warnings?: unknown }).warnings) &&
+        ((response as { warnings: string[] }).warnings).map(w => (
+          <div key={w} className="mt-1 text-amber-500">⚠ {w}</div>
+        ))}
     </div>
   );
 }
@@ -216,7 +250,7 @@ export function PlannerChat() {
 
         {items.map((it, i) => {
           if (it.kind === 'user') {
-            return <div key={i} className="ml-auto max-w-[85%] rounded-2xl rounded-tr-none bg-indigo-600 p-3 text-white">{it.text}</div>;
+            return <div key={i} className="ml-auto max-w-[85%] whitespace-pre-wrap break-words rounded-2xl rounded-tr-none bg-indigo-600 p-3 text-white">{it.text}</div>;
           }
           if (it.kind === 'assistant') {
             return it.text ? (
@@ -261,6 +295,7 @@ export function PlannerChat() {
             }
           }}
           rows={2}
+          disabled={busy}
           placeholder="e.g. Forex broker, €40k/month, Germany and Austria, no Google licence yet"
           className={cn('flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm text-white placeholder:text-slate-500 focus:border-indigo-500 focus:outline-none')}
         />
