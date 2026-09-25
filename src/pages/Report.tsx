@@ -198,7 +198,7 @@ const Report = () => {
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Button
             variant="ghost"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="gap-2 text-muted-foreground hover:text-foreground"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -738,7 +738,7 @@ const Report = () => {
           </div>
 
           <Button
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="w-full bg-indigo-600 hover:bg-indigo-500"
           >
             Return to Plan →

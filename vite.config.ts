@@ -34,8 +34,12 @@ function aiGatewayDev(mode: string): Plugin {
   };
 }
 
+// MOCK_CLERK=1 npm run dev: local QA with a fake signed-in superuser (dev server only).
+const mockClerk = process.env.MOCK_CLERK === '1';
+if (mockClerk) process.env.ALLOW_ANON = 'true';
+
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
+export default defineConfig(({ mode, command }) => ({
   plugins: [
     react(),
     aiGatewayDev(mode),
@@ -51,8 +55,15 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
+      ...(mockClerk && command === 'serve'
+        ? { '@clerk/clerk-react': path.resolve(__dirname, './src/dev/clerk-mock.tsx') }
+        : {}),
     },
   },
+  define:
+    mockClerk && command === 'serve'
+      ? { 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify('pk_test_qa_mock') }
+      : {},
   build: {
     rollupOptions: {
       output: {

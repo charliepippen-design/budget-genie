@@ -60,23 +60,33 @@ const OBJECTIVES: Objective[] = ['acquisition', 'retention', 'branding'];
 const strArray = (v: unknown) => (Array.isArray(v) ? v.map(String) : undefined);
 
 function mergeBrief(current: PlanBrief, args: Record<string, unknown>): PlanBrief {
-  const next: PlanBrief = { ...current, objectives: { ...current.objectives }, notes: [...current.notes] };
+  const next: PlanBrief = {
+    ...current,
+    objectives: { ...current.objectives },
+    notes: [...current.notes],
+    shareOverrides: { ...(current.shareOverrides ?? {}) },
+    lockedChannels: [...(current.lockedChannels ?? [])],
+  };
 
   if (typeof args.industry === 'string' && INDUSTRY_PACKS.some(p => p.id === args.industry)) {
     if (args.industry !== current.industry) {
-      // Channel keys are per-industry: drop stale preferences.
+      // Channel keys and ad restrictions are per-industry: drop stale preferences.
       next.includeChannels = [];
       next.excludeChannels = [];
+      next.excludeTags = [];
+      next.shareOverrides = {};
+      next.lockedChannels = [];
     }
     next.industry = args.industry as IndustryId;
   }
   if (typeof args.monthlyBudget === 'number' && args.monthlyBudget > 0) next.monthlyBudget = args.monthlyBudget;
   if (typeof args.months === 'number' && args.months > 0) next.months = Math.round(args.months);
   if (args.objectives && typeof args.objectives === 'object') {
+    // Objectives describe the whole mix: replace, don't merge with the old weights.
     const o = args.objectives as Record<string, unknown>;
-    OBJECTIVES.forEach(k => {
-      if (typeof o[k] === 'number') next.objectives[k] = Math.max(0, o[k] as number);
-    });
+    next.objectives = Object.fromEntries(
+      OBJECTIVES.map(k => [k, typeof o[k] === 'number' ? Math.max(0, o[k] as number) : 0])
+    );
   }
   const markets = strArray(args.markets);
   if (markets) next.markets = markets.map(m => m.toUpperCase());
@@ -117,6 +127,35 @@ export function setChannelShare(channelId: string, pct: number) {
   return true;
 }
 
+/**
+ * Record a manual adjustment in the brief so the next rebuild (e.g. "double the budget")
+ * keeps it instead of silently undoing locks, removals and pinned shares.
+ */
+function rememberAdjustment(channelId: string, action: string) {
+  const { brief } = useMediaPlanStore.getState();
+  if (!brief || !channelId.startsWith(`${brief.industry}-`)) return;
+  const key = channelId.slice(brief.industry.length + 1);
+  const next: PlanBrief = {
+    ...brief,
+    shareOverrides: { ...(brief.shareOverrides ?? {}) },
+    lockedChannels: (brief.lockedChannels ?? []).filter(k => k !== key),
+    excludeChannels: brief.excludeChannels.filter(k => k !== key),
+  };
+  const share = summarizePlan().channels.find(c => c.id === channelId)?.sharePct;
+
+  if (action === 'set_share' || action === 'lock') {
+    if (typeof share === 'number') next.shareOverrides[key] = share;
+    if (action === 'lock') next.lockedChannels.push(key);
+    else if ((brief.lockedChannels ?? []).includes(key)) next.lockedChannels.push(key);
+  } else if (action === 'unlock') {
+    delete next.shareOverrides[key];
+  } else if (action === 'deactivate' || action === 'remove') {
+    delete next.shareOverrides[key];
+    next.excludeChannels.push(key);
+  }
+  useMediaPlanStore.setState({ brief: next });
+}
+
 export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> {
   const store = useMediaPlanStore.getState();
 
@@ -130,6 +169,7 @@ export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> 
       plan: summarizePlan(),
       rationale: plan.rationale,
       skipped: plan.skipped,
+      warnings: plan.warnings,
       unallocated: plan.unallocated,
     };
   }
@@ -138,12 +178,18 @@ export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> 
     const { channelId, action, sharePct } = call.args as { channelId: string; action: string; sharePct?: number };
     const ch = store.channels.find(c => c.id === channelId);
     if (!ch) return { ok: false, error: `Unknown channel id ${channelId}` };
+    let note: string | undefined;
 
     switch (action) {
-      case 'set_share':
+      case 'set_share': {
         if (typeof sharePct !== 'number') return { ok: false, error: 'sharePct required' };
         if (!setChannelShare(channelId, sharePct)) return { ok: false, error: 'Fixed-fee channels have a set price; change the fee instead.' };
+        const applied = summarizePlan().channels.find(c => c.id === channelId)?.sharePct ?? 0;
+        if (Math.abs(applied - sharePct) > 0.5) {
+          note = `Requested ${sharePct}% but the maximum possible is ${applied}% (fixed fees and locked channels use the rest). Tell the user.`;
+        }
         break;
+      }
       case 'lock':
       case 'unlock':
         if (ch.locked !== (action === 'lock')) store.toggleChannelLock(channelId);
@@ -158,7 +204,8 @@ export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> 
       default:
         return { ok: false, error: `Unknown action ${action}` };
     }
-    return { ok: true, plan: summarizePlan() };
+    rememberAdjustment(channelId, action);
+    return { ok: true, ...(note ? { note } : {}), plan: summarizePlan() };
   }
 
   return { ok: false, error: `Unknown tool ${call.name}` };

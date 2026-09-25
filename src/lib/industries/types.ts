@@ -40,6 +40,7 @@ export interface ChannelTemplate {
   baseWeight: number;        // relative share in a balanced plan
   minBudget?: number;        // skip below this monthly budget unless explicitly requested
   tags?: ChannelTag[];
+  bannedIn?: string[];       // ISO markets where this channel is illegal for the industry
   note?: string;             // one-line why/when, shown to user and AI
 }
 

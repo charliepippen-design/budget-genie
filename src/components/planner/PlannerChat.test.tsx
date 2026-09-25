@@ -8,6 +8,13 @@ vi.mock('@clerk/clerk-react', () => ({
 
 import { PlannerChat } from '@/components/planner/PlannerChat';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { CurrencyProvider } from '@/contexts/CurrencyContext';
+
+const Chat = () => (
+  <CurrencyProvider>
+    <PlannerChat />
+  </CurrencyProvider>
+);
 
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -33,7 +40,7 @@ afterEach(() => {
 
 describe('PlannerChat', () => {
   it('quick-start builds a plan without AI', () => {
-    act(() => root.render(<PlannerChat />));
+    act(() => root.render(<Chat />));
     const chip = [...container.querySelectorAll('button')].find((b) => b.textContent === 'B2B SaaS')!;
     act(() => chip.click());
 
@@ -56,7 +63,7 @@ describe('PlannerChat', () => {
       .mockImplementationOnce(() => reply({ text: 'Plan ready: affiliates lead the mix.', toolCalls: [], raw: [] }));
     vi.stubGlobal('fetch', fetchMock);
 
-    act(() => root.render(<PlannerChat />));
+    act(() => root.render(<Chat />));
     const textarea = container.querySelector('textarea')!;
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;
@@ -84,7 +91,7 @@ describe('PlannerChat', () => {
 
   it('shows a sign-in link when the gateway refuses anonymous users', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ error: 'Sign in to use the AI planner.' }), { status: 401 }))));
-    act(() => root.render(<PlannerChat />));
+    act(() => root.render(<Chat />));
     const textarea = container.querySelector('textarea')!;
     act(() => {
       const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!;

@@ -58,6 +58,7 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
   const errors: string[] = [];
+  let quotaExhausted = false;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
   for (const model of [MODEL, FALLBACK_MODEL]) {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -72,13 +73,40 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
       }
       const detail = await res.text();
       errors.push(`${model}: ${res.status} ${detail.slice(0, 300)}`);
-      if (res.status === 401 || res.status === 403) throw new Error(errors.join(" | "));
+      if (res.status === 401 || res.status === 403) {
+        console.error("Gemini auth failed:", errors);
+        throw new GatewayError("The AI service key is invalid. The site owner needs to update it.", 503);
+      }
+      // A spent daily/monthly quota won't recover by retrying.
+      if (res.status === 429 && /quota/i.test(detail)) {
+        quotaExhausted = true;
+        break;
+      }
       if (res.status !== 429 && res.status !== 503) break;
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
   console.error("Gemini failed:", errors);
-  throw new Error("The AI model is busy or unavailable right now. Please try again in a minute.");
+  if (quotaExhausted) {
+    throw new GatewayError(
+      "The AI usage limit has been reached for now. Your plan and sliders still work; try the chat again later.",
+      429
+    );
+  }
+  throw new GatewayError("The AI model is busy or unavailable right now. Please try again in a minute.", 503);
+}
+
+class GatewayError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+  }
+}
+
+/** Keep the last MAX_MESSAGES, starting at a user turn: an orphan tool result or call is rejected by Gemini. */
+function trimHistory(messages: AgentMessage[]): AgentMessage[] {
+  const recent = messages.slice(-MAX_MESSAGES);
+  const firstUser = recent.findIndex((m) => m.role === "user");
+  return firstUser >= 0 ? recent.slice(firstUser) : [];
 }
 
 function toContents(messages: AgentMessage[]) {
@@ -159,13 +187,17 @@ HOW TO WORK
 1. Interview briefly. You need at minimum: industry, monthly budget, main objective. Ask at most 2 short questions per turn. Useful extras: markets (countries), duration, licences/ad restrictions, channels already working or refused, target CPA, risk appetite.
 2. As soon as you have the minimum, call update_brief to generate a first plan. Showing a plan early beats a long interview; refine afterwards.
 3. Translate every peculiarity into the brief or a channel action. Examples:
-   - "we have no Google gambling licence" -> excludeTags ["restricted"] (or excludeChannels for the specific one)
+   - "we have no Google licence/verification" -> excludeChannels ["google-search"] (only that channel)
+   - "we can't advertise on Google or Meta" / "no ad licences at all" -> excludeTags ["restricted"]
    - "our affiliates work great" -> includeChannels ["affiliate-cpa"]
    - "we only sell in Italy and Spain" -> markets ["IT","ES"]
    - "we need to grow the brand" -> raise objectives.branding
    - "max €80 per customer" -> targetCpa 80
    Facts that are not a field (seasonality, product details, team limits) go in addNotes.
-4. For a specific change to one channel, use adjust_channel with an id from PLAN STATE.
+4. For a specific change to one channel, use adjust_channel with an id from PLAN STATE. Locks, removals and
+   pinned shares are remembered in the brief, so later update_brief calls keep them.
+   If a tool result contains "note" or "warnings", tell the user plainly (e.g. a share that could not be reached,
+   a target CPA that is not achievable, budget held back because channels would saturate).
 5. After a tool result, explain the plan in 3-6 short lines: the top allocations, why, and one trade-off or risk. Mention channels that were skipped only when relevant.
 
 RULES
@@ -211,7 +243,7 @@ export async function handleAIRequest(req: Request): Promise<Response> {
 
   try {
     const body = await req.json();
-    const messages: AgentMessage[] = Array.isArray(body.messages) ? body.messages.slice(-MAX_MESSAGES) : [];
+    const messages = trimHistory(Array.isArray(body.messages) ? body.messages : []);
 
     switch (body.task) {
       case "planner":
@@ -223,6 +255,7 @@ export async function handleAIRequest(req: Request): Promise<Response> {
     }
   } catch (err) {
     console.error("ai-gateway error:", err);
-    return json({ error: err instanceof Error ? err.message : "AI request failed" }, 500);
+    if (err instanceof GatewayError) return json({ error: err.message }, err.status);
+    return json({ error: "AI request failed. Please try again." }, 500);
   }
 }

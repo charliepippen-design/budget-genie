@@ -117,7 +117,10 @@ export const BudgetGenieAI = () => {
 
   // 2. UI STATE (The Skin)
   // Purely presentational state
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  // On phones/tablets the settings drawer covers the dashboard, so start closed there.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(
+    () => typeof window === 'undefined' || window.innerWidth >= 1024
+  );
   const [preset, setPreset] = useState<BudgetPresetKey>('custom');
   const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -235,6 +238,21 @@ export const BudgetGenieAI = () => {
           <BudgetWizard isOpen={isBudgetWizardOpen} onClose={() => setIsBudgetWizardOpen(false)} />
         </Suspense>
 
+        {/* Mobile: toggle + backdrop for the settings drawer */}
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen((open) => !open)}
+          className="fixed bottom-4 left-4 z-[60] rounded-full bg-slate-800 px-4 py-2 text-sm font-medium text-white shadow-xl lg:hidden"
+        >
+          {isSidebarOpen ? 'Close settings' : 'Settings'}
+        </button>
+        {isSidebarOpen && (
+          <div
+            className="fixed inset-0 z-40 bg-black/50 lg:hidden"
+            onClick={() => setIsSidebarOpen(false)}
+          />
+        )}
+
         {/* LEFT SIDEBAR (SETTINGS) */}
         <div
           className={cn(
@@ -282,7 +300,7 @@ export const BudgetGenieAI = () => {
                 <MonthConfigPanel />
               </div>
 
-              <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_384px] gap-6 mb-6">
+              <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_384px] gap-6 mb-6">
                 {/* CENTER COLUMN (Charts & Wizard) */}
                 <div className="min-w-0 space-y-6">
                   {/* PROJECT MANAGER (Top Bar) */}

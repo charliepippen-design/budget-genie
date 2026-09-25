@@ -135,6 +135,7 @@ export const OnboardWizard = () => {
   const clearActiveGeos = useMediaPlanStore((state) => state.clearActiveGeos);
   const setTierAllocation = useMediaPlanStore((state) => state.setTierAllocation);
   const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
+  const hasExistingPlan = useMediaPlanStore((state) => state.hasCompletedOnboarding);
 
   const [state, setState] = useState<WizardState>({
     step: 1,
@@ -250,6 +251,13 @@ export const OnboardWizard = () => {
         },
       };
 
+      if (
+        hasExistingPlan &&
+        !window.confirm('This will replace your current media plan. Continue?')
+      ) {
+        return;
+      }
+
       goToStep('generating');
 
       const startedAt = Date.now();
@@ -268,6 +276,8 @@ export const OnboardWizard = () => {
       setOnboardingSubvertical(state.subvertical);
       setHasCompletedOnboarding(true);
       setTotalBudget(answers.budget);
+      // A new wizard plan supersedes any AI planner brief built on the old plan.
+      useMediaPlanStore.setState({ brief: null, planRationale: [], planWarnings: [] });
 
       const adjustedPresetChannels = preset.channels.map((channel) => {
         const aiAdj = refinedPlan?.channelAdjustments.find(
@@ -353,7 +363,7 @@ export const OnboardWizard = () => {
       }
 
       goToStep('done');
-      window.requestAnimationFrame(() => navigate('/', { replace: true }));
+      window.requestAnimationFrame(() => navigate('/app', { replace: true }));
 
       if (refinedPlan) {
         toast('Your plan is ready', {
@@ -368,6 +378,7 @@ export const OnboardWizard = () => {
       }
     },
     [
+      hasExistingPlan,
       addActiveGeo,
       clearActiveGeos,
       goToStep,
@@ -409,10 +420,13 @@ export const OnboardWizard = () => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
+        if (hasExistingPlan && state.step !== 'generating') navigate('/app');
         return;
       }
 
       if (event.key !== 'Enter') return;
+      // Enter on a focused option button selects it; don't also advance the step.
+      if ((event.target as HTMLElement | null)?.tagName === 'BUTTON') return;
 
       if (state.step === 1) {
         event.preventDefault();
@@ -428,13 +442,22 @@ export const OnboardWizard = () => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [applyPlan, continueFromBudget, goToStep, state.step]);
+  }, [applyPlan, continueFromBudget, goToStep, hasExistingPlan, navigate, state.step]);
 
   const progress = typeof state.step === 'number' ? Math.min(state.step, 6) : 6;
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 pb-12 pt-8 sm:px-8">
+        {hasExistingPlan && state.step !== 'generating' && (
+          <button
+            type="button"
+            onClick={() => navigate('/app')}
+            className="mb-4 self-start text-sm text-slate-400 hover:text-white"
+          >
+            ← Back to my plan
+          </button>
+        )}
         {state.step !== 'generating' && (
           <div className="mb-8 flex items-center gap-2">
             {[1, 2, 3, 4, 5, 6].map((dot) => (

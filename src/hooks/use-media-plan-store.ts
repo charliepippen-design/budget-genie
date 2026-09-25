@@ -29,8 +29,8 @@ import { industryToVertical } from '@/lib/industries';
 export type { ChannelCategory };
 
 // ========== BUDGET CONSTRAINTS ==========
-const GLOBAL_BUDGET_CAP = 1000000; // $1M max
-const MIN_BUDGET_CAP = 5000; // $5k min for stability
+export const GLOBAL_BUDGET_CAP = 1000000; // 1M max
+export const MIN_BUDGET_CAP = 1000; // 1k min: small businesses plan real 1k/month budgets
 
 // ========== DATA MODEL ==========
 
@@ -987,8 +987,14 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       // Multipliers
       setGlobalMultipliers: (updates) => {
+        // Skip undefined/NaN so a partial update can never wipe a default (e.g. revenue-model rates).
+        const clean = Object.fromEntries(
+          Object.entries(updates).filter(
+            ([, v]) => v !== undefined && !(typeof v === 'number' && !Number.isFinite(v))
+          )
+        ) as Partial<GlobalMultipliers>;
         set((state) => ({
-          globalMultipliers: { ...state.globalMultipliers, ...updates },
+          globalMultipliers: { ...state.globalMultipliers, ...clean },
         }));
       },
 
@@ -1245,6 +1251,15 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         planWarnings: state.planWarnings,
       }),
       version: 9,
+      // Fill multipliers missing from older/broken saves (JSON drops undefined keys) with defaults.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<MediaPlanState>;
+        return {
+          ...current,
+          ...saved,
+          globalMultipliers: { ...current.globalMultipliers, ...(saved.globalMultipliers ?? {}) },
+        };
+      },
       migrate: (persistedState: unknown, version) => {
         const safeState = (persistedState ?? {}) as Partial<MediaPlanState> & {
           channels?: Array<Partial<ChannelData>>;

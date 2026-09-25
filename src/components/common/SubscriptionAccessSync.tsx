@@ -8,6 +8,15 @@ export function SubscriptionAccessSync() {
   const { hasActivePayment, isSuperUser, effectiveTier } = usePaymentStatus();
   const subscriptionTier = useMediaPlanStore((state) => state.subscriptionTier);
   const setSubscriptionTier = useMediaPlanStore((state) => state.setSubscriptionTier);
+  const userStatus = useMediaPlanStore((state) => state.userStatus);
+  const setUserStatus = useMediaPlanStore((state) => state.setUserStatus);
+
+  // Paid and superuser accounts must never see demo locks (export, premium geos, upsells).
+  useEffect(() => {
+    if (!isLoaded) return;
+    const next = isSignedIn && hasActivePayment ? 'active' : 'demo';
+    if (userStatus !== next) setUserStatus(next);
+  }, [hasActivePayment, isLoaded, isSignedIn, setUserStatus, userStatus]);
 
   useEffect(() => {
     if (!isLoaded) {

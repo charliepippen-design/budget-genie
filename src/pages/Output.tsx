@@ -203,7 +203,7 @@ const Output = () => {
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => navigate('/')}
+            onClick={() => navigate('/app')}
             className="gap-2 text-muted-foreground hover:text-foreground shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />

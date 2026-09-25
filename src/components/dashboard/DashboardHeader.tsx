@@ -61,7 +61,7 @@ export function DashboardHeader({
   onReset,
   onLaunchMasterWizard,
 }: DashboardHeaderProps) {
-  const { totalBudget, globalMultipliers, setHasCompletedOnboarding } = useMediaPlanStore();
+  const { totalBudget, globalMultipliers } = useMediaPlanStore();
   const vc = useVerticalConfig();
   const userStatus = useMediaPlanStore((state) => state.userStatus);
   const { format } = useCurrency();
@@ -171,10 +171,9 @@ export function DashboardHeader({
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setHasCompletedOnboarding(false);
-                navigate('/onboard');
-              }}
+              // Keep the current plan reachable: the wizard offers "Back to my plan"
+              // and asks before overwriting.
+              onClick={() => navigate('/onboard')}
               className={cn(
                 'group relative h-10 rounded-xl border-0 px-4 text-white gap-2 font-semibold transition-all duration-300 hover:-translate-y-0.5',
                 isDark
