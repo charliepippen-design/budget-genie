@@ -19,8 +19,8 @@ const WEBHOOK_EVENTS = [
 ];
 // Keep in sync with src/lib/plans.ts (amounts in cents).
 const PLANS = [
-  { env: 'STRIPE_PRICE_PRO_MONTHLY', lookupKey: 'mediaplan_pro_monthly', name: 'MediaPlanner Pro', amount: 4900 },
-  { env: 'STRIPE_PRICE_ENTERPRISE_MONTHLY', lookupKey: 'mediaplan_enterprise_monthly', name: 'MediaPlanner Enterprise', amount: 14900 },
+  { env: 'STRIPE_PRICE_PRO_MONTHLY', lookupKey: 'mediaplan_pro_monthly', name: 'MediaPlanner Pro', amount: 1900 },
+  { env: 'STRIPE_PRICE_ENTERPRISE_MONTHLY', lookupKey: 'mediaplan_enterprise_monthly', name: 'MediaPlanner Enterprise', amount: 3900 },
 ];
 
 function askHidden(question) {
