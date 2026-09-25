@@ -109,4 +109,12 @@ describe('Plan generator', () => {
   it('does not set a CPA target unless the user gave one', () => {
     expect(generatePlan({ industry: 'saas' }).multipliers).not.toHaveProperty('cpaTarget');
   });
+
+  it('iGaming in Italy only plans channels that are legal there', () => {
+    const plan = generatePlan({ industry: 'igaming', monthlyBudget: 60000, markets: ['IT'] });
+    expect(plan.channels.map((c) => c.id).sort()).toEqual(['igaming-crm', 'igaming-seo-content']);
+    const mixed = generatePlan({ industry: 'igaming', monthlyBudget: 60000, markets: ['IT', 'DE'] });
+    expect(mixed.channels.length).toBeGreaterThan(2);
+    expect(mixed.warnings.join(' ')).toMatch(/IT/);
+  });
 });

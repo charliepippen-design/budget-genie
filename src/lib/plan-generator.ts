@@ -181,6 +181,14 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
       skipped.push({ key: t.key, name: t.name, reason: 'Excluded by you.' });
       return [];
     }
+    const bannedMarkets = (t.bannedIn ?? []).filter(m => brief.markets.map(x => x.toUpperCase()).includes(m));
+    if (bannedMarkets.length > 0 && bannedMarkets.length === brief.markets.length) {
+      skipped.push({ key: t.key, name: t.name, reason: `Advertising this is not allowed in ${bannedMarkets.join(', ')}.` });
+      return [];
+    }
+    if (bannedMarkets.length > 0) {
+      warnings.push(`${t.name}: exclude ${bannedMarkets.join(', ')} from targeting (advertising not allowed there).`);
+    }
     const blockedTag = (t.tags ?? []).find(tag => excludeTags.has(tag));
     if (blockedTag && !forced) {
       skipped.push({ key: t.key, name: t.name, reason: blockedTag === 'restricted' ? 'Needs an ad licence/certification you do not have.' : `Excluded (${blockedTag}).` });
