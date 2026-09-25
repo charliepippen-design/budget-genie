@@ -23,7 +23,8 @@ import {
   useMediaPlanStore,
   useChannelsWithMetrics,
   useBlendedMetrics,
-  calculateChannelMetrics,
+  computePlanSnapshot,
+  getSpendSharePct,
 } from '@/hooks/use-media-plan-store';
 // import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -42,9 +43,10 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { ChannelEditor } from './ChannelEditor';
-import { BUYING_MODEL_INFO } from '@/types/channel';
+import { BUYING_MODEL_INFO, hasMediaDeliveryMetrics } from '@/types/channel';
 import { useActionPulseStore } from '@/store/useActionPulseStore';
 import { useSortableTable } from '@/hooks/use-sortable-table';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -59,6 +61,10 @@ const CATEGORY_ICONS: Partial<Record<ChannelCategory, LucideIcon>> = {
   'Email/SMS': Users,
   Other: Settings2,
 };
+
+/** Impressions/CTR only mean something for CPM/CPC media; fixed-fee rows never have them. */
+const showsMediaMetrics = (channel: ChannelWithMetrics) =>
+  channel.tier !== 'fixed' && hasMediaDeliveryMetrics(channel.buyingModel);
 
 const CATEGORY_TINT_BG_CLASSES: Record<ChannelCategory, string> = {
   'SEO/Content': 'bg-[hsl(var(--chart-1)/0.2)]',
@@ -176,6 +182,7 @@ export function ChannelTable() {
     updateChannelConfigField,
     totalBudget,
     toggleChannelLock,
+    toggleChannelActive,
     setGhostProjectedRevenue,
     globalMultipliers,
   } = useMediaPlanStore();
@@ -192,6 +199,9 @@ export function ChannelTable() {
   const priceHintTimerRef = useRef<number | null>(null);
   const guidedPulseTimerRef = useRef<number | null>(null);
   const rowRefs = useRef<Record<string, HTMLTableRowElement | null>>({});
+  // Radix fires onValueCommit before onValueChange for keyboard steps, so the ghost
+  // projection is only shown while a pointer drag is in progress.
+  const isPointerDraggingRef = useRef(false);
 
   const targetChannelId = useActionPulseStore((state) => state.targetChannelId);
   const pulseKey = useActionPulseStore((state) => state.pulseKey);
@@ -217,9 +227,7 @@ export function ChannelTable() {
         case 'spend':
           return formatCurrency(row.metrics.spend);
         case 'impressions':
-          return row.buyingModel === 'FLAT_FEE' || row.buyingModel === 'CPA' || row.tier === 'fixed'
-            ? '--'
-            : formatNumber(row.metrics.impressions, true);
+          return showsMediaMetrics(row) ? formatNumber(row.metrics.impressions, true) : '—';
         case 'cpa':
           return row.metrics.cpa ? formatCurrency(row.metrics.cpa) : '0';
         case 'roas':
@@ -336,25 +344,35 @@ export function ChannelTable() {
   const handleSliderChange = useCallback(
     (channelId: string, values: number[]) => {
       setChannelAllocation(channelId, values[0]);
+      if (!isPointerDraggingRef.current) return;
 
-      const {
-        channels: updatedChannels,
-        totalBudget: updatedBudget,
-        globalMultipliers,
-      } = useMediaPlanStore.getState();
-      const projectedRevenue = updatedChannels.reduce((sum, channel) => {
-        return sum + calculateChannelMetrics(channel, updatedBudget, globalMultipliers).revenue;
-      }, 0);
-
-      setGhostProjectedRevenue(projectedRevenue);
+      setGhostProjectedRevenue(
+        computePlanSnapshot(useMediaPlanStore.getState()).blended.projectedRevenue
+      );
     },
     [setChannelAllocation, setGhostProjectedRevenue]
   );
 
-  const handleSliderCommit = useCallback(() => {
-    normalizeAllocations();
+  // Keyboard steps commit with the new value *before* onValueChange runs, so apply the
+  // committed value here too: mouse drags and arrow keys then renormalise the same way.
+  const handleSliderCommit = useCallback(
+    (channelId: string, values: number[]) => {
+      setChannelAllocation(channelId, values[0]);
+      normalizeAllocations();
+      setGhostProjectedRevenue(null);
+    },
+    [setChannelAllocation, normalizeAllocations, setGhostProjectedRevenue]
+  );
+
+  const handleSliderPointerDown = useCallback(() => {
+    isPointerDraggingRef.current = true;
+    setGhostProjectedRevenue(blendedMetrics.projectedRevenue);
+  }, [blendedMetrics.projectedRevenue, setGhostProjectedRevenue]);
+
+  const handleSliderPointerEnd = useCallback(() => {
+    isPointerDraggingRef.current = false;
     setGhostProjectedRevenue(null);
-  }, [normalizeAllocations, setGhostProjectedRevenue]);
+  }, [setGhostProjectedRevenue]);
 
   const triggerPriceHint = useCallback((channelId: string) => {
     setPriceHintChannelId(channelId);
@@ -404,10 +422,10 @@ export function ChannelTable() {
     [setChannelAllocation, totalBudget, updateChannelConfigField]
   );
 
-  // Calculate total allocation
+  // Shares are of plan spend, so fixed-fee rows count and inactive rows don't.
   const totalAllocation = useMemo(
-    () => channels.reduce((sum, ch) => sum + ch.allocationPct, 0),
-    [channels]
+    () => channels.reduce((sum, ch) => sum + getSpendSharePct(ch, blendedMetrics), 0),
+    [channels, blendedMetrics]
   );
 
   const renderSortHeader = (label: string, key: SortKey) => {
@@ -561,7 +579,10 @@ export function ChannelTable() {
                     channel.tier === 'fixed' ||
                     channel.buyingModel === 'FLAT_FEE' ||
                     channel.buyingModel === 'RETAINER';
-                  const isAllocationDisabled = channel.locked || isAllocationFixedByModel;
+                  const isInactive = channel.isActive === false;
+                  const isAllocationDisabled =
+                    channel.locked || isAllocationFixedByModel || isInactive;
+                  const sharePct = getSpendSharePct(channel, blendedMetrics);
 
                   return (
                     <Fragment key={channel.id}>
@@ -571,7 +592,8 @@ export function ChannelTable() {
                         }}
                         className={cn(
                           'group transition-colors hover:bg-muted/20',
-                          isWarning && 'bg-destructive/5 hover:bg-destructive/10'
+                          isWarning && 'bg-destructive/5 hover:bg-destructive/10',
+                          isInactive && 'opacity-50'
                         )}
                         title={
                           isWarning
@@ -593,6 +615,19 @@ export function ChannelTable() {
                                 <ChevronDown className="h-3.5 w-3.5" />
                               )}
                             </button>
+                            <Switch
+                              checked={!isInactive}
+                              onCheckedChange={() => toggleChannelActive(channel.id)}
+                              aria-label={
+                                isInactive ? `Activate ${channel.name}` : `Deactivate ${channel.name}`
+                              }
+                              title={
+                                isInactive
+                                  ? 'Channel is off and not in the plan. Click to turn it on.'
+                                  : 'Channel is on. Click to take it out of the plan.'
+                              }
+                              className="h-4 min-h-0 w-7 shrink-0 print-mode-hide [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+                            />
                             <span className={cn('text-sm', isWarning && 'text-destructive')}>
                               {channel.name}
                             </span>
@@ -656,19 +691,13 @@ export function ChannelTable() {
                                   <Slider
                                     data-channel-id={channel.id}
                                     value={[channel.allocationPct]}
-                                    onPointerDown={() => {
-                                      setGhostProjectedRevenue(blendedMetrics.projectedRevenue);
-                                    }}
-                                    onPointerUp={() => {
-                                      setGhostProjectedRevenue(null);
-                                    }}
-                                    onPointerCancel={() => {
-                                      setGhostProjectedRevenue(null);
-                                    }}
+                                    onPointerDown={handleSliderPointerDown}
+                                    onPointerUp={handleSliderPointerEnd}
+                                    onPointerCancel={handleSliderPointerEnd}
                                     onValueChange={(values) =>
                                       handleSliderChange(channel.id, values)
                                     }
-                                    onValueCommit={handleSliderCommit}
+                                    onValueCommit={(values) => handleSliderCommit(channel.id, values)}
                                     min={0}
                                     max={100}
                                     step={0.1}
@@ -677,7 +706,7 @@ export function ChannelTable() {
                                       isAllocationDisabled &&
                                         'opacity-50 cursor-not-allowed [&_[role=slider]]:cursor-not-allowed grayscale'
                                     )}
-                                    disabled={channel.locked || isAllocationFixedByModel}
+                                    disabled={isAllocationDisabled}
                                   />
                                 </div>
                               </TooltipTrigger>
@@ -694,7 +723,7 @@ export function ChannelTable() {
                                 isAllocationFixedByModel && 'text-slate-500 italic'
                               )}
                             >
-                              {formatPercentage(channel.allocationPct)}
+                              {formatPercentage(sharePct)}
                             </span>
                           </div>
                         </TableCell>
@@ -715,29 +744,36 @@ export function ChannelTable() {
                                 'animate-pulse ring-1 ring-cyan-400/70 text-cyan-400'
                             )}
                           >
-                            <EditableCell
-                              value={channel.metrics.effectivePrice}
-                              onSave={(v) => updateChannelConfigField(channel.id, 'price', v)}
-                              prefix={symbol}
-                              className="justify-end text-muted-foreground"
-                              highlight={priceHintChannelId === channel.id}
-                            />
+                            {channel.buyingModel === 'REV_SHARE' ? (
+                              <EditableCell
+                                value={channel.typeConfig.secondaryPrice ?? 0}
+                                onSave={(v) =>
+                                  updateChannelConfigField(channel.id, 'secondaryPrice', Math.min(100, v))
+                                }
+                                suffix="%"
+                                className="justify-end text-muted-foreground"
+                              />
+                            ) : (
+                              <EditableCell
+                                value={channel.metrics.effectivePrice}
+                                onSave={(v) => updateChannelConfigField(channel.id, 'price', v)}
+                                prefix={symbol}
+                                className="justify-end text-muted-foreground"
+                                highlight={priceHintChannelId === channel.id}
+                              />
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="text-right font-mono text-sm">
-                          {channel.buyingModel === 'FLAT_FEE' ||
-                          channel.buyingModel === 'CPA' ||
-                          channel.tier === 'fixed' ? (
-                            <span className="text-slate-500">--</span>
-                          ) : (
+                          {showsMediaMetrics(channel) ? (
                             formatNumber(channel.metrics.impressions, true)
+                          ) : (
+                            <span className="text-slate-500">—</span>
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          {channel.buyingModel === 'FLAT_FEE' ||
-                          channel.buyingModel === 'CPA' ||
-                          channel.tier === 'fixed' ? (
-                            <div className="text-right text-slate-500 text-sm py-1">N/A</div>
+                          {!showsMediaMetrics(channel) ? (
+                            <div className="text-right text-slate-500 text-sm py-1">—</div>
                           ) : (
                             <EditableCell
                               value={channel.metrics.effectiveCtr}
@@ -869,7 +905,10 @@ export function ChannelTable() {
                   channel.tier === 'fixed' ||
                   channel.buyingModel === 'FLAT_FEE' ||
                   channel.buyingModel === 'RETAINER';
-                const isAllocationDisabled = channel.locked || isAllocationFixedByModel;
+                const isInactive = channel.isActive === false;
+                const isAllocationDisabled =
+                  channel.locked || isAllocationFixedByModel || isInactive;
+                const sharePct = getSpendSharePct(channel, blendedMetrics);
 
                 return (
                   <div
@@ -878,7 +917,8 @@ export function ChannelTable() {
                       'p-3 rounded-lg border',
                       isWarning
                         ? 'border-destructive/50 bg-destructive/5'
-                        : 'border-border/30 bg-muted/20'
+                        : 'border-border/30 bg-muted/20',
+                      isInactive && 'opacity-50'
                     )}
                   >
                     <div className="flex items-center justify-between mb-3">
@@ -895,6 +935,14 @@ export function ChannelTable() {
                             <ChevronDown className="h-3.5 w-3.5" />
                           )}
                         </button>
+                        <Switch
+                          checked={!isInactive}
+                          onCheckedChange={() => toggleChannelActive(channel.id)}
+                          aria-label={
+                            isInactive ? `Activate ${channel.name}` : `Deactivate ${channel.name}`
+                          }
+                          className="h-4 min-h-0 w-7 shrink-0 print-mode-hide [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
+                        />
                         <span
                           className={cn(
                             'text-sm font-medium truncate',
@@ -942,17 +990,11 @@ export function ChannelTable() {
                       <Slider
                         data-channel-id={channel.id}
                         value={[channel.allocationPct]}
-                        onPointerDown={() => {
-                          setGhostProjectedRevenue(blendedMetrics.projectedRevenue);
-                        }}
-                        onPointerUp={() => {
-                          setGhostProjectedRevenue(null);
-                        }}
-                        onPointerCancel={() => {
-                          setGhostProjectedRevenue(null);
-                        }}
+                        onPointerDown={handleSliderPointerDown}
+                        onPointerUp={handleSliderPointerEnd}
+                        onPointerCancel={handleSliderPointerEnd}
                         onValueChange={(values) => handleSliderChange(channel.id, values)}
-                        onValueCommit={handleSliderCommit}
+                        onValueCommit={(values) => handleSliderCommit(channel.id, values)}
                         min={0}
                         max={100}
                         step={0.1}
@@ -961,10 +1003,10 @@ export function ChannelTable() {
                           isAllocationDisabled &&
                             'opacity-50 cursor-not-allowed [&_[role=slider]]:cursor-not-allowed'
                         )}
-                        disabled={channel.locked || isAllocationFixedByModel}
+                        disabled={isAllocationDisabled}
                       />
                       <span className="font-mono text-sm w-14 text-right">
-                        {formatPercentage(channel.allocationPct)}
+                        {formatPercentage(sharePct)}
                       </span>
                     </div>
 
@@ -979,12 +1021,10 @@ export function ChannelTable() {
                       <div>
                         <span className="text-muted-foreground">Impr.</span>
                         <p className="font-mono font-medium">
-                          {channel.buyingModel === 'FLAT_FEE' ||
-                          channel.buyingModel === 'CPA' ||
-                          channel.tier === 'fixed' ? (
-                            <span className="text-slate-500">--</span>
-                          ) : (
+                          {showsMediaMetrics(channel) ? (
                             formatNumber(channel.metrics.impressions, true)
+                          ) : (
+                            <span className="text-slate-500">—</span>
                           )}
                         </p>
                       </div>
