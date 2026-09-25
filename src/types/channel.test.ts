@@ -39,8 +39,8 @@ describe('CPM model', () => {
     expect(result.impressions).toBeCloseTo(1_000_000);
     // Clicks = 1,000,000 * 0.02 = 20,000
     expect(result.clicks).toBeCloseTo(20_000);
-    // FTDs = 20,000 * 0.05 = 1,000
-    expect(result.ftds).toBeCloseTo(1_000);
+    // Linear FTDs = 20,000 * 0.05 = 1,000, then saturation: 1,000 / (1 + 10,000 / 100,000)
+    expect(result.ftds).toBeCloseTo(1_000 / 1.1);
   });
 
   it('returns 0 impressions when CPM price is 0 (division-by-zero guard)', () => {
@@ -259,10 +259,11 @@ describe('Saturation decay', () => {
     };
     const spend = 5_000;
     const result = calculateUnifiedMetrics(config, spend, 150);
-    // ftds = 100, linearRevenue = 100 * 150 = 15,000
-    // decayFactor = 1 / (1 + 5000 / 5000) = 0.5
-    // revenue = 15,000 * 0.5 = 7,500
+    // linear ftds = 100, decayFactor = 1 / (1 + 5000 / 5000) = 0.5 -> 50 effective FTDs
+    // revenue = 50 * 150 = 7,500 and CPA doubles to 100
     expect(result.revenue).toBeCloseTo(7_500);
+    expect(result.ftds).toBeCloseTo(50);
+    expect(result.cpa).toBeCloseTo(100);
     expect(result.roas).toBeCloseTo(7_500 / 5_000);
   });
 

@@ -247,20 +247,16 @@ export function calculateUnifiedMetrics(
       break;
   }
 
-  // 1. Calculate Linear Revenue (Pre-Saturation)
-  let revenue = ftds * playerValue;
-
-  // 2. Apply Diminishing Returns (Saturation — Michaelis-Menten decay)
-  // Formula: Revenue = LinearRevenue × (1 / (1 + Spend / SaturationCeiling))
-  // SaturationCeiling is the spend level where efficiency is exactly halved.
-  // NOTE: If saturationCeiling is 0 or undefined, the decay is intentionally skipped.
-  // Set a meaningful saturationCeiling on each channel to model real-world diminishing returns.
+  // Diminishing returns (Michaelis-Menten): each extra euro buys fewer conversions, so CPA
+  // rises with spend. SaturationCeiling is the spend where efficiency is exactly halved.
+  // If saturationCeiling is 0 or undefined, the decay is intentionally skipped.
   const saturation = baselineMetrics.saturationCeiling;
-
   if (saturation && saturation > 0 && finalSpend > 0) {
-    const decayFactor = 1 / (1 + finalSpend / saturation);
-    revenue = revenue * decayFactor;
+    ftds = ftds / (1 + finalSpend / saturation);
   }
+
+  // Value per conversion is channel-specific (aov), falling back to the plan-wide player value.
+  const revenue = ftds * aov;
 
   const cpa = ftds > 0 ? finalSpend / ftds : null;
   // Recalculate ROAS based on decayed revenue
