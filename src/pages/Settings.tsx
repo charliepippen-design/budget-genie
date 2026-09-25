@@ -1,3 +1,4 @@
+import { PAID_PLANS } from '@/lib/plans';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -26,7 +27,7 @@ import { usePaymentStatus } from '@/hooks/use-payment-status';
 const NOWPAYMENTS_CHECKOUT_URL = 'https://nowpayments.io/payment/?iid=4321051348&source=button';
 const NOWPAYMENTS_BUTTON_SRC = 'https://nowpayments.io/images/embeds/payment-button-white.svg';
 // Keep Stripe integration in code, but disable it in UI for now.
-const ENABLE_STRIPE_CHECKOUT = false;
+const ENABLE_STRIPE_CHECKOUT = true;
 type CheckoutMode = 'card' | 'crypto';
 
 // Zod schema for validating billing pending checkout state
@@ -47,6 +48,9 @@ const ProjectListForCountSchema = z.array(
     multiMonthState: z.unknown(),
   })
 );
+
+const planPrice = (tier: 'pro' | 'enterprise') =>
+  PAID_PLANS.find((p) => p.tier === tier)?.priceLabel ?? '';
 
 const PRICING_TIERS: Array<{
   key: SubscriptionTier;
@@ -74,7 +78,7 @@ const PRICING_TIERS: Array<{
   {
     key: 'pro',
     title: 'Pro Acquisition',
-    price: '$129',
+    price: planPrice('pro'),
     cadence: '/month',
     description: 'For teams optimizing LTV and GEO-level acquisition economics every week.',
     highlighted: true,
@@ -89,7 +93,7 @@ const PRICING_TIERS: Array<{
   {
     key: 'enterprise',
     title: 'Enterprise Operator',
-    price: '$499',
+    price: planPrice('enterprise'),
     cadence: '/month',
     description: 'For performance orgs syncing planning decisions across data, BI, and CDP.',
     features: [
@@ -278,7 +282,13 @@ export default function Settings() {
 
       let synced = false;
       for (let attempt = 0; attempt < 8; attempt += 1) {
-        const refreshedTier = await syncBillingTierFromMetadata();
+        // The Stripe webhook writes to Clerk; reload the user to see the new metadata.
+        await clerkUser?.reload();
+        const meta = (clerkUser?.publicMetadata ?? {}) as { payment_status?: unknown; subscription_tier?: unknown };
+        const refreshedTier =
+          meta.payment_status === true && (meta.subscription_tier === 'pro' || meta.subscription_tier === 'enterprise')
+            ? meta.subscription_tier
+            : null;
 
         if (refreshedTier === pending.expectedTier) {
           synced = true;
@@ -305,6 +315,7 @@ export default function Settings() {
     };
 
     void processReturn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run once per return from Stripe
   }, [location.search, navigate, setSubscriptionTier, syncBillingTierFromMetadata]);
 
   // Password and email are managed in Clerk's account screen.
@@ -352,12 +363,7 @@ export default function Settings() {
         JSON.stringify({ expectedTier: tier, state: billingState, startedAt: Date.now() })
       );
 
-      const checkout = await createCheckoutSession({
-        tier,
-        paymentMethod: 'card',
-        successUrl: `${window.location.origin}/settings?checkout=success`,
-        cancelUrl: `${window.location.origin}/settings?checkout=cancelled`,
-      });
+      const checkout = await createCheckoutSession({ tier, email: email ?? undefined });
 
       if (!checkout.url) {
         throw new Error('Checkout URL not returned by billing gateway.');

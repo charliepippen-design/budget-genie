@@ -34,6 +34,15 @@ export function registerAITokenGetter(getter: TokenGetter) {
   registeredGetToken = getter;
 }
 
+/** The signed-in user's Clerk token, for calls to our own API routes. */
+export async function getAuthToken(): Promise<string | null> {
+  try {
+    return (await registeredGetToken?.()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export async function callAI(task: AITask, body: Record<string, unknown>, userToken?: string | null): Promise<AIResponse> {
   let token = userToken ?? null;
   if (token === null && registeredGetToken) {
