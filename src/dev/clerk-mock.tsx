@@ -26,7 +26,11 @@ export const useAuth = () => ({
 
 export const useUser = () => ({ isLoaded: true, isSignedIn: true, user });
 
-export const useClerk = () => ({ signOut: async () => undefined, openSignIn: () => undefined });
+export const useClerk = () => ({
+  signOut: async () => undefined,
+  openSignIn: () => undefined,
+  openUserProfile: () => undefined,
+});
 
 export const SignIn = () => <div data-qa="mock-sign-in">Mock sign-in (QA mode)</div>;
 export const SignUp = SignIn;

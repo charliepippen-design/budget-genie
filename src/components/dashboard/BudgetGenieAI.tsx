@@ -156,7 +156,7 @@ export const BudgetGenieAI = () => {
   }, [channels]);
 
   const handleExport = useCallback(
-    (formatType: 'pdf' | 'csv' | 'xlsx') => {
+    (formatType: 'pdf' | 'csv' | 'xlsx' | 'json') => {
       try {
         if (userStatus === 'demo') {
           toast.error(
@@ -177,6 +177,20 @@ export const BudgetGenieAI = () => {
         }
 
         if (formatType === 'csv') {
+          exportToCsv(
+            channels,
+            vm.totalBudget,
+            vm.blendedMetrics,
+            exportOptions,
+            scenarioOutputs,
+            efficiencyAlerts,
+            sandboxSnapshot
+          );
+          toast.success('CSV export complete');
+          return;
+        }
+
+        if (formatType === 'json') {
           exportEnterpriseConfigJson(
             channels,
             vm.totalBudget,
@@ -186,7 +200,7 @@ export const BudgetGenieAI = () => {
             },
             vm.projectName
           );
-          toast.success('Enterprise JSON config export complete');
+          toast.success('JSON config export complete');
           return;
         }
 

@@ -4,7 +4,7 @@
 // Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional),
 //      VITE_CLERK_PUBLISHABLE_KEY (used to verify signed-in users), ALLOW_ANON=true (local dev only)
 
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { verifyClerkUser } from "./_auth.js";
 
 const env = (k: string) => process.env[k];
 
@@ -22,35 +22,6 @@ type AgentMessage =
 
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
-
-// ---------- Auth ----------
-// Clerk session tokens are verified against Clerk's public JWKS (no secret needed).
-// The frontend API host is encoded in the publishable key: pk_live_<base64(host$)>.
-
-let jwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-
-function clerkJwks() {
-  if (jwks) return jwks;
-  const pk = env("CLERK_PUBLISHABLE_KEY") ?? env("VITE_CLERK_PUBLISHABLE_KEY") ?? "";
-  const encoded = pk.replace(/^pk_(live|test)_/, "");
-  if (!encoded || encoded === pk) return null;
-  const host = Buffer.from(encoded, "base64").toString("utf8").replace(/\$$/, "");
-  jwks = createRemoteJWKSet(new URL(`https://${host}/.well-known/jwks.json`));
-  return jwks;
-}
-
-async function isSignedInUser(req: Request): Promise<boolean> {
-  if (env("ALLOW_ANON") === "true") return true;
-  const keySet = clerkJwks();
-  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  if (!keySet || !token) return false;
-  try {
-    const { payload } = await jwtVerify(token, keySet);
-    return !!payload.sub;
-  } catch {
-    return false;
-  }
-}
 
 // ---------- Gemini ----------
 async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
@@ -239,7 +210,7 @@ async function runJson(payload: { prompt: string }) {
 
 export async function handleAIRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!(await isSignedInUser(req))) return json({ error: "Sign in to use the AI planner." }, 401);
+  if (!(await verifyClerkUser(req))) return json({ error: "Sign in to use the AI planner." }, 401);
 
   try {
     const body = await req.json();

@@ -374,7 +374,10 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     onOpenChange(false);
   }, [onOpenChange, resetWizard]);
 
-  const canProceedFromAnalyze = !hasCurrencyConflict || !!currencyResolution;
+  // A file with no months or no money in it can't become a plan: stop here, don't show "Ready".
+  const hasUsableData =
+    !!result?.success && result.months.length > 0 && result.months.some((m) => m.budget > 0);
+  const canProceedFromAnalyze = hasUsableData && (!hasCurrencyConflict || !!currencyResolution);
   const canProceedFromReconcile = pendingIssues === 0;
 
   const getNextStep = (current: WizardStep): WizardStep => {
@@ -595,6 +598,13 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
               )}
 
               {/* Warnings */}
+              {!hasUsableData && (
+                <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                  We couldn't find months with budgets in this file. It needs a month/date column and a
+                  budget or channel spend columns. Check the file and try again.
+                </div>
+              )}
+
               {detected.warnings.length > 0 && (
                 <Alert variant="default" className="border-warning/50 bg-warning/10">
                   <AlertTriangle className="h-4 w-4 text-warning" />
