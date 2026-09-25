@@ -402,22 +402,24 @@ export async function exportToExcel(
       { header: 'Channel', key: 'Channel', width: 28 },
       { header: 'Family', key: 'Family', width: 18 },
       { header: 'Buying Model', key: 'BuyingModel', width: 14 },
-      { header: 'Allocation %', key: 'AllocationPct', width: 13 },
-      { header: 'Spend', key: 'Spend', width: 12 },
-      { header: 'Impressions', key: 'Impressions', width: 13 },
-      { header: 'Clicks', key: 'Clicks', width: 10 },
-      { header: 'Conversions', key: 'Conversions', width: 13 },
-      { header: 'CPA', key: 'CPA', width: 12 },
-      { header: 'Revenue', key: 'Revenue', width: 12 },
-      { header: 'ROAS', key: 'ROAS', width: 10 },
+      { header: 'Allocation %', key: 'AllocationPct', width: 13, style: { numFmt: '0.0%' } },
+      { header: 'Spend', key: 'Spend', width: 12, style: { numFmt: '#,##0' } },
+      { header: 'Impressions', key: 'Impressions', width: 13, style: { numFmt: '#,##0' } },
+      { header: 'Clicks', key: 'Clicks', width: 10, style: { numFmt: '#,##0' } },
+      { header: 'Conversions', key: 'Conversions', width: 13, style: { numFmt: '#,##0' } },
+      { header: 'CPA', key: 'CPA', width: 12, style: { numFmt: '#,##0.00' } },
+      { header: 'Revenue', key: 'Revenue', width: 12, style: { numFmt: '#,##0' } },
+      { header: 'ROAS', key: 'ROAS', width: 10, style: { numFmt: '0.00"x"' } },
     ];
     alloc.getRow(1).font = { bold: true };
+    // Share of what is actually spent (stored allocation weights don't include fixed fees).
+    const allocSpend = channels.reduce((sum, ch) => sum + safeNumber(ch.metrics.spend), 0);
     channels.forEach((ch) => {
       alloc.addRow({
         Channel: ch.name,
         Family: safeFamilyName(ch.family),
         BuyingModel: safeBuyingModelName(ch.buyingModel),
-        AllocationPct: Number(safeNumber(ch.allocationPct).toFixed(4)),
+        AllocationPct: allocSpend > 0 ? safeNumber(ch.metrics.spend) / allocSpend : 0,
         Spend: Number(safeNumber(ch.metrics.spend).toFixed(4)),
         Impressions: Math.round(safeNumber(ch.metrics.impressions)),
         Clicks: Math.round(safeNumber(ch.metrics.clicks)),
@@ -432,9 +434,9 @@ export async function exportToExcel(
     const scen = workbook.addWorksheet('Scenario Outputs');
     scen.columns = [
       { header: 'Scenario', key: 'Scenario', width: 10 },
-      { header: 'LTV / User', key: 'LtvPerUser', width: 14 },
-      { header: 'Cohort Value', key: 'CohortValue', width: 16 },
-      { header: 'LTV : CAC', key: 'LtvToCac', width: 12 },
+      { header: 'LTV / User', key: 'LtvPerUser', width: 14, style: { numFmt: '#,##0.00' } },
+      { header: 'Cohort Value', key: 'CohortValue', width: 16, style: { numFmt: '#,##0' } },
+      { header: 'LTV : CAC', key: 'LtvToCac', width: 12, style: { numFmt: '0.00"x"' } },
     ];
     scen.getRow(1).font = { bold: true };
     scenarios.forEach((s) => {

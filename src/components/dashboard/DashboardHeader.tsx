@@ -48,7 +48,7 @@ import { useVerticalConfig } from '@/hooks/use-vertical-config';
 interface DashboardHeaderProps {
   budgetPreset: BudgetPresetKey;
   onPresetChange: (preset: BudgetPresetKey) => void;
-  onExport: (format: 'pdf' | 'csv' | 'xlsx') => void;
+  onExport: (format: 'pdf' | 'csv' | 'xlsx' | 'json') => void;
   onImport: () => void;
   onReset: () => void;
   onLaunchMasterWizard: () => void;
@@ -350,6 +350,16 @@ export function DashboardHeader({
                   </DropdownMenuItem>
                   <DropdownMenuItem
                     onClick={() => onExport('csv')}
+                    className={cn(
+                      'gap-2 cursor-pointer font-medium',
+                      isDark ? 'focus:bg-slate-800' : 'focus:bg-slate-100'
+                    )}
+                  >
+                    <Download className="h-4 w-4" />
+                    Export as CSV
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => onExport('json')}
                     className={cn(
                       'gap-2 cursor-pointer font-medium',
                       isDark ? 'focus:bg-slate-800' : 'focus:bg-slate-100'

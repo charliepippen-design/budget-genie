@@ -526,6 +526,21 @@ async function parseJSON(file: File): Promise<string[][]> {
             String(parseNumber(m.kpis?.roas)),
           ]);
           resolve([headers, ...rows]);
+        } else if (
+          json?.event_name === 'media_plan_configuration_ready' &&
+          Array.isArray(json.campaign_allocation)
+        ) {
+          // Our own "Export Config (JSON)" file: one month with each channel's planned budget.
+          const allocation = json.campaign_allocation.slice(0, MAX_COLUMNS) as Array<{
+            channel_name?: string;
+            planned_budget?: number;
+          }>;
+          const generated = new Date(json.generated_at ?? Date.now());
+          const month = `${generated.getFullYear()}-${String(generated.getMonth() + 1).padStart(2, '0')}`;
+          resolve([
+            ['Month', 'Budget', ...allocation.map((c) => sanitizeString(String(c.channel_name ?? '')))],
+            [month, String(parseNumber(json.total_budget)), ...allocation.map((c) => String(parseNumber(c.planned_budget)))],
+          ]);
         } else if (Array.isArray(json)) {
           if (json.length > MAX_ROWS) {
             reject(new Error(`JSON array exceeds maximum rows (${MAX_ROWS})`));
