@@ -243,7 +243,7 @@ export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: strin
     'SEO/Content': { name: 'SEO & Content', color: 'hsl(var(--chart-1))', icon: 'Search' },
     'Display/Programmatic': { name: 'Paid Media', color: 'hsl(var(--chart-2))', icon: 'Megaphone' },
     Affiliate: { name: 'Affiliates', color: 'hsl(var(--chart-3))', icon: 'Users' },
-    'Paid Social': { name: 'Influencers', color: 'hsl(var(--chart-4))', icon: 'Star' },
+    'Paid Social': { name: 'Paid Social', color: 'hsl(var(--chart-4))', icon: 'Star' },
     'Paid Search': { name: 'Paid Search', color: 'hsl(var(--chart-5))', icon: 'Search' },
     'Offline/TV': { name: 'Offline/TV', color: 'hsl(var(--muted-foreground))', icon: 'Tv' },
     'Email/SMS': { name: 'Email/SMS', color: 'hsl(var(--primary))', icon: 'Mail' },

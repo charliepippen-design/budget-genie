@@ -414,7 +414,7 @@ export function calculateChannelMetrics(
   // 1. CTR Bump
   const effectiveCtr = Math.max(
     0.01,
-    (channel.typeConfig.baselineMetrics.ctr || 1) + multipliers.ctrBump
+    (channel.typeConfig.baselineMetrics.ctr ?? 1) + multipliers.ctrBump
   );
 
   // 2. Global CPM Override (Only if model is CPM? Or apply broadly?)
@@ -971,6 +971,30 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       // Channel Type Actions (NEW)
       setChannelType: (channelId, family, buyingModel) => {
+        // Translate the price into the new model from the channel's current economics, so a
+        // €6 CPM doesn't silently become a €6 CPA.
+        const current = computePlanSnapshot(get()).channels.find((c) => c.id === channelId);
+        const m = current?.metrics;
+        const price = (() => {
+          if (!current || current.buyingModel === buyingModel) return current?.typeConfig.price ?? 0;
+          switch (buyingModel) {
+            case 'CPM':
+              return m && m.impressions > 0 ? (m.spend / m.impressions) * 1000 : 5;
+            case 'CPC':
+              return m && m.clicks > 0 ? m.spend / m.clicks : 1;
+            case 'CPA':
+            case 'HYBRID':
+              return m && m.conversions > 0 ? m.spend / m.conversions : 50;
+            case 'FLAT_FEE':
+            case 'RETAINER':
+              return m && m.spend > 0 ? m.spend : 1000;
+            case 'REV_SHARE':
+              return 25;
+            default:
+              return current.typeConfig.price;
+          }
+        })();
+        const fixed = buyingModel === 'FLAT_FEE' || buyingModel === 'RETAINER';
         set((state) => ({
           channels: state.channels.map((ch) =>
             ch.id === channelId
@@ -978,7 +1002,16 @@ export const useMediaPlanStore = create<MediaPlanState>()(
                   ...ch,
                   family,
                   buyingModel,
-                  typeConfig: { ...ch.typeConfig, family, buyingModel },
+                  tier: fixed ? 'fixed' : ch.tier === 'fixed' ? 'scalable' : ch.tier,
+                  typeConfig: {
+                    ...ch.typeConfig,
+                    family,
+                    buyingModel,
+                    price: Math.round(price * 100) / 100,
+                    ...(buyingModel === 'REV_SHARE' || buyingModel === 'HYBRID'
+                      ? { secondaryPrice: ch.typeConfig.secondaryPrice || 25 }
+                      : {}),
+                  },
                 }
               : ch
           ),
@@ -1521,7 +1554,8 @@ export function useFtdVelocityMetrics(): FtdVelocityMetrics {
   const globalMultipliers = useMediaPlanStore((s) => s.globalMultipliers);
 
   return useMemo(() => {
-    const unlocked = channelsWithMetrics.filter((ch) => !ch.locked && ch.isActive);
+    // Locking a channel freezes its budget; it still delivers conversions.
+    const unlocked = channelsWithMetrics.filter((ch) => ch.isActive);
 
     const totalImpressions = unlocked.reduce((sum, ch) => sum + ch.metrics.impressions, 0);
     const rawClicks = unlocked.reduce((sum, ch) => sum + ch.metrics.clicks, 0);

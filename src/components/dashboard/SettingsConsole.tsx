@@ -189,7 +189,7 @@ const GlobalMultipliers: React.FC = () => {
               value={globalMultipliers.cpaTarget || ''}
               onChange={(e) =>
                 setGlobalMultipliers({
-                  cpaTarget: e.target.value ? parseFloat(e.target.value) : null,
+                  cpaTarget: parseFloat(e.target.value) > 0 ? parseFloat(e.target.value) : null,
                 })
               }
               placeholder="None"
@@ -225,7 +225,7 @@ const GlobalMultipliers: React.FC = () => {
               value={globalMultipliers.roasTarget || ''}
               onChange={(e) =>
                 setGlobalMultipliers({
-                  roasTarget: e.target.value ? parseFloat(e.target.value) : null,
+                  roasTarget: parseFloat(e.target.value) > 0 ? parseFloat(e.target.value) : null,
                 })
               }
               placeholder="None"
@@ -590,6 +590,11 @@ export const SettingsConsole: React.FC = () => {
       return;
     }
 
+    if (!(newPrice > 0)) {
+      toast({ title: 'Price must be greater than zero', variant: 'destructive' });
+      return;
+    }
+
     const family = inferChannelFamily(sanitizedName);
     addChannel({
       name: sanitizedName,
@@ -815,8 +820,9 @@ export const SettingsConsole: React.FC = () => {
                   )}
                   <Input
                     type="number"
+                    min={0}
                     value={newPrice}
-                    onChange={(e) => setNewPrice(parseFloat(e.target.value) || 0)}
+                    onChange={(e) => setNewPrice(Math.max(0, parseFloat(e.target.value) || 0))}
                     className={cn(
                       'bg-slate-800 shadow-inner border-slate-700 transition-all focus:ring-2 focus:ring-cyan-500/50',
                       'pr-16',

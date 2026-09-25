@@ -90,7 +90,10 @@ export function buildBudgetUtilization(
   totalBudget: number
 ): BudgetUtilizationPoint[] {
   const totals = buildGroupSpendTotals(channels);
-  const safeBudget = totalBudget > 0 ? totalBudget : 1;
+  // A spend multiplier can push spend above the nominal budget; measure against whichever
+  // is larger so groups never add up to more than 100%.
+  const totalSpend = Object.values(totals).reduce((sum, v) => sum + v, 0);
+  const safeBudget = Math.max(totalBudget, totalSpend, 1);
 
   return (Object.keys(totals) as ChannelGroup[]).map((group) => {
     const spend = totals[group];

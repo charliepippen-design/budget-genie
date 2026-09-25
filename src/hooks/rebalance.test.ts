@@ -229,3 +229,17 @@ describe('rebalanceToTargets action', () => {
     expect(channels.find((c) => c.id === 'ghost')?.allocationPct).toBe(40);
   });
 });
+
+describe('setChannelType keeps channel economics', () => {
+  it('converts a CPM price into an equivalent CPA instead of reusing the number', async () => {
+    const { generatePlan } = await import('@/lib/plan-generator');
+    const { computePlanSnapshot } = await import('@/hooks/use-media-plan-store');
+    useMediaPlanStore.getState().applyGeneratedPlan(generatePlan({ industry: 'ecommerce', monthlyBudget: 40000 }));
+    const id = 'ecommerce-meta-social';
+    const before = computePlanSnapshot(useMediaPlanStore.getState()).channels.find((c) => c.id === id)!;
+    useMediaPlanStore.getState().setChannelType(id, before.family, 'CPA');
+    const after = useMediaPlanStore.getState().channels.find((c) => c.id === id)!;
+    expect(after.typeConfig.price).toBeCloseTo(before.metrics.cpa!, 0);
+    expect(after.typeConfig.price).toBeGreaterThan(before.typeConfig.price * 2);
+  });
+});
