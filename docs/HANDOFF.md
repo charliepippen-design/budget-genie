@@ -69,7 +69,7 @@ Wave 1 is fixed in PR #2 (demo lock, NaN, budget input, wizard lockout, undo in 
 - **Payments moved to Vercel:**
   - `api/billing-checkout.ts` creates the Stripe Checkout session.
   - `api/stripe-webhook.ts` verifies the Stripe signature and sets Clerk `publicMetadata.payment_status` / `subscription_tier`.
-  - The Pricing page uses real checkout. Prices come from `src/lib/plans.ts` (Pro $99, Enterprise $499; confirm with the owner).
+  - The Pricing page uses real checkout. Prices come from `src/lib/plans.ts` (Pro $19/mo, Enterprise $39/mo, set by the owner to cover AI cost plus a 20–30% margin).
   - The old Supabase billing functions were removed. They wrote to Supabase auth, so they never unlocked anyone.
 - **To switch payments on, these Vercel env vars are needed:**
   - `STRIPE_SECRET_KEY` (the owner pastes it via `npx vercel env add ... --sensitive`)

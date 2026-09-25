@@ -13,7 +13,7 @@ export const PAID_PLANS: PlanInfo[] = [
   {
     tier: 'pro',
     name: 'Pro',
-    priceLabel: '$49',
+    priceLabel: '$19',
     tagline: 'For marketers planning real budgets',
     features: [
       'AI media planner (chat)',
@@ -25,7 +25,7 @@ export const PAID_PLANS: PlanInfo[] = [
   {
     tier: 'enterprise',
     name: 'Enterprise',
-    priceLabel: '$149',
+    priceLabel: '$39',
     tagline: 'For agencies and multi-brand teams',
     features: ['Everything in Pro', 'Multi-month planning and P&L', 'Priority support'],
   },
