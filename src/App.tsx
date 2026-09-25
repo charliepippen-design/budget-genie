@@ -26,6 +26,7 @@ const Settings = lazy(() => import('./pages/Settings'));
 const Onboard = lazy(() => import('./pages/Onboard'));
 const Report = lazy(() => import('./pages/Report'));
 const Output = lazy(() => import('./pages/Output'));
+const Legal = lazy(() => import('./pages/Legal'));
 
 const queryClient = new QueryClient();
 
@@ -64,6 +65,9 @@ const AppShell = () => {
                   <Route path="/" element={<Landing />} />
                   <Route path="/auth" element={<Auth />} />
                   <Route path="/pricing" element={<Pricing />} />
+                  <Route path="/terms" element={<Legal doc="terms" />} />
+                  <Route path="/refund-policy" element={<Legal doc="refund" />} />
+                  <Route path="/privacy" element={<Legal doc="privacy" />} />
                   <Route
                     path="/app"
                     element={

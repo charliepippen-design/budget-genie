@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUser, useAuth } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
+import { LegalLinks } from '@/pages/Legal';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -84,6 +85,7 @@ export default function Landing() {
         <p className="mt-8 text-white/70 text-sm">
           {isSignedIn ? 'Choose your plan to get started' : 'Sign in to unlock premium features'}
         </p>
+        <LegalLinks className="mt-6 text-white/70" />
       </div>
 
       {/* CSS for animations */}

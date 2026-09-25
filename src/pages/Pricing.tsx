@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { createCheckoutSession } from '@/lib/billing';
 import { PAID_PLANS, type PlanInfo } from '@/lib/plans';
+import { LegalLinks } from '@/pages/Legal';
 
 export default function Pricing() {
   const navigate = useNavigate();
@@ -96,6 +97,10 @@ export default function Pricing() {
           ))}
         </div>
 
+        <p className="text-center text-sm text-gray-600 mb-4">
+          Billed monthly. Cancel any time. 14-day money-back guarantee on your first payment.
+        </p>
+        <LegalLinks />
       </div>
     </div>
   );
