@@ -11,7 +11,7 @@ For whoever picks this up next (a new Claude session or a developer). The owner 
   - AI gateway on Vercel (`api/ai-gateway.ts`). The Gemini key is server-only and users are verified through Clerk.
   - Engine fixes.
   - The owner confirmed on the live site that the chat works.
-- **Waiting for the owner's OK, not merged: PR #2 (wave 1) and PR #3 (wave 2, stacked on #2)**, branch `qa/bugs`, https://github.com/charliepippen-design/budget-genie/pull/2. It contains wave-1 fixes from the browser QA pass (section 4). CI is green: tsc, eslint, 138 tests, build. The Vercel preview is ready.
+- **Waiting for the owner's OK, not merged: PR #2 (wave 1), PR #3 (wave 2) and PR #4 (wave 3 + payments), stacked in that order**, branch `qa/bugs`, https://github.com/charliepippen-design/budget-genie/pull/2. It contains wave-1 fixes from the browser QA pass (section 4). CI is green: tsc, eslint, 138 tests, build. The Vercel preview is ready.
   - Merging to `main` deploys production. Do it only after the owner writes "ok merge 2". Auto-mode blocks production deploys without explicit consent.
 - **Branches:**
   - `main` is the real codebase (April work plus PR #1).
@@ -61,27 +61,26 @@ Wave 1 is fixed in PR #2 (demo lock, NaN, budget input, wizard lockout, undo in 
   - Rev-share/hybrid rows show odd CTR/impressions.
   - No UI to activate/deactivate a channel.
 
-**Wave 3: data in/out, saving, settings**
-- Import (`import-service.ts`, `ImportWizard.tsx`):
-  - Months get relabelled to the current month.
-  - The 6-month sum is written as the monthly budget.
-  - EU number format `€20.000,00` becomes 20.
-  - A "Monthly Budget" header breaks column mapping.
-  - Invalid or empty files reach "Ready to Import", or show a raw JS error.
-  - Common channel names are not recognised; revenue/FTD columns are ignored.
-- Projects:
-  - `ProjectManager` is rendered twice with separate state, and saving from one deletes the other's projects.
-  - Duplicate names, no rename, delete without confirmation.
-  - Presets and scenarios can be saved but never loaded. `ScenarioComparison` and `MultiMonthCharts` are never mounted.
-- Exports:
-  - The "CSV" item actually exports JSON, and the app can't re-import its own JSON.
-  - XLSX has no number formats and no multi-month data.
-  - `/report` "Export PDF" is disabled.
-  - "Copy Link" is not a real share link.
-  - Printing `/output` keeps the dark theme.
-- Settings shows the Clerk user as a guest and "Cloud CONNECTED" while Supabase is dead. "Continue Free" doesn't stick.
-- Cloud save: there is none. Supabase is paused, and `useAutoSave` is not mounted. Decide between a new backend (e.g. Vercel Postgres/Neon) and dropping the claims from the UI.
-- Minor: reloading mid-wizard loses answers; invalid CPA/LTV is silently dropped; a phantom 4th month on import; linear and flat curves are identical; the storage-sync key is wrong (`use-store-sync.ts:19`); `/output` overflows on mobile.
+**Wave 3 + payments: done in PR #4** (branch `qa/wave3`, stacked on #3).
+- My Projects no longer loses saves.
+- Import handles EU numbers, real months, the "Monthly Budget" header, common platform names, and empty/bad files.
+- Exports: real CSV, JSON can be re-imported, Excel is formatted.
+- Settings shows the Clerk user and honest storage status.
+- **Payments moved to Vercel:**
+  - `api/billing-checkout.ts` creates the Stripe Checkout session.
+  - `api/stripe-webhook.ts` verifies the Stripe signature and sets Clerk `publicMetadata.payment_status` / `subscription_tier`.
+  - The Pricing page uses real checkout. Prices come from `src/lib/plans.ts` (Pro $99, Enterprise $499; confirm with the owner).
+  - The old Supabase billing functions were removed. They wrote to Supabase auth, so they never unlocked anyone.
+- **To switch payments on, these Vercel env vars are needed:**
+  - `STRIPE_SECRET_KEY` (the owner pastes it via `npx vercel env add ... --sensitive`)
+  - `STRIPE_PRICE_PRO_MONTHLY` and `STRIPE_PRICE_ENTERPRISE_MONTHLY` (price IDs of the Stripe products)
+  - `CLERK_SECRET_KEY`
+  - `STRIPE_WEBHOOK_SECRET`, from a Stripe webhook endpoint `https://mediaplannerpro.com/api/stripe-webhook` with events `checkout.session.completed`, `customer.subscription.updated` and `customer.subscription.deleted`.
+- Still open:
+  - No cloud save exists (browser only): decide on a backend.
+  - Presets and scenarios can be saved but never loaded; `ScenarioComparison` and `MultiMonthCharts` are never mounted.
+  - `/report` "Export PDF" is disabled; "Copy Link" is not a real share link; printing `/output` keeps the dark theme.
+  - Reloading mid-wizard loses the answers.
 
 ## 5. Product direction (agreed with the owner)
 
