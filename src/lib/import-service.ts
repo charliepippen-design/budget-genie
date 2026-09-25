@@ -119,6 +119,9 @@ export interface DetectedStructure {
 
 export interface ParsedMonthData {
   label: string;
+  /** First day of the month the row belongs to, when the file had a real date. */
+  date?: string; // "YYYY-MM"
+
   monthIndex: number;
   isSoftLaunch: boolean;
   budget: number;
@@ -153,6 +156,14 @@ export interface ImportResult {
 // ========== CHANNEL ALIASES FOR FUZZY MATCHING ==========
 
 const CHANNEL_ALIASES: Record<string, string[]> = {
+  // Common platform names come first so e.g. "Google Ads CPA" isn't read as affiliate CPA.
+  'google-search': ['google ads', 'google search', 'adwords', 'sem', 'ppc', 'paid search', 'search ads', 'bing ads'],
+  'google-shopping': ['google shopping', 'shopping ads', 'pmax', 'performance max'],
+  'meta-social': ['meta ads', 'meta', 'facebook', 'facebook ads', 'instagram', 'fb ads', 'paid social'],
+  'tiktok': ['tiktok', 'tik tok', 'tiktok ads'],
+  'youtube': ['youtube', 'youtube ads', 'video ads', 'ctv'],
+  'linkedin': ['linkedin', 'linkedin ads'],
+  'email-crm': ['email', 'newsletter', 'sms', 'crm', 'klaviyo'],
   'seo-tech': ['tech audit', 'tech', 'on-page', 'seo audit', 'technical seo', 'on page'],
   'seo-content': ['content', 'content production', 'content creation', 'blog', 'articles'],
   'seo-backlinks': ['backlinks', 'guest posts', 'link building', 'outreach', 'links'],
@@ -167,6 +178,13 @@ const CHANNEL_ALIASES: Record<string, string[]> = {
 };
 
 const CHANNEL_DEFAULTS: Record<string, { category: ChannelCategory; cpm: number; ctr: number; cr: number; roas: number }> = {
+  'google-search': { category: 'Paid Search', cpm: 40, ctr: 4, cr: 3, roas: 2.5 },
+  'google-shopping': { category: 'Paid Search', cpm: 12, ctr: 1.5, cr: 2.5, roas: 3.5 },
+  'meta-social': { category: 'Paid Social', cpm: 9, ctr: 1, cr: 1.5, roas: 2.2 },
+  'tiktok': { category: 'Paid Social', cpm: 6, ctr: 0.8, cr: 1, roas: 1.8 },
+  'youtube': { category: 'Offline/TV', cpm: 10, ctr: 0.4, cr: 1, roas: 1.5 },
+  'linkedin': { category: 'Paid Social', cpm: 35, ctr: 0.6, cr: 1, roas: 2 },
+  'email-crm': { category: 'Email/SMS', cpm: 1, ctr: 3, cr: 3, roas: 5 },
   'seo-tech': { category: 'SEO/Content', cpm: 2.5, ctr: 0.8, cr: 2.5, roas: 3.2 },
   'seo-content': { category: 'SEO/Content', cpm: 1.8, ctr: 1.2, cr: 2.5, roas: 4.5 },
   'seo-backlinks': { category: 'SEO/Content', cpm: 3.5, ctr: 0.5, cr: 2.5, roas: 2.8 },
@@ -181,6 +199,13 @@ const CHANNEL_DEFAULTS: Record<string, { category: ChannelCategory; cpm: number;
 };
 
 export const CHANNEL_DISPLAY_NAMES: Record<string, string> = {
+  'google-search': 'Google Search',
+  'google-shopping': 'Google Shopping / PMax',
+  'meta-social': 'Meta Ads',
+  'tiktok': 'TikTok Ads',
+  'youtube': 'YouTube / CTV',
+  'linkedin': 'LinkedIn Ads',
+  'email-crm': 'Email & CRM',
   'seo-tech': 'SEO - Tech Audit',
   'seo-content': 'SEO - Content',
   'seo-backlinks': 'SEO - Backlinks',
@@ -309,12 +334,25 @@ function parseNumber(value: string | number | undefined): number {
     return Math.max(MIN_BUDGET_VALUE, Math.min(MAX_BUDGET_VALUE, value));
   }
 
-  // Sanitize string - only allow numbers, decimal point, minus sign
-  const cleaned = value.toString()
-    .replace(/[€$£¥₹,\s]/g, '')
-    .replace(/\(([^)]+)\)/, '-$1') // Handle negative in parentheses
-    .replace(/%$/, '') // Remove trailing %
-    .replace(/[^0-9.-]/g, ''); // Remove any other non-numeric characters
+  let text = value.toString().trim()
+    .replace(/[€$£¥₹\s]/g, '')
+    .replace(/^\(([^)]+)\)$/, '-$1') // Handle negative in parentheses
+    .replace(/%$/, ''); // Remove trailing %
+
+  // Work out which separator is decimal: "1.234,56" (EU), "1,234.56" (US),
+  // "20.000" / "20,000" (thousands only), "12,5" (EU decimal).
+  const lastDot = text.lastIndexOf('.');
+  const lastComma = text.lastIndexOf(',');
+  if (lastDot >= 0 && lastComma >= 0) {
+    const decimal = lastDot > lastComma ? '.' : ',';
+    const thousands = decimal === '.' ? ',' : '.';
+    text = text.split(thousands).join('').replace(decimal, '.');
+  } else if (lastComma >= 0) {
+    text = /^-?\d{1,3}(,\d{3})+$/.test(text) ? text.replace(/,/g, '') : text.replace(',', '.');
+  } else if (lastDot >= 0 && /^-?\d{1,3}(\.\d{3})+$/.test(text)) {
+    text = text.replace(/\./g, '');
+  }
+  const cleaned = text.replace(/[^0-9.-]/g, '');
 
   const num = parseFloat(cleaned);
   if (isNaN(num)) return 0;
@@ -602,8 +640,10 @@ function fingerprintColumns(headerRow: string[], rawDataBelow: string[][]): Reco
     const val = String(cell).toLowerCase().trim();
 
     // Core
-    if (!map['month'] && /month|date|period/.test(val)) { map['month'] = idx; return; }
-    if (!map['budget'] && /budget|planned|target/.test(val)) { map['budget'] = idx; return; }
+    // Budget first: "Monthly Budget" is a budget column, not the month column.
+    // Word boundaries keep "Retargeting" from matching "target".
+    if (map['budget'] === undefined && /\bbudget\b|\bplanned\b|^target\b/.test(val)) { map['budget'] = idx; return; }
+    if (map['month'] === undefined && /^(month|date|period|mese)\b/.test(val)) { map['month'] = idx; return; }
 
     // Metrics
     if (/spend|cost|actuals/.test(val)) { map['gross_spend'] = idx; return; }
@@ -648,7 +688,8 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
 
   // Step 1: Find Anchor
   const { rowIndex: headerRowIndex } = findHeaderRow(rawData);
-  const headerRow = rawData[headerRowIndex];
+  // An empty or header-less file has nothing to map; treat it as an empty header row.
+  const headerRow = rawData[headerRowIndex] ?? [];
 
   // Step 2: Fingerprint Columns
   const dataRows = rawData.slice(headerRowIndex + 1);
@@ -702,8 +743,9 @@ export function detectStructure(rawData: string[][], fileName: string): Detected
 
     parsedMonths.push({
       label,
+      date: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
       monthIndex: monthIndex++,
-      isSoftLaunch: label.toLowerCase().includes('soft') || idx === 0 && budget < 1000, // Heuristic
+      isSoftLaunch: label.toLowerCase().includes('soft'),
       budget,
       channels,
       metrics: {
@@ -880,7 +922,7 @@ export function convertToMonthData(
       progressionPattern: 'custom',
       includeSoftLaunch: false,
       planningMonths: 6,
-      startMonth: new Date().toISOString().slice(0, 7),
+      startMonth: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
       warnings,
       errors,
     };
@@ -889,9 +931,11 @@ export function convertToMonthData(
   const includeSoftLaunch = parsedMonths.some(m => m.isSoftLaunch);
   const planningMonths = parsedMonths.filter(m => !m.isSoftLaunch).length || parsedMonths.length;
 
-  // Detect start month from first month label
-  let startMonth = new Date().toISOString().slice(0, 7);
-  const firstLabel = parsedMonths[0]?.label || '';
+  // Start month: the first row's real date when present, else parse its label
+  const now = new Date();
+  let startMonth =
+    parsedMonths[0]?.date ?? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  const firstLabel = parsedMonths[0]?.date ? '' : parsedMonths[0]?.label || '';
   const monthMatch = firstLabel.match(/(january|february|march|april|may|june|july|august|september|october|november|december)/i);
   const yearMatch = firstLabel.match(/20\d{2}/);
   if (monthMatch && yearMatch) {
