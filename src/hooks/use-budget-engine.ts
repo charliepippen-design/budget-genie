@@ -57,7 +57,9 @@ export const useBudgetEngine = () => {
         // B. Scalable / Capped Channels
         const variableChannels = currentChannels.filter(ch => ch.tier !== 'fixed');
 
-        if (variableChannels.length > 0) {
+        // When fixed fees eat the whole budget there is nothing to split: keep the variable
+        // channels' relative weights instead of zeroing them (which later flattened the mix).
+        if (variableChannels.length > 0 && remainingBudget > 0) {
             // We need to distribute the 'remainingBudget' among these channels.
 
             // First, get current relative weights of variable channels

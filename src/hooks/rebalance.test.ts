@@ -243,3 +243,28 @@ describe('setChannelType keeps channel economics', () => {
     expect(after.typeConfig.price).toBeGreaterThan(before.typeConfig.price * 2);
   });
 });
+
+describe('budget changes keep the channel mix', () => {
+  it('dropping to the fixed-fee floor and back does not flatten variable shares', async () => {
+    const { generatePlan } = await import('@/lib/plan-generator');
+    const { useBudgetEngine } = await import('@/hooks/use-budget-engine');
+    const { createElement, act } = await import('react');
+    const { createRoot } = await import('react-dom/client');
+    let engine!: ReturnType<typeof useBudgetEngine>;
+    const Probe = () => {
+      engine = useBudgetEngine();
+      return null;
+    };
+    const root = createRoot(document.createElement('div'));
+    act(() => root.render(createElement(Probe)));
+    useMediaPlanStore.getState().applyGeneratedPlan(generatePlan({ industry: 'ecommerce', monthlyBudget: 40000 }));
+    const weights = () =>
+      useMediaPlanStore.getState().channels.filter((c) => c.tier !== 'fixed').map((c) => c.allocationPct);
+    const ratio = (w: number[]) => w.map((x) => x / w.reduce((a, b) => a + b, 0));
+    const before = ratio(weights());
+    engine.updateBudget(1000);
+    engine.updateBudget(40000);
+    ratio(weights()).forEach((r, i) => expect(r).toBeCloseTo(before[i], 5));
+    act(() => root.unmount());
+  });
+});
