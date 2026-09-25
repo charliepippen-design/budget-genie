@@ -53,63 +53,75 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
   const [newProjectName, setNewProjectName] = useState('');
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
-  // Load projects from localStorage on mount
-  useEffect(() => {
-    if (localStorage) {
+  // Always read storage fresh: this component is mounted twice (header + dashboard), and a
+  // list cached at mount made one copy overwrite projects saved from the other.
+  const readProjects = (): Project[] => {
+    try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) {
-        try {
-          const parsed = JSON.parse(stored);
-          const validated = ProjectListSchema.safeParse(parsed);
-          if (validated.success) {
-            setProjects(validated.data);
-          } else {
-            console.warn('Invalid projects schema in localStorage:', validated.error);
-            setProjects([]);
-          }
-        } catch (e) {
-          console.error('Failed to parse projects from localStorage', e);
-          setProjects([]);
-        }
+      if (!stored) return [];
+      const validated = ProjectListSchema.safeParse(JSON.parse(stored));
+      if (!validated.success) {
+        console.warn('Invalid projects schema in localStorage:', validated.error);
+        return [];
       }
+      return validated.data;
+    } catch (e) {
+      console.error('Failed to read projects from localStorage', e);
+      return [];
     }
+  };
+
+  const writeProjects = (list: Project[]) => {
+    setProjects(list);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      toast.error('Could not save: browser storage is full or blocked');
+    }
+  };
+
+  useEffect(() => {
+    if (open) setProjects(readProjects());
     setIsLoadingProjects(false);
-  }, []);
+  }, [open]);
 
   const saveProject = () => {
-    if (!newProjectName.trim()) {
+    const name = newProjectName.trim();
+    if (!name) {
       toast.error('Please enter a project name');
       return;
     }
 
-    const mediaPlanState = useMediaPlanStore.getState();
-    const multiMonthState = useMultiMonthStore.getState();
+    const current = readProjects();
+    const existing = current.find((p) => p.name.toLowerCase() === name.toLowerCase());
+    if (existing && !window.confirm(`A project called "${existing.name}" exists. Overwrite it?`)) {
+      return;
+    }
 
+    const now = new Date().toISOString();
     const newProject: Project = {
-      id: crypto.randomUUID(),
-      name: newProjectName,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      mediaPlanState,
-      multiMonthState,
+      id: existing?.id ?? crypto.randomUUID(),
+      name,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now,
+      mediaPlanState: useMediaPlanStore.getState(),
+      multiMonthState: useMultiMonthStore.getState(),
     };
 
-    const updatedProjects = [newProject, ...projects];
-    setProjects(updatedProjects);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updatedProjects));
+    writeProjects([newProject, ...current.filter((p) => p.id !== newProject.id)]);
     setNewProjectName('');
-    toast.success('Project saved securely');
+    toast.success(existing ? 'Project updated' : 'Project saved in this browser');
   };
 
   const loadProject = (project: Project) => {
     try {
-      // 1. Load Media Plan State
-      // We need to be careful not to overwrite persisted storage configs if any
-      // But setState usually merges if not replaced carefully.
-      // Zustand's persist middleware handles hydration, but manual setState works too.
-      useMediaPlanStore.setState(project.mediaPlanState as Partial<MediaPlanState>);
-
-      // 2. Load Multi-Month State
+      // Account/access fields come from the signed-in user, never from a saved file.
+      const {
+        subscriptionTier: _tier,
+        userStatus: _status,
+        ...planState
+      } = project.mediaPlanState as Partial<MediaPlanState>;
+      useMediaPlanStore.setState(planState);
       useMultiMonthStore.setState(project.multiMonthState as Partial<MultiMonthState>);
 
       toast.success(`Loaded project: ${project.name}`);
@@ -122,9 +134,9 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
 
   const deleteProject = (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent triggering load
-    const updated = projects.filter((p) => p.id !== id);
-    setProjects(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const target = readProjects().find((p) => p.id === id);
+    if (!target || !window.confirm(`Delete "${target.name}"? This cannot be undone.`)) return;
+    writeProjects(readProjects().filter((p) => p.id !== id));
     toast.info('Project deleted');
   };
 
