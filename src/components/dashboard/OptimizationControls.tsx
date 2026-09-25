@@ -12,14 +12,15 @@ export function OptimizationControls() {
         const result = optimizeBudget(channels, totalBudget, globalMultipliers);
 
         // Check if changes occurred
-        if (result.changes.freedAllocation > 0) {
+        const { slashed, boosted, freedAllocation } = result.changes;
+        if (slashed.length + boosted.length > 0) {
             setChannels(result.channels);
             // Ensure normalization runs to be safe, though utility does it.
             normalizeAllocations();
 
             toast({
                 title: "Optimization Complete",
-                description: `Reallocated ${(result.changes.freedAllocation).toFixed(1)}% spend from underperforming channels.`,
+                description: `Moved ${freedAllocation.toFixed(1)}% of budget: cut ${slashed.length} channel(s) above target CPA by 30% and boosted ${boosted.length} channel(s) above target ROAS by 30%.`,
             });
         } else {
             toast({

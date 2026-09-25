@@ -549,27 +549,13 @@ export function calculatePlanMetrics(
     endingCumulativeProfit: number;
   };
 } {
-  let cumulativeProfit = 0;
-  let breakEvenMonth: number | null = null;
-
-  const baseMonths = months.map((month, idx) => {
+  const baseMonths = months.map((month) => {
     const metrics = calculateMonthMetrics(month, globalSettings);
-    const operatingCosts = metrics.revenue * 0.15; // 15% operating costs
-    const netProfit = metrics.revenue - metrics.totalSpend - operatingCosts;
-    cumulativeProfit += netProfit;
-
-    if (breakEvenMonth === null && cumulativeProfit >= 0) {
-      breakEvenMonth = idx;
-    }
-
     return {
       ...month,
       totalSpend: metrics.totalSpend,
       totalConversions: metrics.totalConversions,
       revenue: metrics.revenue,
-      operatingCosts,
-      netProfit,
-      cumulativeProfit,
     };
   });
 
@@ -583,11 +569,26 @@ export function calculatePlanMetrics(
       )
     : [];
 
+  let cumulativeProfit = 0;
+  let breakEvenMonth: number | null = null;
+
   const enrichedMonths = baseMonths.map((month, idx) => {
     const waterfall = waterfallSeries[idx];
+    // iGaming P/L is earned on NGR (after bonuses); other industries use channel revenue.
+    const netRevenue = waterfall ? waterfall.ngr : month.revenue;
+    const operatingCosts = netRevenue * 0.15; // 15% operating costs
+    const netProfit = netRevenue - month.totalSpend - operatingCosts;
+    cumulativeProfit += netProfit;
+
+    if (breakEvenMonth === null && cumulativeProfit >= 0) {
+      breakEvenMonth = idx;
+    }
 
     return {
       ...month,
+      operatingCosts,
+      netProfit,
+      cumulativeProfit,
       registrations: waterfall?.registrations,
       activePlayers: waterfall?.activePlayers,
       ggr: waterfall?.ggr,
@@ -620,7 +621,7 @@ export function calculatePlanMetrics(
       totalNgr,
       totalGrossContribution,
       operatingCosts: totalOperatingCosts,
-      netProfit: totalRevenue - totalSpend - totalOperatingCosts,
+      netProfit: enrichedMonths.reduce((sum, m) => sum + m.netProfit, 0),
       avgMonthlyBudget:
         enrichedMonths.length > 0 ? totalAllocatedBudget / enrichedMonths.length : 0, // Keeping for backward compat if needed
       avgCpa: totalConversions > 0 ? totalSpend / totalConversions : null,

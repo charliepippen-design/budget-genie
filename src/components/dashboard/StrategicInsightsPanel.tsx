@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useActionPulseStore } from '@/store/useActionPulseStore';
 import { useLayoutEffect, useMemo, useRef } from 'react';
 import { getEfficiencyAlerts, getMetricIntegrityIssues } from '@/lib/planning-insights';
+import { planAutoFixAllocation, planReallocation } from '@/lib/insight-actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
@@ -26,7 +27,7 @@ const fmt = (n: number, currency = 'USD') =>
 export const StrategicInsightsPanel = () => {
   const { toast } = useToast();
   const channels = useChannelsWithMetrics();
-  const { setChannelAllocation, normalizeAllocations, toggleChannelLock } = useMediaPlanStore();
+  const { setChannelAllocation, setAllocations, toggleChannelLock } = useMediaPlanStore();
   const dispatchActionPulse = useActionPulseStore((state) => state.dispatchActionPulse);
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'contrast';
@@ -40,12 +41,13 @@ export const StrategicInsightsPanel = () => {
   const efficiencyTarget = useMemo(() => {
     // Priority: integrity issue > high-severity alert > medium-severity alert
     if (integrityIssues.length > 0) {
-      return { channelName: integrityIssues[0].channelName, reason: integrityIssues[0].issue, type: 'integrity' as const };
+      const issue = integrityIssues[0];
+      return { channelId: issue.channelId, channelName: issue.channelName, reason: issue.issue, type: 'integrity' as const };
     }
     const high = efficiencyAlerts.find((a) => a.severity === 'high');
-    if (high) return { channelName: high.channelName, reason: high.reason, type: 'efficiency' as const };
+    if (high) return { channelId: high.channelId, channelName: high.channelName, reason: high.reason, type: 'efficiency' as const };
     const medium = efficiencyAlerts.find((a) => a.severity === 'medium');
-    if (medium) return { channelName: medium.channelName, reason: medium.reason, type: 'efficiency' as const };
+    if (medium) return { channelId: medium.channelId, channelName: medium.channelName, reason: medium.reason, type: 'efficiency' as const };
     return null;
   }, [integrityIssues, efficiencyAlerts]);
 
@@ -109,44 +111,46 @@ export const StrategicInsightsPanel = () => {
 
   // --- ACTION HANDLERS ---
 
+  // Acts on the channel the Efficiency card names, never a different one.
   const handleAutoFix = () => {
-    const candidates = channels.filter(
-      (ch) =>
-        !ch.locked &&
-        ['CPM', 'CPC', 'CPA'].includes(ch.buyingModel) &&
-        ch.metrics.cpa != null &&
-        ch.metrics.cpa > 0
-    );
-    if (candidates.length === 0) {
-      toast({ title: 'No Action Taken', description: 'No suitable variable channels found to optimize.' });
+    if (!efficiencyTarget) return;
+    const target = channels.find((ch) => ch.id === efficiencyTarget.channelId);
+    if (!target) return;
+    if (efficiencyTarget.type === 'integrity') {
+      // A data problem is fixed in the channel's inputs, not by cutting budget.
+      toast({ title: `Check ${target.name}`, description: efficiencyTarget.reason });
+      dispatchActionPulse(target.id, 'focus-channel');
       return;
     }
-    const worst = candidates.reduce((prev, cur) => {
-      const p = prev.metrics.cpa ?? Infinity;
-      const c = cur.metrics.cpa ?? Infinity;
-      return p > c ? prev : cur;
+    if (target.buyingModel === 'FLAT_FEE' || target.buyingModel === 'RETAINER') {
+      toast({ title: 'No Action Taken', description: `${target.name} is a fixed fee. Change its fee in the channel table.` });
+      return;
+    }
+    const next = planAutoFixAllocation(target);
+    if (next === null) {
+      toast({ title: 'Action Blocked', description: `${target.name} is locked.` });
+      return;
+    }
+    setChannelAllocation(target.id, next);
+    toast({
+      title: 'Spend Reduced',
+      description: `Cut ${target.name} from ${target.allocationPct.toFixed(1)}% to ${next.toFixed(1)}% of budget. The freed budget went to the other unlocked channels.`,
     });
-    if (worst.locked) {
-      toast({ title: 'Action Blocked', description: `${worst.name} is locked.` });
-      return;
-    }
-    setChannelAllocation(worst.id, Math.max(0, worst.allocationPct * 0.9));
-    normalizeAllocations();
-    toast({ title: 'Optimized', description: `Reduced ${worst.name} budget by 10% due to high cost per conversion.` });
-    dispatchActionPulse(worst.id, 'reduce-spend');
+    dispatchActionPulse(target.id, 'reduce-spend');
   };
 
   const handleReallocate = () => {
     if (!arbitrage) return;
-    if (arbitrage.winner.locked) {
-      toast({ title: 'Action Blocked', description: `${arbitrage.winner.name} is locked.` });
+    const allocations = planReallocation(arbitrage.winner, arbitrage.loser);
+    if (!allocations) {
+      const locked = arbitrage.winner.locked ? arbitrage.winner : arbitrage.loser;
+      toast({ title: 'Action Blocked', description: `${locked.name} is locked.` });
       return;
     }
-    setChannelAllocation(arbitrage.winner.id, Math.min(100, arbitrage.winner.allocationPct + 20));
-    normalizeAllocations();
+    setAllocations(allocations);
     toast({
       title: 'Budget Reallocated',
-      description: `Shifted budget from ${arbitrage.loser.name} → ${arbitrage.winner.name}.`,
+      description: `Moved ${fmt(arbitrage.shiftAmount)} (20% of ${arbitrage.loser.name}) to ${arbitrage.winner.name}.`,
       className: 'border-green-500/30 bg-green-500/10',
     });
     dispatchActionPulse(arbitrage.winner.id, 'reallocate');
@@ -154,10 +158,14 @@ export const StrategicInsightsPanel = () => {
 
   const handleCapSpend = () => {
     if (!topSaturation) return;
+    if (topSaturation.locked) {
+      toast({ title: 'Already Capped', description: `${topSaturation.name} is already locked at its current budget.` });
+      return;
+    }
     toggleChannelLock(topSaturation.id);
     toast({
       title: 'Spend Capped',
-      description: `Locked ${topSaturation.name} to prevent diminishing returns.`,
+      description: `Locked ${topSaturation.name} at its current budget so rebalancing can't push it further into diminishing returns.`,
       className: 'border-amber-500/30 bg-amber-500/10',
     });
     dispatchActionPulse(topSaturation.id, 'cap-spend');
@@ -243,7 +251,7 @@ export const StrategicInsightsPanel = () => {
                   className="w-full border-red-500/20 hover:bg-red-500/10 text-red-300 hover:text-red-200"
                   onClick={handleAutoFix}
                 >
-                  Auto-Fix (Reduce Spend)
+                  {efficiencyTarget.type === 'integrity' ? 'Review Channel' : 'Auto-Fix (Reduce Spend 10%)'}
                 </Button>
               </div>
             </Card>
@@ -298,7 +306,7 @@ export const StrategicInsightsPanel = () => {
                   className="w-full border-green-500/20 hover:bg-green-500/10 text-green-300 hover:text-green-200"
                   onClick={handleReallocate}
                 >
-                  Reallocate Budget
+                  Reallocate 20% of {arbitrage.loser.name}
                 </Button>
               </div>
             </Card>
@@ -350,7 +358,7 @@ export const StrategicInsightsPanel = () => {
                   className="w-full border-amber-500/20 hover:bg-amber-500/10 text-amber-300 hover:text-amber-200"
                   onClick={handleCapSpend}
                 >
-                  Cap Spend
+                  Cap at Current Spend
                 </Button>
 
                 <div className="mt-3 flex flex-wrap gap-2 text-[11px]" aria-live="polite">

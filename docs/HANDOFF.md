@@ -53,11 +53,8 @@ Wave 1 is fixed in PR #2 (demo lock, NaN, budget input, wizard lockout, undo in 
 **Wave 2: done in PR #3** (branch `qa/wave2`, stacked on PR #2; merge #2 first, then retarget #3 to `main`).
 - Shared LTV model, unified currency formatting, multi-month sync, budget mix kept, spend multiplier, locked velocity, buying-model price conversion, validation, reset confirm, undo scope.
 - Still open from wave 2:
-  - Insight actions (Reallocate, Auto-Fix) do something different from what their text says.
   - Keyboard slider changes don't renormalise.
   - Fixed-fee rows show 0% in the table.
-  - The P&L "Net P/L" ignores NGR for iGaming.
-  - Onboarding: the goal is ignored without AI; the geo list is iGaming-only; the UK flag is broken.
   - Rev-share/hybrid rows show odd CTR/impressions.
   - No UI to activate/deactivate a channel.
 

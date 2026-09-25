@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { useMediaPlanStore, computePlanSnapshot } from '@/hooks/use-media-plan-store';
-import { calculateMonthMetrics, toMonthValue, useMultiMonthStore } from '@/hooks/use-multi-month-store';
+import { calculateMonthMetrics, calculatePlanMetrics, toMonthValue, useMultiMonthStore } from '@/hooks/use-multi-month-store';
+import { DEFAULT_IGAMING_REVENUE_INPUTS } from '@/lib/igaming-revenue-model';
 import { generatePlan } from '@/lib/plan-generator';
 
 describe('multi-month follows the main plan', () => {
@@ -27,6 +28,27 @@ describe('multi-month follows the main plan', () => {
     const snap = computePlanSnapshot(plan).blended;
     expect(m.totalConversions).toBeCloseTo(snap.totalConversions, -1);
     expect(m.revenue).toBeCloseTo(snap.projectedRevenue, -2);
+  });
+
+  it('iGaming Net P/L is earned on NGR; other industries on revenue', () => {
+    useMultiMonthStore.getState().generateMonths();
+    const { months, globalSettings } = useMultiMonthStore.getState();
+    const plain = calculatePlanMetrics(months, globalSettings);
+    plain.months.forEach((m) => {
+      expect(m.netProfit).toBeCloseTo(m.revenue! * 0.85 - m.totalSpend!, 2);
+    });
+
+    const withNgr = calculatePlanMetrics(months, globalSettings, {
+      ...DEFAULT_IGAMING_REVENUE_INPUTS,
+      playerValue: 200,
+    });
+    withNgr.months.forEach((m) => {
+      expect(m.netProfit).toBeCloseTo(m.ngr! * 0.85 - m.totalSpend!, 2);
+      expect(m.netProfit).not.toBeCloseTo(m.revenue! * 0.85 - m.totalSpend!, 0);
+    });
+    const sum = withNgr.months.reduce((s, m) => s + m.netProfit!, 0);
+    expect(withNgr.totals.netProfit).toBeCloseTo(sum, 2);
+    expect(withNgr.totals.endingCumulativeProfit).toBeCloseTo(sum, 2);
   });
 
   it('month values use local time', () => {
