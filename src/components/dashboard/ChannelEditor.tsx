@@ -46,7 +46,7 @@ interface ChannelEditorProps {
 }
 
 export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
-  const { setChannelType, updateChannelConfigField, globalMultipliers } = useMediaPlanStore();
+  const { setChannelType, updateChannelConfigField } = useMediaPlanStore();
   const { format: formatCurrency, symbol } = useCurrency();
   const { theme } = useTheme();
   const vc = useVerticalConfig();
