@@ -41,7 +41,7 @@ const Output = () => {
   const { theme, cycleTheme } = useTheme();
   const channels = useChannelsWithMetrics();
   const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore();
-  const { format } = useCurrency();
+  const { format, code } = useCurrency();
 
   const $ = (n: number) => format(n);
 
@@ -107,6 +107,7 @@ const Output = () => {
       alertCount: alerts.length,
       vertical: vc.vertical,
       geos: activeGeos,
+      currency: code,
     })
       .then((result) => {
         setNarrative(result);

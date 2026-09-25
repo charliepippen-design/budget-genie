@@ -544,6 +544,7 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
 // MAIN COMPONENT: SettingsConsole
 // ------------------------------------------------------------------
 export const SettingsConsole: React.FC = () => {
+  const { symbol } = useCurrency();
   const { channels, addChannel, resetAll, totalBudget, globalMultipliers } = useProjectStore();
   const channelsWithMetrics = useChannelsWithMetrics();
   const { toast } = useToast();
@@ -561,17 +562,17 @@ export const SettingsConsole: React.FC = () => {
   const priceMeta = useMemo(() => {
     switch (newModel) {
       case 'CPM':
-        return { label: 'CPM Price', prefix: '$', suffix: 'per 1K' };
+        return { label: 'CPM Price', prefix: symbol, suffix: 'per 1K' };
       case 'CPA':
-        return { label: 'Target CPA', prefix: '$', suffix: 'per FTD' };
+        return { label: 'Target CPA', prefix: symbol, suffix: 'per conversion' };
       case 'REV_SHARE':
         return { label: 'RevShare %', prefix: '', suffix: '%' };
       case 'FLAT_FEE':
-        return { label: 'Flat Fee', prefix: '$', suffix: 'total' };
+        return { label: 'Flat Fee', prefix: symbol, suffix: 'total' };
       default:
-        return { label: 'Price', prefix: '$', suffix: '' };
+        return { label: 'Price', prefix: symbol, suffix: '' };
     }
-  }, [newModel]);
+  }, [newModel, symbol]);
 
   useEffect(() => {
     setNewModel(getLikelyModel(newCat));

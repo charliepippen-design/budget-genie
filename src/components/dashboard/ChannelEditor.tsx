@@ -127,7 +127,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={0.1}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per 1K"
               isDark={isDark}
             />
@@ -174,7 +174,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={0.01}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per click"
               isDark={isDark}
             />
@@ -210,7 +210,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={1}
               icon={<Target className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               suffix="per FTD"
               isDark={isDark}
             />
@@ -246,7 +246,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={1000000}
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
           </motion.div>
@@ -270,7 +270,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={100000}
               step={1}
               icon={<Target className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
             <PremiumSlider
@@ -292,7 +292,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={1000000}
               step={5}
               icon={<DollarSign className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
           </motion.div>
@@ -317,7 +317,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               max={50000}
               step={50}
               icon={<Wallet className="h-4 w-4" />}
-              prefix="€"
+              prefix={symbol}
               isDark={isDark}
             />
             <PremiumSlider
@@ -356,7 +356,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
                 max={1000000}
                 step={100}
                 icon={<Zap className="h-4 w-4" />}
-                prefix="€"
+                prefix={symbol}
                 isDark={isDark}
               />
             ) : null}

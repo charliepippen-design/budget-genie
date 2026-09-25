@@ -252,34 +252,23 @@ export const CATEGORY_INFO: Record<ChannelCategory, { name: string; color: strin
 
 // Utility functions
 export function formatCurrency(value: number, compact = false): string {
-  // Fallback function - should use context's format() instead
-  // Default to EUR for legacy/fallback usage
-  const info: { symbol: string; locale: string; symbolPosition: 'before' | 'after' } = {
-    symbol: '€',
-    locale: 'de-DE',
-    symbolPosition: 'after',
-  };
-
+  // Fallback for code outside CurrencyProvider; matches the context's style (EUR, en-US grouping).
+  if (!Number.isFinite(value)) return '€0';
   if (compact) {
-    let formatted: string;
-    if (value >= 1000000) {
-      formatted = `${(value / 1000000).toFixed(1)}M`;
-    } else if (value >= 1000) {
-      formatted = `${(value / 1000).toFixed(1)}K`;
-    } else {
-      formatted = value.toFixed(0);
-    }
-    return `${formatted}${info.symbol}`;
+    const abs = Math.abs(value);
+    const formatted =
+      abs >= 1000000
+        ? `${(value / 1000000).toFixed(1)}M`
+        : abs >= 1000
+          ? `${(value / 1000).toFixed(1)}K`
+          : value.toFixed(0);
+    return `€${formatted}`;
   }
-
-  const formatter = new Intl.NumberFormat(info.locale, {
+  return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'EUR',
-    minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-  });
-
-  return formatter.format(value);
+  }).format(value);
 }
 
 export function formatNumber(value: number, compact = false): string {

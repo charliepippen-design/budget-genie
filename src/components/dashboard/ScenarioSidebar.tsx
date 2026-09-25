@@ -1,3 +1,4 @@
+import { useCurrency } from '@/contexts/CurrencyContext';
 import React from 'react';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import type { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
@@ -42,6 +43,7 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
   onReset,
   onNormalize,
 }) => {
+  const { format } = useCurrency();
   // Use the modern store hooks
   const {
     setAllocations,
@@ -109,7 +111,7 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
                 <span className="text-slate-300">Target CPA</span>
                 {globalMultipliers.cpaTarget ? (
                   <span className="text-emerald-400 font-mono text-xs border border-emerald-500/30 bg-emerald-500/10 px-1.5 rounded">
-                    Active: €{globalMultipliers.cpaTarget}
+                    Active: {format(globalMultipliers.cpaTarget)}
                   </span>
                 ) : (
                   <span className="text-slate-500 text-xs">No Limit</span>

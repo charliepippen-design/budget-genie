@@ -1,3 +1,4 @@
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { Globe2, Lock, Pencil, Search, Sparkles, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
@@ -30,6 +31,7 @@ const TIER_RAILS: Record<GeoTierKey, string> = {
 };
 
 export function GlobalGeoArbitrageTokenMatrix() {
+  const { format } = useCurrency();
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'contrast';
   const activeTiers = useMediaPlanStore((state) => state.activeTiers);
@@ -229,12 +231,12 @@ export function GlobalGeoArbitrageTokenMatrix() {
           <StatChip
             isDark={isDark}
             label="Blended CPA"
-            value={`$${geoProfile.blendedCpa.toFixed(0)}`}
+            value={format(geoProfile.blendedCpa)}
           />
           <StatChip
             isDark={isDark}
             label="Blended LTV"
-            value={`$${geoProfile.blendedLtv.toFixed(0)}`}
+            value={format(geoProfile.blendedLtv)}
           />
         </div>
       </div>

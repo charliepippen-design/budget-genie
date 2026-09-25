@@ -59,12 +59,12 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } else {
         formatted = `${(value / 1000).toFixed(1)}K`;
       }
-      return info.symbolPosition === 'before'
-        ? `${info.symbol}${formatted}`
-        : `${formatted}${info.symbol}`;
+      return `${info.symbol}${formatted}`;
     }
 
-    const formatter = new Intl.NumberFormat(info.locale, {
+    // One number style across the app (en-US grouping), whatever the currency,
+    // so "€40,000" never sits next to "40.000 €" on the same screen.
+    const formatter = new Intl.NumberFormat('en-US', {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
       style: 'currency',

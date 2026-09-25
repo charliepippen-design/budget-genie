@@ -1,3 +1,4 @@
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Users, TrendingUp, FlaskConical, Shield, CheckCircle } from 'lucide-react';
@@ -124,6 +125,7 @@ function parsePositive(value: string): number | undefined {
 }
 
 export const OnboardWizard = () => {
+  const { format, symbol } = useCurrency();
   const navigate = useNavigate();
   const setTotalBudget = useMediaPlanStore((state) => state.setTotalBudget);
   const setOnboardingVertical = useMediaPlanStore((state) => state.setOnboardingVertical);
@@ -517,7 +519,7 @@ export const OnboardWizard = () => {
                       <CheckCircle className="absolute right-4 top-4 h-5 w-5 text-indigo-400" />
                     ) : null}
                     <p className="text-sm font-semibold text-slate-200">{tier.title}</p>
-                    <p className="mt-2 text-2xl font-bold text-white">{tier.rangeLabel}</p>
+                    <p className="mt-2 text-2xl font-bold text-white">{tier.rangeLabel.replace(/\$/g, symbol)}</p>
                     <p className="mt-1 text-sm text-slate-400">{tier.helper}</p>
                     <p className="mt-2 text-sm text-slate-400">{tier.description}</p>
                   </Card>
@@ -551,8 +553,8 @@ export const OnboardWizard = () => {
                 />
                 <p className="mt-4 text-3xl font-bold text-indigo-400">
                   {typeof state.budget === 'number'
-                    ? `$${state.budget.toLocaleString('en-US')}`
-                    : '$0'}
+                    ? format(state.budget)
+                    : format(0)}
                 </p>
                 <p className="mt-2 text-xs text-slate-500">
                   You can adjust this at any time from the dashboard.
@@ -673,7 +675,7 @@ export const OnboardWizard = () => {
               <p className="text-sm font-semibold text-slate-200">Preview</p>
               <p className="mt-2 text-sm text-slate-400">
                 {selectedSubverticalPreset
-                  ? `${selectedSubverticalPreset.label}: margin ${(selectedSubverticalPreset.margin * 100).toFixed(1)}%, bonus ${(selectedSubverticalPreset.bonusRate * 100).toFixed(1)}%, reg to FTD ${(selectedSubverticalPreset.regToFtdCvr * 100).toFixed(1)}%, player value $${selectedSubverticalPreset.playerValue}, retention ${(selectedSubverticalPreset.retentionRate * 100).toFixed(0)}%.`
+                  ? `${selectedSubverticalPreset.label}: margin ${(selectedSubverticalPreset.margin * 100).toFixed(1)}%, bonus ${(selectedSubverticalPreset.bonusRate * 100).toFixed(1)}%, reg to FTD ${(selectedSubverticalPreset.regToFtdCvr * 100).toFixed(1)}%, player value ${format(selectedSubverticalPreset.playerValue)}, retention ${(selectedSubverticalPreset.retentionRate * 100).toFixed(0)}%.`
                   : 'Skip this if you want to enter your own revenue model inputs later.'}
               </p>
             </div>
@@ -843,7 +845,7 @@ export const OnboardWizard = () => {
                 </label>
                 <div className="relative mt-3">
                   <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    $
+                    {symbol}
                   </span>
                   <Input
                     inputMode="decimal"
@@ -870,7 +872,7 @@ export const OnboardWizard = () => {
                 </label>
                 <div className="relative mt-3">
                   <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
-                    $
+                    {symbol}
                   </span>
                   <Input
                     inputMode="decimal"

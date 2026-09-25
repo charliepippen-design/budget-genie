@@ -59,7 +59,7 @@ const Report = () => {
   const vc = useVerticalConfig();
   const channels = useChannelsWithMetrics();
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore();
-  const { format } = useCurrency();
+  const { format, code } = useCurrency();
 
   const {
     active,
@@ -113,6 +113,7 @@ const Report = () => {
       alertCount: alerts.length,
       vertical: vc.vertical,
       geos: activeGeos,
+      currency: code,
     }).then((result) => {
       setNarrative(result);
       setNarrativeLoading(false);

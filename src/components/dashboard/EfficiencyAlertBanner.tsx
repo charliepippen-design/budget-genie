@@ -1,8 +1,10 @@
+import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useChannelsWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 
 export function EfficiencyAlertBanner() {
+  const { format } = useCurrency();
   const channels = useChannelsWithMetrics();
   const subscriptionTier = useMediaPlanStore((state) => state.subscriptionTier);
   const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
@@ -28,11 +30,7 @@ export function EfficiencyAlertBanner() {
   );
 
   const wastedSpend = roasUnderperformers.reduce((sum, c) => sum + c.metrics.spend, 0);
-  const money = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(wastedSpend);
+  const money = format(wastedSpend);
 
   if (!isPro) {
     return null;
