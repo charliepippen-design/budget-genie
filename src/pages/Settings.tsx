@@ -14,11 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { supabase } from '@/lib/supabase';
-import type { User } from '@supabase/supabase-js';
+import { useClerk, useUser } from '@clerk/clerk-react';
 import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
-import { Progress } from '@/components/ui/progress';
 import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
@@ -107,7 +105,10 @@ const PRICING_TIERS: Array<{
 export default function Settings() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [user, setUser] = useState<User | null>(null);
+  // Identity comes from Clerk (the app's auth); Supabase auth is not used.
+  const { user: clerkUser } = useUser();
+  const clerk = useClerk();
+  const email = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
   const [projectCount, setProjectCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
@@ -174,29 +175,6 @@ export default function Settings() {
   );
 
   const syncBillingTierFromMetadata = useCallback(async () => {
-    const {
-      data: { user: refreshedUser },
-      error,
-    } = await supabase.auth.getUser();
-
-    if (error) {
-      setBillingSyncStatus('error');
-      setBillingSyncMessage(error.message);
-      return null;
-    }
-
-    setUser(refreshedUser ?? null);
-
-    const refreshedTier = refreshedUser?.app_metadata?.subscription_tier;
-    if (refreshedTier === 'free' || refreshedTier === 'pro' || refreshedTier === 'enterprise') {
-      setMetadataTier(refreshedTier);
-      setSubscriptionTier(refreshedTier);
-      setBillingSyncStatus('synced');
-      setBillingSyncMessage(`Metadata sync healthy (${refreshedTier.toUpperCase()})`);
-      setLastSyncedAt(new Date().toISOString());
-      return refreshedTier;
-    }
-
     if (isSuperUser || hasActivePayment) {
       setMetadataTier(effectiveTier);
       setSubscriptionTier(effectiveTier);
@@ -211,8 +189,8 @@ export default function Settings() {
     }
 
     setMetadataTier(null);
-    setBillingSyncStatus('error');
-    setBillingSyncMessage('No subscription_tier found in auth metadata');
+    setBillingSyncStatus('synced');
+    setBillingSyncMessage('Free plan');
     return null;
   }, [effectiveTier, hasActivePayment, isSuperUser, setSubscriptionTier]);
 
@@ -221,32 +199,10 @@ export default function Settings() {
       try {
         await syncBillingTierFromMetadata();
 
-        const { count, error } = await supabase
-          .from('projects')
-          .select('*', { count: 'exact', head: true });
-
-        if (!error) {
-          setProjectCount(count || 0);
-        } else {
-          const stored = localStorage.getItem('igaming_projects');
-          if (stored) {
-            try {
-              const parsed = JSON.parse(stored);
-              const validated = ProjectListForCountSchema.safeParse(parsed);
-              if (validated.success) {
-                setProjectCount(validated.data.length);
-              } else {
-                console.warn('Invalid projects list schema in localStorage:', validated.error);
-                setProjectCount(0);
-              }
-            } catch (e) {
-              console.error('Failed to parse projects from localStorage for count', e);
-              setProjectCount(0);
-            }
-          } else {
-            setProjectCount(0);
-          }
-        }
+        // Projects are saved in this browser (see My Projects).
+        const stored = localStorage.getItem('igaming_projects');
+        const validated = stored ? ProjectListForCountSchema.safeParse(JSON.parse(stored)) : null;
+        setProjectCount(validated?.success ? validated.data.length : 0);
       } catch (e) {
         console.warn('Failed to fetch settings data', e);
       } finally {
@@ -351,15 +307,8 @@ export default function Settings() {
     void processReturn();
   }, [location.search, navigate, setSubscriptionTier, syncBillingTierFromMetadata]);
 
-  const handleResetPassword = async () => {
-    if (!user?.email) return;
-    const { error } = await supabase.auth.resetPasswordForEmail(user.email);
-    if (error) {
-      toast.error('Failed to send reset email: ' + error.message);
-    } else {
-      toast.success('Password reset email sent!');
-    }
-  };
+  // Password and email are managed in Clerk's account screen.
+  const handleResetPassword = () => clerk.openUserProfile();
 
   const openUpgrade = (
     tier: SubscriptionTier,
@@ -506,7 +455,7 @@ export default function Settings() {
                   Email Address
                 </label>
                 <div className="mt-1 text-slate-200 font-medium">
-                  {user?.email || 'guest@mediaplanner.pro (Demo Mode)'}
+                  {email ?? 'Not signed in'}
                 </div>
               </div>
               <div>
@@ -521,7 +470,7 @@ export default function Settings() {
                     Active
                   </Badge>
                   <Badge variant="outline" className="border-slate-600 text-slate-400">
-                    {user ? 'Authenticated' : 'Anonymous Session'}
+                    {clerkUser ? 'Signed in' : 'Not signed in'}
                   </Badge>
                 </div>
               </div>
@@ -529,10 +478,10 @@ export default function Settings() {
               <Button
                 variant="outline"
                 onClick={handleResetPassword}
-                disabled={!user}
+                disabled={!clerkUser}
                 className="w-full border-slate-600 text-slate-300 hover:text-white hover:bg-slate-700 hover:border-slate-500"
               >
-                Reset Password
+                Manage Account & Password
               </Button>
               <Button
                 variant="outline"
@@ -555,10 +504,10 @@ export default function Settings() {
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between p-3 rounded-lg bg-[#0f172a] border border-slate-800">
                 <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.5)]"></div>
-                  <span className="text-sm font-medium text-slate-300">Cloud Connection</span>
+                  <div className="h-2 w-2 rounded-full bg-amber-400"></div>
+                  <span className="text-sm font-medium text-slate-300">Storage</span>
                 </div>
-                <span className="text-xs text-green-400 font-mono">CONNECTED</span>
+                <span className="text-xs text-amber-300 font-mono">THIS BROWSER ONLY</span>
               </div>
 
               <div className="space-y-2">
@@ -570,12 +519,8 @@ export default function Settings() {
                     {loading ? '...' : projectCount}
                   </span>
                 </div>
-                <Progress
-                  value={Math.min(((projectCount || 0) / 10) * 100, 100)}
-                  className="h-1.5 bg-slate-800 [&>div]:bg-blue-500"
-                />
                 <p className="text-xs text-slate-500 text-right">
-                  {10 - (projectCount || 0)} free slots remaining
+                  Saved in this browser. Export a JSON config to keep a copy.
                 </p>
               </div>
             </CardContent>
