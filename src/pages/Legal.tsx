@@ -8,7 +8,7 @@ const LEGAL = {
   product: 'MediaPlan Pro',
   site: 'mediaplannerpro.com',
   operator: 'MediaPlan Pro',
-  contactEmail: 'support@mediaplannerpro.com',
+  contactEmail: 'info@mediaplannerpro.com',
   governingLaw: 'Italy',
   lastUpdated: 'September 25, 2026',
 };
