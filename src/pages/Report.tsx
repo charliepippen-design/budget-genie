@@ -1,3 +1,4 @@
+import { usePlanEconomics } from '@/hooks/use-plan-economics';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -33,7 +34,6 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import {
-  buildScenarioEnvelope,
   getEfficiencyAlerts,
   buildRoasTrendData,
   buildGroupSpendTotals,
@@ -61,42 +61,18 @@ const Report = () => {
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore();
   const { format } = useCurrency();
 
-  const active = useMemo(
-    () => channels.filter((c) => c.isActive && c.metrics.spend > 0),
-    [channels]
-  );
-
-  const totalSpend = useMemo(() => active.reduce((s, c) => s + c.metrics.spend, 0), [active]);
-
-  const projectedRevenue = useMemo(
-    () => active.reduce((s, c) => s + c.metrics.revenue, 0),
-    [active]
-  );
-
-  const projectedFtds = useMemo(
-    () => active.reduce((s, c) => s + c.metrics.conversions, 0),
-    [active]
-  );
-
-  const blendedCpa = useMemo(
-    () => (projectedFtds > 0 ? totalSpend / projectedFtds : null),
-    [totalSpend, projectedFtds]
-  );
-
-  const blendedRoas = useMemo(
-    () => (totalSpend > 0 ? projectedRevenue / totalSpend : 0),
-    [projectedRevenue, totalSpend]
-  );
-
-  const netPnl = projectedRevenue - totalSpend;
+  const {
+    active,
+    totalSpend,
+    projectedRevenue,
+    projectedFtds,
+    blendedCpa,
+    blendedRoas,
+    netPnl,
+    paybackMonths,
+    scenarioEnvelope,
+  } = usePlanEconomics();
   const isProfit = netPnl >= 0;
-
-  const paybackMonths = useMemo(() => {
-    const monthlyLtvInflow = projectedFtds * globalMultipliers.playerValue;
-    if (monthlyLtvInflow <= 0) return null;
-    const months = Math.ceil((totalSpend / monthlyLtvInflow) * 12);
-    return months > 24 ? null : months;
-  }, [projectedFtds, globalMultipliers.playerValue, totalSpend]);
 
   const topChannel = useMemo(
     () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
@@ -104,17 +80,6 @@ const Report = () => {
   );
 
   const weakestChannel = useMemo(() => active.find((c) => c.metrics.roas < 1) ?? null, [active]);
-
-  const scenarioEnvelope = useMemo(
-    () =>
-      buildScenarioEnvelope({
-        baseLtvPerUser: globalMultipliers.playerValue,
-        conversions: projectedFtds,
-        cpa: blendedCpa ?? 0,
-        assumptions: { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 },
-      }),
-    [globalMultipliers.playerValue, projectedFtds, blendedCpa]
-  );
 
   const roasTrend = useMemo(
     () => buildRoasTrendData(active, { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 }, 6),
@@ -288,7 +253,7 @@ const Report = () => {
                 <p className="text-sm">{vc.report.paybackLabel}</p>
               </div>
               <p className={`text-4xl font-bold ${paybackColor}`}>
-                {paybackMonths ? `${paybackMonths} months` : '24+ months'}
+                {paybackMonths ? `${paybackMonths} months` : '12+ months'}
               </p>
               <p className="mt-2 text-xs text-muted-foreground">
                 based on {$(globalMultipliers.playerValue)} {vc.terms.customerValue.toLowerCase()}
@@ -373,7 +338,7 @@ const Report = () => {
               <div className="hidden h-full w-px bg-border md:block" />
 
               <div>
-                <p className="text-sm text-muted-foreground">Net P&L (Month 1)</p>
+                <p className="text-sm text-muted-foreground">Net Value (cohort value − spend)</p>
                 <p
                   className={`mt-2 text-3xl font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}
                 >

@@ -1,3 +1,4 @@
+import { buildPlanScenarios, DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 import { PlannerChat } from '../planner/PlannerChat';
 import {
   useState,
@@ -37,7 +38,6 @@ import {
 import { useSandboxStore } from '@/store/useSandboxStore';
 import { cn } from '@/lib/utils';
 import {
-  buildScenarioEnvelope,
   getEfficiencyAlerts,
   getMetricIntegrityIssues,
 } from '@/lib/planning-insights';
@@ -125,21 +125,18 @@ export const BudgetGenieAI = () => {
   const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
+  // Same scenario model as the LTV lab and /report, so exports show the same numbers.
+  const playerValue = useMediaPlanStore((s) => s.globalMultipliers.playerValue);
+  const observedLtv = useMediaPlanStore((s) => s.observedLtv);
   const scenarioOutputs = useMemo(
     () =>
-      buildScenarioEnvelope({
-        baseLtvPerUser: vm.blendedMetrics.blendedCpa
-          ? vm.blendedMetrics.blendedCpa * vm.blendedMetrics.blendedRoas
-          : 0,
-        conversions: vm.blendedMetrics.totalConversions,
-        cpa: vm.blendedMetrics.blendedCpa ?? 0,
-        assumptions: {
-          churnRate: 0.04,
-          cpaMultiplier: 1,
-          roasMultiplier: 1,
-        },
+      buildPlanScenarios(vm.blendedMetrics, {
+        playerValue,
+        blendedRoas: vm.blendedMetrics.blendedRoas,
+        churnRate: DEFAULT_CHURN_RATE,
+        observedLtv,
       }),
-    [vm.blendedMetrics]
+    [observedLtv, playerValue, vm.blendedMetrics]
   );
 
   const efficiencyAlerts = useMemo(() => {

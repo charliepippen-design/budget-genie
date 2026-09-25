@@ -1,3 +1,4 @@
+import { usePlanEconomics } from '@/hooks/use-plan-economics';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -17,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
-import { buildScenarioEnvelope, getEfficiencyAlerts } from '@/lib/planning-insights';
+import { getEfficiencyAlerts } from '@/lib/planning-insights';
 import { generateReportNarrative, type ReportNarrative } from '@/lib/report-narrator';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
@@ -46,42 +47,18 @@ const Output = () => {
 
   // ─── Derived data ────────────────────────────────────────────────────────
 
-  const active = useMemo(
-    () => channels.filter((c) => c.isActive && c.metrics.spend > 0),
-    [channels]
-  );
-
-  const totalSpend = useMemo(() => active.reduce((s, c) => s + c.metrics.spend, 0), [active]);
-
-  const projectedRevenue = useMemo(
-    () => active.reduce((s, c) => s + c.metrics.revenue, 0),
-    [active]
-  );
-
-  const projectedFtds = useMemo(
-    () => active.reduce((s, c) => s + c.metrics.conversions, 0),
-    [active]
-  );
-
-  const blendedCpa = useMemo(
-    () => (projectedFtds > 0 ? totalSpend / projectedFtds : null),
-    [totalSpend, projectedFtds]
-  );
-
-  const blendedRoas = useMemo(
-    () => (totalSpend > 0 ? projectedRevenue / totalSpend : 0),
-    [projectedRevenue, totalSpend]
-  );
-
-  const netPnl = projectedRevenue - totalSpend;
+  const {
+    active,
+    totalSpend,
+    projectedRevenue,
+    projectedFtds,
+    blendedCpa,
+    blendedRoas,
+    netPnl,
+    paybackMonths,
+    scenarioEnvelope,
+  } = usePlanEconomics();
   const isProfit = netPnl >= 0;
-
-  const paybackMonths = useMemo(() => {
-    const monthlyLtvInflow = projectedFtds * globalMultipliers.playerValue;
-    if (monthlyLtvInflow <= 0) return null;
-    const months = Math.ceil((totalSpend / monthlyLtvInflow) * 12);
-    return months > 24 ? null : months;
-  }, [projectedFtds, globalMultipliers.playerValue, totalSpend]);
 
   const topChannel = useMemo(
     () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
@@ -89,17 +66,6 @@ const Output = () => {
   );
 
   const weakestChannel = useMemo(() => active.find((c) => c.metrics.roas < 1) ?? null, [active]);
-
-  const scenarioEnvelope = useMemo(
-    () =>
-      buildScenarioEnvelope({
-        baseLtvPerUser: globalMultipliers.playerValue,
-        conversions: projectedFtds,
-        cpa: blendedCpa ?? 0,
-        assumptions: { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 },
-      }),
-    [globalMultipliers.playerValue, projectedFtds, blendedCpa]
-  );
 
   const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
 
@@ -326,7 +292,7 @@ const Output = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.paybackLabel}</p>
                   <p className={`text-2xl font-bold mt-1 ${paybackColor}`}>
-                    {paybackMonths ? `${paybackMonths} months` : '24+ months'}
+                    {paybackMonths ? `${paybackMonths} months` : '12+ months'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     based on {$(globalMultipliers.playerValue)}{' '}
