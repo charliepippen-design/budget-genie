@@ -194,7 +194,9 @@ export function getMetricIntegrityIssues(channels: ChannelWithMetrics[]): Metric
   channels.forEach((channel) => {
     const baselineCtr = channel.typeConfig.baselineMetrics.ctr ?? 0;
 
-    if (baselineCtr > 0 && channel.metrics.impressions <= 0) {
+    const isFixedFee = channel.buyingModel === 'FLAT_FEE' || channel.buyingModel === 'RETAINER';
+    // Fixed-fee channels are bought as traffic, not impressions, so no impression volume is normal.
+    if (baselineCtr > 0 && channel.metrics.impressions <= 0 && !isFixedFee) {
       issues.push({
         channelId: channel.id,
         channelName: channel.name,

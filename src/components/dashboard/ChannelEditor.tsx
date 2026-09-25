@@ -33,9 +33,8 @@ import {
   BuyingModel,
   FAMILY_INFO,
   BUYING_MODEL_INFO,
-  calculateUnifiedMetrics,
 } from '@/types/channel';
-import { useMediaPlanStore, ChannelData } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, useChannelsWithMetrics, ChannelData } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -64,11 +63,14 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
 
   const allowedModels = useMemo(() => familyInfo?.allowedModels || ['CPM', 'CPC'], [familyInfo]);
 
-  const previewMetrics = useMemo(() => {
-    if (!config)
-      return { spend: 0, ftds: 0, revenue: 0, cpa: null, roas: 0, impressions: 0, clicks: 0 };
-    return calculateUnifiedMetrics(config, 10000, globalMultipliers.playerValue || 150);
-  }, [config, globalMultipliers.playerValue]);
+  // Preview the channel's real numbers from the engine (same as its table row).
+  const row = useChannelsWithMetrics().find((c) => c.id === channel.id);
+  const previewMetrics = {
+    spend: row?.metrics.spend ?? 0,
+    ftds: row?.metrics.conversions ?? 0,
+    cpa: row?.metrics.cpa ?? null,
+    roas: row?.metrics.roas ?? 0,
+  };
 
   if (!channel || !family || !buyingModel || !config) return null;
 

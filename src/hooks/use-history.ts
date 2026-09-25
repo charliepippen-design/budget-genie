@@ -12,6 +12,10 @@ interface MediaPlanSnapshot {
   globalMultipliers: ReturnType<typeof useMediaPlanStore.getState>['globalMultipliers'];
   presets: ReturnType<typeof useMediaPlanStore.getState>['presets'];
   projectName: ReturnType<typeof useMediaPlanStore.getState>['projectName'];
+  // Markets and the AI brief change numbers too, so undo must restore them.
+  activeTiers?: ReturnType<typeof useMediaPlanStore.getState>['activeTiers'];
+  activeGeos?: ReturnType<typeof useMediaPlanStore.getState>['activeGeos'];
+  brief?: ReturnType<typeof useMediaPlanStore.getState>['brief'];
 }
 
 interface MultiMonthSnapshot {
@@ -71,6 +75,9 @@ function createSnapshot(): VersionedBudgetState {
       globalMultipliers: mediaState.globalMultipliers,
       presets: mediaState.presets,
       projectName: mediaState.projectName,
+      activeTiers: mediaState.activeTiers,
+      activeGeos: mediaState.activeGeos,
+      brief: mediaState.brief,
     },
     multiMonth: {
       includeSoftLaunch: multiMonthState.includeSoftLaunch,
@@ -107,6 +114,9 @@ function applySnapshot(snapshot: VersionedBudgetState) {
     globalMultipliers: cloneSnapshot(snapshot.mediaPlan.globalMultipliers),
     presets: cloneSnapshot(snapshot.mediaPlan.presets),
     projectName: snapshot.mediaPlan.projectName,
+    ...(snapshot.mediaPlan.activeTiers ? { activeTiers: cloneSnapshot(snapshot.mediaPlan.activeTiers) } : {}),
+    ...(snapshot.mediaPlan.activeGeos ? { activeGeos: cloneSnapshot(snapshot.mediaPlan.activeGeos) } : {}),
+    ...(snapshot.mediaPlan.brief !== undefined ? { brief: cloneSnapshot(snapshot.mediaPlan.brief) } : {}),
   });
 
   useMultiMonthStore.setState({
