@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, lazy, Suspense } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, lazy, Suspense } from 'react';
 import { LayoutGrid, Upload, Sparkles, Calendar } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,7 +14,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
+import { toMonthValue, useMultiMonthStore } from '@/hooks/use-multi-month-store';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
 
 const ImportWizard = lazy(() =>
@@ -34,7 +35,29 @@ export function MonthConfigPanel() {
     setPlanningMonths,
     setStartMonth,
     months,
+    monthsCustomized,
+    generateMonths,
   } = useMultiMonthStore();
+
+  // Months follow the main plan until the user edits a month by hand.
+  const planBudget = useMediaPlanStore((s) => s.totalBudget);
+  const planChannels = useMediaPlanStore((s) => s.channels);
+  const [planChangedSinceEdit, setPlanChangedSinceEdit] = useState(false);
+  const firstRun = useRef(true);
+  useEffect(() => {
+    const isFirst = firstRun.current;
+    firstRun.current = false;
+    if (months.length === 0 || !monthsCustomized) {
+      generateMonths();
+    } else if (!isFirst) {
+      setPlanChangedSinceEdit(true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- react to plan changes only
+  }, [planBudget, planChannels]);
+
+  const confirmRebuild = () =>
+    !monthsCustomized ||
+    window.confirm('This rebuilds all months and discards your per-month edits. Continue?');
 
   const totalMonths = planningMonths + (includeSoftLaunch ? 1 : 0);
 
@@ -50,7 +73,7 @@ export function MonthConfigPanel() {
     const now = new Date();
     for (let i = -3; i <= 12; i++) {
       const date = new Date(now.getFullYear(), now.getMonth() + i, 1);
-      const value = date.toISOString().slice(0, 7);
+      const value = toMonthValue(date);
       const label = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(
         date
       );
@@ -76,7 +99,7 @@ export function MonthConfigPanel() {
                   <Checkbox
                     id="soft-launch"
                     checked={includeSoftLaunch}
-                    onCheckedChange={(checked) => setIncludeSoftLaunch(checked === true)}
+                    onCheckedChange={(checked) => confirmRebuild() && setIncludeSoftLaunch(checked === true)}
                   />
                   <Label
                     htmlFor="soft-launch"
@@ -87,7 +110,7 @@ export function MonthConfigPanel() {
                 </div>
                 <Select
                   value={planningMonths.toString()}
-                  onValueChange={(v) => setPlanningMonths(parseInt(v))}
+                  onValueChange={(v) => confirmRebuild() && setPlanningMonths(parseInt(v))}
                 >
                   <SelectTrigger className="w-24 h-8 text-sm bg-background border-border">
                     <SelectValue />
@@ -106,7 +129,7 @@ export function MonthConfigPanel() {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <Label className="text-sm text-muted-foreground">Start:</Label>
-                <Select value={startMonth} onValueChange={setStartMonth}>
+                <Select value={startMonth} onValueChange={(v) => confirmRebuild() && setStartMonth(v)}>
                   <SelectTrigger className="w-40 h-8 text-sm bg-background border-border">
                     <SelectValue />
                   </SelectTrigger>
@@ -119,6 +142,22 @@ export function MonthConfigPanel() {
                   </SelectContent>
                 </Select>
               </div>
+
+              {planChangedSinceEdit && monthsCustomized && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => {
+                    if (confirmRebuild()) {
+                      generateMonths();
+                      setPlanChangedSinceEdit(false);
+                    }
+                  }}
+                >
+                  Plan changed: resync months
+                </Button>
+              )}
 
               {/* Total Display */}
               <Badge variant="secondary" className="px-3 py-1 text-sm">

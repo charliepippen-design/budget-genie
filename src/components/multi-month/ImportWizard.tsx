@@ -338,7 +338,8 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
         });
 
         // Apply Updates
-        setTotalBudget(totalImportedBudget);
+        // The plan budget is monthly: use the average imported month.
+        setTotalBudget(totalImportedBudget / Math.max(1, importedMonths.length));
         setChannels(newChannels);
 
         // IMPORTANT: Reset multipliers so the total budget matches exactly
