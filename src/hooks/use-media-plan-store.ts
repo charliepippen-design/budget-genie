@@ -787,9 +787,11 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           const newPercentage = Math.max(0, Math.min(100, percentage));
           const delta = newPercentage - oldPercentage;
 
-          const availableChannels = state.channels.filter(
-            (ch) => ch.id !== channelId && !ch.locked
-          );
+          // Only active, unlocked, variable channels absorb the change: inactive channels are out
+          // of the plan and fixed-fee spend comes from their price, not the percentage.
+          const absorbs = (ch: ChannelData) =>
+            ch.id !== channelId && !ch.locked && ch.isActive !== false && !isFixedCostChannel(ch);
+          const availableChannels = state.channels.filter(absorbs);
           const availableTotal = availableChannels.reduce((sum, ch) => sum + ch.allocationPct, 0);
 
           if (delta > 0 && availableTotal <= 0) {
@@ -805,7 +807,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
               return { ...ch, allocationPct: Math.max(0, finalTargetPercentage) };
             }
 
-            if (ch.locked) return ch;
+            if (!absorbs(ch)) return ch;
 
             if (availableTotal <= 0) return ch;
 
@@ -830,39 +832,15 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       normalizeAllocations: () => {
-        set((state) => {
-          const total = state.channels.reduce((sum, ch) => sum + ch.allocationPct, 0);
-          const discrepancy = 100 - total;
-
-          if (Math.abs(discrepancy) < 0.000001) {
-            return { channels: state.channels };
-          }
-
-          const unlockedChannels = state.channels.filter((ch) => !ch.locked);
-          if (unlockedChannels.length === 0) {
-            return { channels: state.channels };
-          }
-
-          const largestUnlocked = unlockedChannels.reduce((max, ch) =>
-            ch.allocationPct > max.allocationPct ? ch : max
-          );
-
-          const channels = state.channels.map((ch) => {
-            if (ch.id !== largestUnlocked.id) return ch;
-            return {
-              ...ch,
-              allocationPct: ch.allocationPct + discrepancy,
-            };
-          });
-
-          return { channels };
-        });
+        // Same rule as toggling/adding channels: inactive channels keep their ghost value,
+        // active unlocked ones are scaled so the active plan sums to 100%.
+        set((state) => ({ channels: normalizeAllocationsUtil(state.channels) }));
       },
 
       toggleChannelActive: (channelId) => {
         set((state) => {
           const newChannels = state.channels.map((ch) =>
-            ch.id === channelId ? { ...ch, isActive: !ch.isActive } : ch
+            ch.id === channelId ? { ...ch, isActive: ch.isActive === false } : ch
           );
 
           // Re-normalize immediately after toggle
@@ -1529,23 +1507,37 @@ export function useGeoMarketProfile(): GeoMarketProfile {
   );
 }
 
+/**
+ * A channel's share of total plan spend (0–100). This is the share shown in the table:
+ * fixed-fee channels get their real share (their allocationPct is not what drives spend)
+ * and inactive channels get 0.
+ */
+export function getSpendSharePct(channel: ChannelWithMetrics, blended: BlendedMetrics): number {
+  return blended.totalSpend > 0 ? (channel.metrics.spend / blended.totalSpend) * 100 : 0;
+}
+
+export function computeCategoryTotals(
+  snapshot: ReturnType<typeof computePlanSnapshot>
+): Record<string, { spend: number; percentage: number }> {
+  const totals: Record<string, { spend: number; percentage: number }> = {};
+
+  Object.keys(CATEGORY_INFO).forEach((cat) => {
+    totals[cat] = { spend: 0, percentage: 0 };
+  });
+
+  snapshot.channels.forEach((ch) => {
+    totals[ch.category] ??= { spend: 0, percentage: 0 };
+    totals[ch.category].spend += ch.metrics.spend;
+    totals[ch.category].percentage += getSpendSharePct(ch, snapshot.blended);
+  });
+
+  return totals;
+}
+
 export function useCategoryTotals(): Record<string, { spend: number; percentage: number }> {
-  const channelsWithMetrics = useChannelsWithMetrics();
+  const snapshot = usePlanSnapshot();
 
-  return useMemo(() => {
-    const totals: Record<string, { spend: number; percentage: number }> = {};
-
-    Object.keys(CATEGORY_INFO).forEach((cat) => {
-      totals[cat] = { spend: 0, percentage: 0 };
-    });
-
-    channelsWithMetrics.forEach((ch) => {
-      totals[ch.category].spend += ch.metrics.spend;
-      totals[ch.category].percentage += ch.allocationPct;
-    });
-
-    return totals;
-  }, [channelsWithMetrics]);
+  return useMemo(() => computeCategoryTotals(snapshot), [snapshot]);
 }
 
 export function useFtdVelocityMetrics(): FtdVelocityMetrics {

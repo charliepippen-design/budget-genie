@@ -104,6 +104,14 @@ export const BUYING_MODEL_INFO: Record<
   },
 };
 
+/**
+ * Only media bought per impression or per click produces meaningful impressions and CTR.
+ * Outcome-based (CPA, rev-share, hybrid) and fixed-fee deals don't, so the UI shows "—".
+ */
+export function hasMediaDeliveryMetrics(buyingModel: BuyingModel | undefined): boolean {
+  return buyingModel === 'CPM' || buyingModel === 'CPC';
+}
+
 // ========== EXTENDED CHANNEL INTERFACE ==========
 
 export interface ChannelTypeConfig {
@@ -293,7 +301,8 @@ export function inferChannelFamily(name: string): ChannelFamily {
 export function inferBuyingModel(name: string, family: ChannelFamily): BuyingModel {
   const lower = name.toLowerCase();
 
-  if (lower.includes('revshare') || lower.includes('rs')) return 'REV_SHARE';
+  // Word-bounded: a bare 'rs' substring matched "Influencers", "Partners", "Retainers"...
+  if (/\brev[\s_-]?share\b|\brs\b/.test(lower)) return 'REV_SHARE';
   if (lower.includes('hybrid')) return 'HYBRID';
   if (lower.includes('fixed') || lower.includes('listing')) return 'FLAT_FEE';
   if (lower.includes('retainer')) return 'RETAINER';
