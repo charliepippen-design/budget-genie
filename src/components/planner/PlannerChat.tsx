@@ -112,6 +112,11 @@ export function PlannerChat() {
   const callAI = useAI();
   const endRef = useRef<HTMLDivElement>(null);
 
+  // Phones: the panel is full-screen, so start hidden and let the user open it.
+  useEffect(() => {
+    if (window.innerWidth < 768) setOpen(false);
+  }, [setOpen]);
+
   useEffect(() => saveChat(items), [items]);
   useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [items, busy]);
 

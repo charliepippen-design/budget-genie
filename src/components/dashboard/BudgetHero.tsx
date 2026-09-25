@@ -129,7 +129,7 @@ export const BudgetHero = () => {
       />
 
       {/* SPLIT LAYOUT CONTAINER */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="relative z-10 w-full max-w-6xl mx-auto grid grid-cols-1 2xl:grid-cols-2 gap-6">
         {/* LEFT COLUMN: BUDGET INPUT */}
         <div
           className={cn(
