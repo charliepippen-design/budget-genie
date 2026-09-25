@@ -5,7 +5,7 @@ import { TrendingUp, Rocket, Crown, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
-import { useBlendedMetrics } from '@/hooks/use-media-plan-store';
+import { MIN_BUDGET_CAP, useBlendedMetrics } from '@/hooks/use-media-plan-store';
 import { ForecastCard } from './ForecastCard';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
 
@@ -26,9 +26,13 @@ export const BudgetHero = () => {
     icon: Zap,
   });
 
-  const minBudget = channels
-    .filter((c) => c.tier === 'fixed')
-    .reduce((sum, c) => sum + (c.typeConfig.price || 0), 0);
+  // Fixed fees must fit in the budget; never below the store's floor.
+  const minBudget = Math.max(
+    MIN_BUDGET_CAP,
+    channels
+      .filter((c) => c.isActive !== false && c.tier === 'fixed')
+      .reduce((sum, c) => sum + (c.typeConfig.price || 0), 0)
+  );
 
   useEffect(() => {
     setLocalBudget(totalBudget);
@@ -38,9 +42,13 @@ export const BudgetHero = () => {
 
   const clampBudget = (value: number) => Math.max(minBudget, Math.min(1000000, value));
 
+  // Accepts "25000", "25,000", "25.000", "40000.75", "40.000,75"; rejects negatives and text.
   const parseBudgetInput = (raw: string) => {
-    const numeric = raw.replace(/[^\d]/g, '');
-    return numeric.length > 0 ? Number(numeric) : NaN;
+    const trimmed = raw.replace(/[\s€$£¥]/g, '');
+    if (!/^[\d.,]+$/.test(trimmed)) return NaN;
+    const withoutThousands = trimmed.replace(/[.,](?=\d{3}(?:[.,]|$))/g, '');
+    const value = Number(withoutThousands.replace(',', '.'));
+    return Number.isFinite(value) ? value : NaN;
   };
 
   const updateMood = (value: number) => {
@@ -157,21 +165,9 @@ export const BudgetHero = () => {
                 type="text"
                 inputMode="numeric"
                 value={inputBudget}
-                onChange={(event) => {
-                  const nextRaw = event.target.value;
-                  const parsed = parseBudgetInput(nextRaw);
-
-                  if (!Number.isFinite(parsed)) {
-                    setInputBudget('');
-                    return;
-                  }
-
-                  const clamped = clampBudget(Math.round(parsed));
-                  setInputBudget(clamped.toLocaleString('en-US'));
-                  setLocalBudget(clamped);
-                  updateBudget(clamped);
-                  updateMood(clamped);
-                }}
+                // Let the user type freely; clamp and apply only on Enter/blur so partial
+                // values ("2", "25") are never clamped mid-typing.
+                onChange={(event) => setInputBudget(event.target.value)}
                 onBlur={commitBudgetInput}
                 onKeyDown={(event) => {
                   if (event.key === 'Enter') {
@@ -205,7 +201,10 @@ export const BudgetHero = () => {
                 isDark ? 'text-slate-500 dark:text-slate-500' : 'text-slate-600'
               )}
             >
-              <span>Min: {symbol}1k</span>
+              <span>
+                Min: {symbol}
+                {Math.round(minBudget).toLocaleString('en-US')}
+              </span>
               <span>Max: {symbol}1M+</span>
             </div>
           </div>
@@ -215,7 +214,10 @@ export const BudgetHero = () => {
             {presets.map((amount) => (
               <button
                 key={amount}
-                onClick={() => handleSlide([amount])}
+                onClick={() => {
+                  handleSlide([amount]);
+                  endBudgetDrag();
+                }}
                 className={cn(
                   'px-4 py-2 rounded-full border font-medium text-xs transition-all',
                   isDark
