@@ -13,7 +13,7 @@ export default function Landing() {
   // Redirect authenticated + paid users directly to app
   useEffect(() => {
     if (isLoaded && isSignedIn && hasActivePayment) {
-      navigate('/app');
+      navigate('/app', { replace: true });
     }
   }, [isLoaded, isSignedIn, hasActivePayment, navigate]);
 

@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components -- module stand-in, not a refreshable component file */
 // Local QA only: stands in for @clerk/clerk-react when the dev server runs with MOCK_CLERK=1.
 // Simulates a signed-in superuser so protected routes can be exercised without a Clerk instance.
 // Never bundled in production builds (the alias is only set for `vite serve`).

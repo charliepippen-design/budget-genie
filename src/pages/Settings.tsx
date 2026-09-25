@@ -125,7 +125,6 @@ export default function Settings() {
   );
   const subscriptionTier = useMediaPlanStore((state) => state.subscriptionTier);
   const setSubscriptionTier = useMediaPlanStore((state) => state.setSubscriptionTier);
-  const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
   const { hasActivePayment, isSuperUser, effectiveTier } = usePaymentStatus();
   const pendingCheckoutKey = 'billing_pending_checkout';
 
@@ -457,8 +456,6 @@ export default function Settings() {
   };
 
   const handleRestartOnboarding = () => {
-    setHasCompletedOnboarding(false);
-    toast.success('Onboarding has been reset. Launching Budget Wizard...');
     navigate('/onboard');
   };
 

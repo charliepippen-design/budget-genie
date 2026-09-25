@@ -27,11 +27,21 @@ export function KeyboardManager() {
       if (e.ctrlKey || e.metaKey) {
         const key = e.key.toLowerCase();
 
+        // Inside text fields, Ctrl+Z/Y/S belong to the field (undo typing), not to the plan.
+        const target = e.target as HTMLElement | null;
+        const isEditing =
+          !!target &&
+          (target.tagName === 'INPUT' ||
+            target.tagName === 'TEXTAREA' ||
+            target.tagName === 'SELECT' ||
+            target.isContentEditable);
+        if (isEditing && ['z', 'y'].includes(key)) return;
+
         if (key === 's') {
           e.preventDefault();
           toast({
-            title: 'Project Saved',
-            description: 'Your changes have been saved locally.',
+            title: 'Saved in this browser',
+            description: 'Your plan is saved automatically. Use My Projects to keep named versions.',
           });
           return;
         }
