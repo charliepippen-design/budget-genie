@@ -1,13 +1,15 @@
 import { generateJSON } from '@/lib/ai-client';
 import { z } from 'zod';
-import { TOP_IGAMING_GEOS } from './geo-market-data';
+import { getOnboardingMarkets, normalizeMarketCode, TOP_IGAMING_GEOS } from './geo-market-data';
+import type { IndustryId } from './industries';
+import { generatePlan, type GeneratedPlan, type PlanBrief } from './plan-generator';
 import { Vertical, VERTICAL_PRESETS } from './vertical-presets';
 
 export interface WizardAnswers {
   budget: number;
   vertical: Vertical;
   goal: 'acquire_volume' | 'maximize_revenue' | 'test_channels' | 'maintain';
-  geos: string[];
+  geos: string[]; // ISO country codes
   benchmarks: {
     cpa?: number;
     ltv?: number;
@@ -34,13 +36,20 @@ export type RefinedPlan = z.infer<typeof RefinedPlanSchema>;
 
 function buildPrompt(answers: WizardAnswers): string {
   const preset = VERTICAL_PRESETS[answers.vertical];
-  const knownGeoNames = new Set(TOP_IGAMING_GEOS.map((g) => g.name));
-  const validGeos = answers.geos.filter((geo) => knownGeoNames.has(geo));
+  const marketNames = new Map(getOnboardingMarkets(answers.vertical).map((m) => [m.code, m.name]));
+  const validGeos = answers.geos
+    .map((code) => marketNames.get(normalizeMarketCode(code)))
+    .filter((name): name is string => !!name);
 
   const geoContext =
     validGeos.length > 0
       ? `Target markets: ${validGeos.join(', ')}.`
       : 'No specific geos selected - using default tier blend.';
+
+  const geoUniverse =
+    answers.vertical === 'igaming'
+      ? TOP_IGAMING_GEOS.map((geo) => `- ${geo.name} (${geo.tier}): CPA $${geo.baselineCpa}, LTV $${geo.baselineLtv}`).join('\n')
+      : getOnboardingMarkets(answers.vertical).map((m) => `- ${m.name} (${m.tier})`).join('\n');
 
   const benchmarkContext =
     [
@@ -66,7 +75,7 @@ ${geoContext}
 ${benchmarkContext}
 
 Known geo universe and tiers:
-${TOP_IGAMING_GEOS.map((geo) => `- ${geo.name} (${geo.tier}): CPA $${geo.baselineCpa}, LTV $${geo.baselineLtv}`).join('\n')}
+${geoUniverse}
 
 The starting channel mix from the vertical preset is:
 ${preset.channels.map((channel) => `- ${channel.name}: ${channel.allocationPct}%`).join('\n')}
@@ -95,6 +104,35 @@ Respond with valid JSON matching this exact shape — no markdown, no explanatio
   "keyRisk": "...",
   "firstActionAfterLaunch": "..."
 }`;
+}
+
+// How each wizard goal steers the deterministic plan generator.
+export const GOAL_BRIEFS: Record<WizardAnswers['goal'], Pick<PlanBrief, 'objectives' | 'riskProfile'>> = {
+  acquire_volume: { objectives: { acquisition: 0.85, retention: 0.1, branding: 0.05 }, riskProfile: 'balanced' },
+  maximize_revenue: { objectives: { acquisition: 0.5, retention: 0.45, branding: 0.05 }, riskProfile: 'balanced' },
+  test_channels: { objectives: { acquisition: 0.6, retention: 0.2, branding: 0.2 }, riskProfile: 'aggressive' },
+  maintain: { objectives: { acquisition: 0.7, retention: 0.2, branding: 0.1 }, riskProfile: 'conservative' },
+};
+
+/** Wizard verticals backed by an industry pack; lead gen and "other" have no pack. */
+export function wizardVerticalToIndustry(vertical: Vertical): IndustryId | null {
+  return vertical === 'igaming' || vertical === 'ecommerce' || vertical === 'saas' ? vertical : null;
+}
+
+/**
+ * Plan without AI: the wizard answers (goal, markets, budget, known CPA) drive the
+ * deterministic generator. Returns null when the vertical has no industry pack.
+ */
+export function generateWizardPlan(answers: WizardAnswers): GeneratedPlan | null {
+  const industry = wizardVerticalToIndustry(answers.vertical);
+  if (!industry) return null;
+  return generatePlan({
+    industry,
+    monthlyBudget: answers.budget,
+    markets: answers.geos.map(normalizeMarketCode),
+    targetCpa: answers.benchmarks.cpa ?? null,
+    ...GOAL_BRIEFS[answers.goal],
+  });
 }
 
 export async function generateOnboardingPlan(answers: WizardAnswers): Promise<RefinedPlan | null> {

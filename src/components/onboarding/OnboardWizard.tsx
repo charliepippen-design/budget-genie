@@ -7,9 +7,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { ChannelData, useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { TIER_DEFAULTS, TOP_IGAMING_GEOS } from '@/lib/geo-market-data';
+import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/lib/geo-market-data';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
-import { WizardAnswers, generateOnboardingPlan } from '@/lib/onboarding-ai';
+import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 
 interface WizardState {
@@ -18,7 +18,7 @@ interface WizardState {
   vertical: Vertical | null;
   subvertical: IgamingSubvertical | null;
   goal: WizardAnswers['goal'] | null;
-  geos: string[];
+  geos: string[]; // ISO country codes
   benchmarks: { cpa: string; ltv: string };
 }
 
@@ -133,7 +133,7 @@ export const OnboardWizard = () => {
   const setChannels = useMediaPlanStore((state) => state.setChannels);
   const normalizeAllocations = useMediaPlanStore((state) => state.normalizeAllocations);
   const setGlobalMultipliers = useMediaPlanStore((state) => state.setGlobalMultipliers);
-  const addActiveGeo = useMediaPlanStore((state) => state.addActiveGeo);
+  const applyGeneratedPlan = useMediaPlanStore((state) => state.applyGeneratedPlan);
   const clearActiveGeos = useMediaPlanStore((state) => state.clearActiveGeos);
   const setTierAllocation = useMediaPlanStore((state) => state.setTierAllocation);
   const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
@@ -203,7 +203,13 @@ export const OnboardWizard = () => {
 
   const selectVertical = useCallback(
     (vertical: Vertical) => {
-      setState((prev) => ({ ...prev, vertical, subvertical: null }));
+      // Market lists differ per industry, so a vertical change clears picked markets.
+      setState((prev) => ({
+        ...prev,
+        vertical,
+        subvertical: null,
+        geos: prev.vertical === vertical ? prev.geos : [],
+      }));
       window.setTimeout(() => goToStep(vertical === 'igaming' ? 3 : 4), 300);
     },
     [goToStep]
@@ -225,14 +231,16 @@ export const OnboardWizard = () => {
     [goToStep]
   );
 
-  const toggleGeo = useCallback((geoName: string) => {
+  const toggleGeo = useCallback((code: string) => {
     setState((prev) => ({
       ...prev,
-      geos: prev.geos.includes(geoName)
-        ? prev.geos.filter((name) => name !== geoName)
-        : [...prev.geos, geoName],
+      geos: prev.geos.includes(code)
+        ? prev.geos.filter((c) => c !== code)
+        : [...prev.geos, code],
     }));
   }, []);
+
+  const onboardingMarkets = useMemo(() => getOnboardingMarkets(state.vertical), [state.vertical]);
 
   const applyPlan = useCallback(
     async (withBenchmarks: boolean) => {
@@ -330,8 +338,15 @@ export const OnboardWizard = () => {
         };
       });
 
-      setChannels(mappedChannels);
-      normalizeAllocations();
+      // Without AI, the goal and markets drive the deterministic plan generator
+      // (industries with a channel pack); otherwise the vertical preset is used.
+      const generatedPlan = refinedPlan ? null : generateWizardPlan(answers);
+      if (generatedPlan) {
+        applyGeneratedPlan(generatedPlan);
+      } else {
+        setChannels(mappedChannels);
+        normalizeAllocations();
+      }
 
       // Use || (not ??) so that a zero returned by the AI falls through to the preset
       // default. playerValue === 0 would make all revenue calculations return 0.
@@ -345,6 +360,7 @@ export const OnboardWizard = () => {
           parsedLtv ||
           refinedPlan?.recommendedPlayerValue ||
           revenueModelDefaults?.playerValue ||
+          generatedPlan?.multipliers.playerValue ||
           preset.defaultPlayerValue,
         cpaTarget: parsedCpa || refinedPlan?.recommendedCpaTarget || preset.defaultCpaTarget,
         roasTarget: refinedPlan?.recommendedRoasTarget || preset.defaultRoasTarget,
@@ -356,12 +372,15 @@ export const OnboardWizard = () => {
         spendMultiplier: 1,
       });
 
-      clearActiveGeos();
-      if (answers.geos.length > 0) {
-        answers.geos.forEach((geoName) => addActiveGeo(geoName));
-      } else {
-        setTierAllocation('tier1', TIER_DEFAULTS.tier1);
-        setTierAllocation('tier2', TIER_DEFAULTS.tier2);
+      if (!generatedPlan) {
+        clearActiveGeos();
+        if (answers.geos.length > 0) {
+          const geo = marketsToGeoSelection(answers.geos);
+          useMediaPlanStore.setState({ activeGeos: geo.activeGeos, activeTiers: geo.activeTiers });
+        } else {
+          setTierAllocation('tier1', TIER_DEFAULTS.tier1);
+          setTierAllocation('tier2', TIER_DEFAULTS.tier2);
+        }
       }
 
       goToStep('done');
@@ -374,14 +393,16 @@ export const OnboardWizard = () => {
         });
       } else {
         toast('Your plan is ready', {
-          description: `We've built your plan using ${preset.label} industry defaults.`,
+          description: generatedPlan
+            ? `We've built your plan from your goal and markets using ${preset.label} benchmarks.`
+            : `We've built your plan using ${preset.label} industry defaults.`,
           duration: 6000,
         });
       }
     },
     [
       hasExistingPlan,
-      addActiveGeo,
+      applyGeneratedPlan,
       clearActiveGeos,
       goToStep,
       navigate,
@@ -768,7 +789,8 @@ export const OnboardWizard = () => {
 
             <div className="mt-8 space-y-8">
               {GEO_GROUPS.map((group) => {
-                const countries = TOP_IGAMING_GEOS.filter((geo) => geo.tier === group.tier);
+                const countries = onboardingMarkets.filter((geo) => geo.tier === group.tier);
+                if (countries.length === 0) return null;
                 return (
                   <div key={group.tier}>
                     <h3 className="mb-3 text-sm font-semibold uppercase tracking-wide text-slate-300">
@@ -776,10 +798,10 @@ export const OnboardWizard = () => {
                     </h3>
                     <div className="flex flex-wrap gap-2">
                       {countries.map((geo) => {
-                        const selected = state.geos.includes(geo.name);
+                        const selected = state.geos.includes(geo.code);
                         return (
                           <Button
-                            key={geo.name}
+                            key={geo.code}
                             type="button"
                             variant="outline"
                             className={`h-11 border-slate-700 bg-slate-900 px-4 text-sm ${
@@ -787,7 +809,7 @@ export const OnboardWizard = () => {
                                 ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
                                 : 'text-slate-200 hover:bg-slate-800'
                             }`}
-                            onClick={() => toggleGeo(geo.name)}
+                            onClick={() => toggleGeo(geo.code)}
                           >
                             <span className="mr-2">{toFlagEmoji(geo.code)}</span>
                             {geo.name}

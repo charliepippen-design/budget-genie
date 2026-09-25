@@ -6,13 +6,14 @@ vi.mock('@/lib/ai-client', () => ({
   generateJSON: (...args: unknown[]) => mockGenerateJSON(...args),
 }));
 
-import { generateOnboardingPlan, type WizardAnswers } from '@/lib/onboarding-ai';
+import { generateOnboardingPlan, generateWizardPlan, type WizardAnswers } from '@/lib/onboarding-ai';
+import { getOnboardingMarkets } from '@/lib/geo-market-data';
 
 const answers: WizardAnswers = {
   budget: 50000,
   vertical: 'igaming',
   goal: 'acquire_volume',
-  geos: ['Germany', 'Unknownland'],
+  geos: ['DE', 'QQ'],
   benchmarks: {},
 };
 
@@ -37,7 +38,7 @@ describe('generateOnboardingPlan', () => {
 
     const prompt = mockGenerateJSON.mock.calls[0][0] as string;
     expect(prompt).toContain('Germany');
-    expect(prompt).not.toContain('Unknownland');
+    expect(prompt).not.toContain('QQ');
   });
 
   it('returns null when the JSON does not match the schema', async () => {
@@ -50,3 +51,45 @@ describe('generateOnboardingPlan', () => {
     expect(await generateOnboardingPlan(answers)).toBeNull();
   });
 });
+
+describe('generateWizardPlan (no AI)', () => {
+  const shares = (goal: WizardAnswers['goal']) => {
+    const plan = generateWizardPlan({ ...answers, geos: [], goal })!;
+    return Object.fromEntries(plan.channels.map((c) => [c.id, Math.round(c.allocationPct)]));
+  };
+
+  it('feeds the chosen goal into the deterministic generator', () => {
+    const plan = generateWizardPlan({ ...answers, goal: 'maintain' })!;
+    expect(plan.brief.riskProfile).toBe('conservative');
+    expect(plan.brief.markets).toEqual(['DE', 'QQ']);
+    expect(shares('acquire_volume')).not.toEqual(shares('maximize_revenue'));
+  });
+
+  it('passes a known CPA as the target', () => {
+    const plan = generateWizardPlan({ ...answers, benchmarks: { cpa: 90 } })!;
+    expect(plan.brief.targetCpa).toBe(90);
+  });
+
+  it('returns null for verticals without an industry pack', () => {
+    expect(generateWizardPlan({ ...answers, vertical: 'lead_gen' })).toBeNull();
+    expect(generateWizardPlan({ ...answers, vertical: 'other' })).toBeNull();
+  });
+});
+
+describe('getOnboardingMarkets', () => {
+  it('offers general ad markets outside iGaming and gambling geos for iGaming', () => {
+    const general = getOnboardingMarkets('ecommerce').map((m) => m.code);
+    expect(general).toEqual(expect.arrayContaining(['US', 'GB', 'FR', 'AU']));
+    const igaming = getOnboardingMarkets('igaming').map((m) => m.code);
+    expect(igaming).not.toContain('US');
+    expect(igaming).toContain('GB');
+  });
+
+  it('uses valid ISO codes so every flag renders (no "UK")', () => {
+    for (const vertical of ['igaming', 'ecommerce'] as const) {
+      getOnboardingMarkets(vertical).forEach((m) => expect(m.code).toMatch(/^[A-Z]{2}$/));
+      expect(getOnboardingMarkets(vertical).map((m) => m.code)).not.toContain('UK');
+    }
+  });
+});
+

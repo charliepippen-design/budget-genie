@@ -108,13 +108,19 @@ export function optimizeBudget(
   });
 
   const finalChannels = normalizeAllocations(resultChannels);
+  // Share of the budget that moved: total allocation taken away from channels.
+  const before = new Map(channels.map((ch) => [ch.id, ch.allocationPct]));
+  const freedAllocation = finalChannels.reduce(
+    (sum, ch) => sum + Math.max(0, (before.get(ch.id) ?? 0) - ch.allocationPct),
+    0
+  );
 
   return {
     channels: finalChannels,
     changes: {
       slashed: slashedIds,
       boosted: boostedIds,
-      freedAllocation: 0, // Concept of "freed" is less relevant now as we just scale the pool
+      freedAllocation,
     },
   };
 }

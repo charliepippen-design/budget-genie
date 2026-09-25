@@ -68,6 +68,8 @@ describe('optimizeBudget', () => {
 
     expect(result.changes.slashed).toContain('high-cpa');
     expect(result.changes.boosted).toContain('high-roas');
+    // 50 -> 35 after the 30% cut and renormalisation: 15 points moved.
+    expect(result.changes.freedAllocation).toBeCloseTo(15, 1);
 
     const total = result.channels.reduce((sum, channel) => sum + channel.allocationPct, 0);
     expect(Number(total.toFixed(2))).toBe(100);
