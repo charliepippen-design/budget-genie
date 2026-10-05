@@ -1,0 +1,16 @@
+{
+  "version": "0.2",
+  "language": "en,en-GB",
+  "ignorePaths": ["node_modules", "dist", ".claude", "package-lock.json", "bun.lockb", "supabase/migrations"],
+  "words": [
+    "actuals", "adwords", "autotable", "backlinks", "capterra", "cmdk", "conv", "convo", "cpas",
+    "decreto", "dignità", "dropoff", "ecommerce", "embla", "esma", "exceljs", "finfluencers",
+    "fintech", "forex", "ftds", "igaming", "impr", "influencers", "klaviyo", "mediaplan",
+    "mediaplanner", "mediaplannerpro", "menten", "mese", "michaelis", "morphism", "mult", "mults",
+    "neobank", "notif", "nowpayments", "nutra", "officedocument", "openxmlformats", "opex",
+    "outbrain", "overfunded", "papaparse", "partialize", "pcts", "pmax", "refreshable", "remarket",
+    "remarketing", "renormalisation", "renormalise", "renormalised", "renormalises", "retarget",
+    "revshare", "roas", "scen", "signups", "sparkline", "spreadsheetml", "sportsbook", "subvertical",
+    "summ", "supabase", "taboola", "unconfigured", "unstub", "unsub", "upsells", "whsec"
+  ]
+}

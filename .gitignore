@@ -28,3 +28,9 @@ test-results/
 supabase/.temp/
 .vercel
 supabase/.temp
+
+# Vite temp files left behind when the dev server is killed mid-reload
+vite.config.ts.timestamp-*.mjs
+
+# Local Claude Code agent worktrees
+.claude/worktrees/

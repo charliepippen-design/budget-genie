@@ -236,7 +236,7 @@ export function calculateUnifiedMetrics(
       // Usually the store will force spend = price.
       // So here we assume spend IS price.
       finalSpend = price;
-      // Traffic ? baselineMetris.trafficPerUnit?
+      // Traffic ? baselineMetrics.trafficPerUnit?
       {
         const traffic = baselineMetrics.trafficPerUnit ?? 0;
         clicks = traffic; // Visits
