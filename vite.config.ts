@@ -67,16 +67,15 @@ export default defineConfig(({ mode, command }) => ({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          react: ['react', 'react-dom', 'react-router-dom'],
-          ui: [
-            '@radix-ui/react-dialog',
-            '@radix-ui/react-dropdown-menu',
-            '@radix-ui/react-tabs',
-            '@radix-ui/react-tooltip',
-          ],
-          charts: ['recharts'],
-          data: ['papaparse', 'zod', 'date-fns'],
+        // Only React itself gets a manual vendor chunk (every page needs it). Rollup pulls the
+        // unassigned dependencies of a manual chunk into it, so the previous charts/ui/data groups
+        // dragged shared helpers (e.g. clsx) along and made the landing page download recharts.
+        // Everything else is left to Rollup, which keeps charts and other heavy libraries in the
+        // lazily loaded chunks that actually use them.
+        manualChunks(id) {
+          if (/\/node_modules\/(react|react-dom|scheduler|react-router|react-router-dom)\//.test(id))
+            return 'react';
+          return undefined;
         },
       },
     },

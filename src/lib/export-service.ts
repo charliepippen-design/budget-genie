@@ -1,7 +1,7 @@
 import { DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
-import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
-import ExcelJS from 'exceljs';
+// jspdf, jspdf-autotable and exceljs are large (~1.5 MB minified together), so they are
+// loaded on demand inside the export functions instead of shipping with the dashboard.
+import type jsPDF from 'jspdf';
 import { ChannelWithMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
 import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
 import {
@@ -55,15 +55,19 @@ function safeNumber(value: number | null | undefined, fallback = 0): number {
 
 // ========== PDF EXPORT ==========
 
-export function exportToPdf(
+export async function exportToPdf(
   channels: ChannelWithMetrics[],
   totalBudget: number,
   blendedMetrics: BlendedMetricsData,
   options: ExportOptions
-): void {
+): Promise<void> {
   try {
+    const [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
+      import('jspdf'),
+      import('jspdf-autotable'),
+    ]);
     const { formatCurrency } = options;
-    const doc = new jsPDF();
+    const doc = new JsPDF();
     const typedDoc = doc as JsPdfWithAutoTable;
 
     // Title
@@ -392,6 +396,7 @@ export async function exportToExcel(
             severity: a.severity,
           }));
 
+    const { default: ExcelJS } = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
     workbook.creator = 'MediaPlanner Pro';
     workbook.created = new Date();
