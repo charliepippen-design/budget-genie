@@ -255,7 +255,7 @@ export function ImportWizard({ open, onOpenChange }: ImportWizardProps) {
     // Generate months first, then update with imported data
     store.generateMonths();
 
-    // Calclate total budget
+    // Calculate total budget
     const totalImportedBudget = importedMonths.reduce((sum, m) => sum + m.budget, 0);
 
     // Update each month with imported data
