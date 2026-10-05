@@ -156,7 +156,7 @@ export const BudgetGenieAI = () => {
   }, [channels]);
 
   const handleExport = useCallback(
-    (formatType: 'pdf' | 'csv' | 'xlsx' | 'json') => {
+    async (formatType: 'pdf' | 'csv' | 'xlsx' | 'json') => {
       try {
         if (userStatus === 'demo') {
           toast.error(
@@ -171,7 +171,7 @@ export const BudgetGenieAI = () => {
         };
 
         if (formatType === 'pdf') {
-          exportToPdf(channels, vm.totalBudget, vm.blendedMetrics, exportOptions);
+          await exportToPdf(channels, vm.totalBudget, vm.blendedMetrics, exportOptions);
           toast.success('PDF export complete');
           return;
         }
