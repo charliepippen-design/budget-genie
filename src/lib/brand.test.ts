@@ -31,3 +31,11 @@ describe('brand', () => {
     expect(hits).toEqual([]);
   });
 });
+
+describe('legal operator line', () => {
+  it('uses the neutral operator note and no invented operator name', () => {
+    const legal = readFileSync(join(process.cwd(), 'src/pages/Legal.tsx'), 'utf8');
+    expect(legal).toContain('MediaPlanner Pro is operated by its owner company; full legal details coming soon.');
+    expect(legal).not.toMatch(/operator:\s*'/);
+  });
+});

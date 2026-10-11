@@ -8,7 +8,8 @@ import { AI_PRIVACY_PARAGRAPH, AI_PRIVACY_PARAGRAPH_IT } from '@/lib/ai-disclosu
 const LEGAL = {
   product: 'MediaPlanner Pro',
   site: 'mediaplannerpro.com',
-  operator: 'MediaPlanner Pro',
+  // No legal entity name until the owner confirms it; do not invent one.
+  operatorNote: 'MediaPlanner Pro is operated by its owner company; full legal details coming soon.',
   contactEmail: 'info@mediaplannerpro.com',
   governingLaw: 'Italy',
   lastUpdated: 'September 25, 2026',
@@ -42,7 +43,7 @@ function Terms() {
     <>
       <Section title="1. Who we are">
         <p>
-          {LEGAL.product} ({LEGAL.site}) is an online media planning tool operated by {LEGAL.operator} ("we", "us").
+          {LEGAL.product} ({LEGAL.site}) is an online media planning tool ("we", "us"). {LEGAL.operatorNote}
           By creating an account or using the service you agree to these terms.
         </p>
       </Section>
@@ -193,7 +194,7 @@ function Privacy() {
       </Section>
       <Section title="Contact">
         <p>
-          {LEGAL.operator}, <Email />.
+          {LEGAL.operatorNote} Email: <Email />.
         </p>
       </Section>
     </>
