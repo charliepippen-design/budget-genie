@@ -43,6 +43,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { Switch } from '@/components/ui/switch';
 import { SandboxSpendChart } from '@/components/dashboard/SandboxSpendChart';
 import { ScenarioChart } from '@/components/dashboard/ScenarioChart';
+import { computeSandboxChannel } from '@/components/dashboard/ltv-sandbox-calc';
 import { useSandboxStore, type ChannelSandboxAdjustment } from '@/store/useSandboxStore';
 
 interface ScenarioPoint {
@@ -163,29 +164,15 @@ export function LtvForecastPanel() {
         ? (channelAdjustments[channel.id] ?? SANDBOX_DEFAULT_ADJUSTMENT)
         : SANDBOX_DEFAULT_ADJUSTMENT;
 
-      const spendMultiplier =
-        (1 + groupDelta / 100) * (1 + clamp(adjustment.spendPct, -80, 200) / 100);
-      const adjustedSpend = Math.max(0, channel.metrics.spend * spendMultiplier);
-
-      const baselineCpa =
-        channel.metrics.cpa ??
-        (channel.metrics.conversions > 0 ? channel.metrics.spend / channel.metrics.conversions : 0);
-      const adjustedCpa = Math.max(
-        0.01,
-        baselineCpa * (1 + clamp(adjustment.cpaPct, -70, 300) / 100)
-      );
-
-      const baselineRoas = Math.max(0, channel.metrics.roas);
-      const adjustedRoas = Math.max(
-        0,
-        baselineRoas * (1 + clamp(adjustment.roasPct, -90, 300) / 100)
-      );
-
-      const churnEffect = Math.max(0.35, 1 - (clamp(adjustment.churnPct, -50, 80) / 100) * 0.25);
-      const conversionsFromCpa =
-        adjustedCpa > 0 ? adjustedSpend / adjustedCpa : channel.metrics.conversions;
-      const adjustedConversions = Math.max(0, conversionsFromCpa * churnEffect);
-      const adjustedRevenue = adjustedSpend * adjustedRoas * churnEffect;
+      const {
+        adjustedSpend,
+        baselineCpa,
+        adjustedCpa,
+        baselineRoas,
+        adjustedRoas,
+        adjustedConversions,
+        adjustedRevenue,
+      } = computeSandboxChannel(channel.metrics, adjustment, groupDelta);
 
       return {
         channelId: channel.id,
