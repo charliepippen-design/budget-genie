@@ -1,4 +1,4 @@
-import { generateJSON } from '@/lib/ai-client';
+import { generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
 
 export interface ReportNarratorInput {
@@ -71,14 +71,16 @@ Respond with valid JSON matching this exact shape — no markdown, no explanatio
 export async function generateReportNarrative(
   input: ReportNarratorInput
 ): Promise<ReportNarrative | null> {
-  const prompt = buildPrompt(input);
   try {
+    const prompt = buildPrompt(input);
     // JSON must match the schema exactly; anything else is treated as no answer.
     const parsed = NarrativeSchema.safeParse(await generateJSON(`${prompt}
 
 Return ONLY a JSON object with the fields described above.`));
     return parsed.success ? parsed.data : null;
   } catch (err) {
+    // The free-tier cap is not a failure to hide: the caller shows the upgrade message.
+    if (isFreeTierLimit(err)) throw err;
     console.error('Report narrative generation failed.', err);
     return null;
   }

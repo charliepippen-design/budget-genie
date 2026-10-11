@@ -43,7 +43,8 @@ import {
   buildGroupSpendTotals,
   GROUP_COLORS,
 } from '@/lib/planning-insights';
-import { generateReportNarrative, ReportNarrative } from '@/lib/report-narrator';
+import { useReportNarrative } from '@/hooks/use-report-narrative';
+import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -99,32 +100,22 @@ const Report = () => {
     [active]
   );
 
-  const [narrative, setNarrative] = useState<ReportNarrative | null>(null);
-  const [narrativeLoading, setNarrativeLoading] = useState(true);
-
-  useEffect(() => {
-    generateReportNarrative({
-      totalBudget,
-      totalSpend,
-      projectedRevenue,
-      projectedFtds,
-      blendedCpa,
-      blendedRoas,
-      paybackMonths,
-      topChannel: topChannel?.name ?? 'Unknown',
-      weakestChannel: weakestChannel?.name ?? null,
-      scenarioBase: scenarioEnvelope[1],
-      alertCount: alerts.length,
-      vertical: vc.vertical,
-      geos: activeGeos,
-      currency: code,
-    }).then((result) => {
-      setNarrative(result);
-      setNarrativeLoading(false);
-    });
-    // Intentionally mount-only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    totalBudget,
+    totalSpend,
+    projectedRevenue,
+    projectedFtds,
+    blendedCpa,
+    blendedRoas,
+    paybackMonths,
+    topChannel: topChannel?.name ?? 'Unknown',
+    weakestChannel: weakestChannel?.name ?? null,
+    scenarioBase: scenarioEnvelope[1],
+    alertCount: alerts.length,
+    vertical: vc.vertical,
+    geos: activeGeos,
+    currency: code,
+  });
 
   const { theme, cycleTheme } = useTheme();
 
@@ -341,6 +332,9 @@ const Report = () => {
               Plan is projecting {blendedRoas.toFixed(2)}x return on {$(totalSpend)} deployed.{' '}
               {topChannel ? `${topChannel.name} is your strongest channel.` : ''}
             </div>
+          )}
+          {!narrative && (
+            <NarrativePrompt loading={narrativeLoading} error={narrativeError} onGenerate={generate} />
           )}
         </section>
 
