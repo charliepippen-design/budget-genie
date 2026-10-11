@@ -4,20 +4,7 @@ This guide explains how to work on Budget Genie in both VS Code and Cursor simul
 
 ## ✅ Quick Start
 
-### Option A: Use the batch script (Windows)
-
-```bash
-.\start-parallel.bat
-```
-
-This will:
-
-- Install dependencies (if needed)
-- Start the Vite dev server
-- Open VS Code
-- Open Cursor
-
-### Option B: Manual setup
+### Setup
 
 1. **Terminal 1** (Main dev server):
 
