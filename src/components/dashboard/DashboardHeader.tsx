@@ -12,6 +12,7 @@ import {
   BarChart,
   Sparkles,
   Share2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
@@ -49,6 +50,8 @@ interface DashboardHeaderProps {
   budgetPreset: BudgetPresetKey;
   onPresetChange: (preset: BudgetPresetKey) => void;
   onExport: (format: 'pdf' | 'csv' | 'xlsx' | 'json') => void;
+  /** Label of the export currently running, or null when idle. */
+  exportingLabel?: string | null;
   onImport: () => void;
   onReset: () => void;
   onLaunchMasterWizard: () => void;
@@ -58,6 +61,7 @@ export function DashboardHeader({
   budgetPreset,
   onPresetChange,
   onExport,
+  exportingLabel = null,
   onImport,
   onReset,
   onLaunchMasterWizard,
@@ -325,9 +329,17 @@ export function DashboardHeader({
             ) : (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button className={cn(controlShellClass, 'gap-2')} aria-label="Open export menu">
-                    <Download className="h-4 w-4" />
-                    Export
+                  <Button
+                    className={cn(controlShellClass, 'gap-2')}
+                    aria-label="Open export menu"
+                    disabled={exportingLabel !== null}
+                  >
+                    {exportingLabel !== null ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4" />
+                    )}
+                    {exportingLabel !== null ? `Exporting ${exportingLabel}...` : 'Export'}
                     <ChevronDown className="h-3 w-3" />
                   </Button>
                 </DropdownMenuTrigger>

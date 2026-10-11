@@ -145,6 +145,8 @@ export interface Preset {
   globalMultipliers: GlobalMultipliers;
   activeTiers?: GeoAllocationState;
   activeGeos?: string[];
+  geoOverrides?: Record<string, GeoMarketOverride>;
+  observedLtv?: ObservedLtvInputs;
 }
 
 // ========== DEFAULT DATA ==========
@@ -1055,17 +1057,21 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
       // Presets
       savePreset: (name) => {
+        const presetName = name.trim();
+        if (!presetName) return;
         set((state) => {
           const preset: Preset = {
-            name,
+            name: presetName,
             totalBudget: state.totalBudget,
             channels: JSON.parse(JSON.stringify(state.channels)),
             globalMultipliers: { ...state.globalMultipliers },
             activeTiers: { ...state.activeTiers },
             activeGeos: [...state.activeGeos],
+            geoOverrides: JSON.parse(JSON.stringify(state.geoOverrides)),
+            observedLtv: { ...state.observedLtv },
           };
 
-          const existing = state.presets.filter((p) => p.name !== name);
+          const existing = state.presets.filter((p) => p.name !== presetName);
           return { presets: [...existing, preset] };
         });
       },
@@ -1078,9 +1084,11 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           return {
             totalBudget: preset.totalBudget,
             channels: JSON.parse(JSON.stringify(preset.channels)),
-            globalMultipliers: { ...preset.globalMultipliers },
+            globalMultipliers: { ...DEFAULT_MULTIPLIERS, ...preset.globalMultipliers },
             activeTiers: { ...TIER_DEFAULTS, ...(preset.activeTiers ?? {}) },
             activeGeos: [...(preset.activeGeos ?? [])],
+            geoOverrides: JSON.parse(JSON.stringify(preset.geoOverrides ?? {})),
+            observedLtv: { m1: null, m3: null, m6: null, ...(preset.observedLtv ?? {}) },
           };
         });
       },

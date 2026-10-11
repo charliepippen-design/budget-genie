@@ -11,16 +11,9 @@ import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/li
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
+import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 
-interface WizardState {
-  step: 1 | 2 | 3 | 4 | 5 | 6 | 'generating' | 'done';
-  budget: number | '';
-  vertical: Vertical | null;
-  subvertical: IgamingSubvertical | null;
-  goal: WizardAnswers['goal'] | null;
-  geos: string[]; // ISO country codes
-  benchmarks: { cpa: string; ltv: string };
-}
+type WizardState = WizardDraft;
 
 const STATUS_MESSAGES = [
   'Analysing your vertical...',
@@ -139,16 +132,17 @@ export const OnboardWizard = () => {
   const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
   const hasExistingPlan = useMediaPlanStore((state) => state.hasCompletedOnboarding);
 
-  const [state, setState] = useState<WizardState>({
-    step: 1,
-    budget: '',
-    vertical: null,
-    subvertical: null,
-    goal: null,
-    geos: [],
-    benchmarks: { cpa: '', ltv: '' },
-  });
-  const [selectedBudgetTierKey, setSelectedBudgetTierKey] = useState<string | null>(null);
+  // Answers and step live in a persisted store so a reload resumes where the user left off.
+  const state = useOnboardingDraftStore((s) => s.draft);
+  const setState = useOnboardingDraftStore((s) => s.setDraft);
+  const selectedBudgetTierKey = useOnboardingDraftStore((s) => s.selectedBudgetTierKey);
+  const setSelectedBudgetTierKey = useOnboardingDraftStore((s) => s.setSelectedBudgetTierKey);
+  const resetDraft = useOnboardingDraftStore((s) => s.reset);
+
+  // Coming back after a finished run starts a fresh wizard.
+  useEffect(() => {
+    if (useOnboardingDraftStore.getState().draft.step === 'done') resetDraft();
+  }, [resetDraft]);
   const [statusIndex, setStatusIndex] = useState(0);
   const [isContinueAttentionActive, setIsContinueAttentionActive] = useState(false);
   const [showContinueLetsGo, setShowContinueLetsGo] = useState(false);
@@ -174,7 +168,7 @@ export const OnboardWizard = () => {
 
   const goToStep = useCallback((step: WizardState['step']) => {
     setState((prev) => ({ ...prev, step }));
-  }, []);
+  }, [setState]);
 
   const continueFromBudget = useCallback(() => {
     if (!selectedBudgetTierKey || !isBudgetValid) return;
@@ -212,7 +206,7 @@ export const OnboardWizard = () => {
       }));
       window.setTimeout(() => goToStep(vertical === 'igaming' ? 3 : 4), 300);
     },
-    [goToStep]
+    [goToStep, setState]
   );
 
   const selectSubvertical = useCallback(
@@ -220,7 +214,7 @@ export const OnboardWizard = () => {
       setState((prev) => ({ ...prev, subvertical }));
       window.setTimeout(() => goToStep(4), 300);
     },
-    [goToStep]
+    [goToStep, setState]
   );
 
   const selectGoal = useCallback(
@@ -228,7 +222,7 @@ export const OnboardWizard = () => {
       setState((prev) => ({ ...prev, goal }));
       window.setTimeout(() => goToStep(5), 300);
     },
-    [goToStep]
+    [goToStep, setState]
   );
 
   const toggleGeo = useCallback((code: string) => {
@@ -238,7 +232,7 @@ export const OnboardWizard = () => {
         ? prev.geos.filter((c) => c !== code)
         : [...prev.geos, code],
     }));
-  }, []);
+  }, [setState]);
 
   const onboardingMarkets = useMemo(() => getOnboardingMarkets(state.vertical), [state.vertical]);
 
@@ -443,7 +437,10 @@ export const OnboardWizard = () => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        if (hasExistingPlan && state.step !== 'generating') navigate('/app');
+        if (hasExistingPlan && state.step !== 'generating') {
+          resetDraft();
+          navigate('/app');
+        }
         return;
       }
 
@@ -465,7 +462,7 @@ export const OnboardWizard = () => {
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [applyPlan, continueFromBudget, goToStep, hasExistingPlan, navigate, state.step]);
+  }, [applyPlan, continueFromBudget, goToStep, hasExistingPlan, navigate, resetDraft, state.step]);
 
   const progress = typeof state.step === 'number' ? Math.min(state.step, 6) : 6;
 
@@ -475,7 +472,10 @@ export const OnboardWizard = () => {
         {hasExistingPlan && state.step !== 'generating' && (
           <button
             type="button"
-            onClick={() => navigate('/app')}
+            onClick={() => {
+              resetDraft();
+              navigate('/app');
+            }}
             className="mb-4 self-start text-sm text-slate-400 hover:text-white"
           >
             ← Back to my plan
