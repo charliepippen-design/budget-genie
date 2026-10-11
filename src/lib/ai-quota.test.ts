@@ -11,6 +11,7 @@ import {
   withQuotaGuard,
 } from '../../api/_quota';
 import { handleAIRequest } from '../../api/_gateway';
+import { DEFAULT_FALLBACK_MODEL, DEFAULT_MODEL } from '../../api/_models';
 
 const post = (body: unknown = {}) =>
   new Request('http://localhost/api/ai-gateway', { method: 'POST', body: JSON.stringify(body) });
@@ -255,7 +256,7 @@ describe('callGemini integration', () => {
   });
 
   it('skips only the exhausted model', async () => {
-    markModelExhausted('gemini-3.5-flash');
+    markModelExhausted(DEFAULT_MODEL);
     const fetchMock = vi.fn(
       async () => new Response(JSON.stringify({ candidates: [{ content: { parts: [{ text: 'ok' }] } }] }))
     );
@@ -264,7 +265,7 @@ describe('callGemini integration', () => {
     expect(res.status).toBe(200);
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url] = fetchMock.mock.calls[0] as unknown as [string];
-    expect(url).toContain('gemini-flash-latest');
+    expect(url).toContain(DEFAULT_FALLBACK_MODEL);
   });
 
   it('does not mark a model exhausted on a per-minute 429', async () => {
@@ -272,7 +273,7 @@ describe('callGemini integration', () => {
     vi.stubGlobal('fetch', fetchMock);
     const res = await planner();
     expect(res.status).toBe(429);
-    expect(isModelExhausted('gemini-3.5-flash')).toBe(false);
-    expect(isModelExhausted('gemini-flash-latest')).toBe(false);
+    expect(isModelExhausted(DEFAULT_MODEL)).toBe(false);
+    expect(isModelExhausted(DEFAULT_FALLBACK_MODEL)).toBe(false);
   });
 });
