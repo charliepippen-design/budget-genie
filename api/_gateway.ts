@@ -8,7 +8,16 @@ import { verifyClerkSession } from "./_auth.js";
 import { geminiModels } from "./_models.js";
 import { admitRequest } from "./_usage.js";
 
+import { isModelExhausted, markModelExhausted } from "./_quota.js";
+
 const env = (k: string) => process.env[k];
+
+// Decision layer (Jev) and number guard, see api/README-AI.md.
+import { getDecisionModel } from "./_decisions.js";
+import { routeMessage } from "./_decision-router.js";
+import { checkReply } from "./_reply-check.js";
+import { collectNumberSources, findUnsourcedNumbers, NUMBER_GUARD_NOTE } from "./_number-guard.js";
+import { detectLang } from "./_language.js";
 
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 6000;
@@ -31,7 +40,10 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   const errors: string[] = [];
   let quotaExhausted = false;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
+  let attempted = 0;
   for (const model of geminiModels()) {
+    if (isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
+    attempted++;
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
@@ -51,13 +63,16 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
       // A spent daily/monthly quota won't recover by retrying.
       if (res.status === 429 && /quota/i.test(detail)) {
         quotaExhausted = true;
+        // Only a per-day limit is worth remembering; a per-minute 429 recovers on its own.
+        if (/PerDay|per day/i.test(detail) || !/PerMinute|per minute/i.test(detail)) markModelExhausted(model);
         break;
       }
       if (res.status !== 429 && res.status !== 503) break;
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
-  console.error("Gemini failed:", errors);
+  if (attempted === 0) quotaExhausted = true; // every model is exhausted: no fetch was made
+  else console.error("Gemini failed:", errors);
   if (quotaExhausted) {
     throw new GatewayError(
       "The AI usage limit has been reached for now. Your plan and sliders still work; try the chat again later.",
@@ -186,12 +201,55 @@ PLAN STATE: ${JSON.stringify(ctx.plan ?? null)}`;
 }
 
 async function runPlanner(payload: { messages: AgentMessage[]; context: Record<string, unknown> }) {
+  const ctx = payload.context ?? {};
+  const decisions = getDecisionModel();
+  const lastUser = [...payload.messages].reverse().find((m) => m.role === "user");
+  const userText = lastUser && lastUser.role === "user" ? String(lastUser.text ?? "") : "";
+
+  // D2 router: may answer with a fixed text or remove tools; any failure leaves the request untouched.
+  let tools = PLANNER_TOOLS;
+  if (decisions) {
+    const lastAssistant = [...payload.messages].reverse().find((m) => m.role === "assistant");
+    const catalog = Array.isArray(ctx.catalog) ? (ctx.catalog as { name?: unknown }[]) : [];
+    const route = await routeMessage(decisions, {
+      message: userText,
+      lastAssistant: lastAssistant && lastAssistant.role === "assistant" ? lastAssistant.text : undefined,
+      briefExists: !!ctx.brief,
+      channelNames: catalog.map((c) => c?.name).filter((n): n is string => typeof n === "string"),
+      availableTools: PLANNER_TOOLS.map((t) => t.name),
+    });
+    if (route.action === "canned" && route.cannedText) {
+      return { text: route.cannedText, toolCalls: [], raw: [{ text: route.cannedText }] };
+    }
+    if (route.action === "narrow") tools = PLANNER_TOOLS.filter((t) => route.tools?.includes(t.name));
+  }
+
   const { parts } = await callGemini({
-    systemInstruction: { parts: [{ text: plannerSystemPrompt(payload.context ?? {}) }] },
+    systemInstruction: { parts: [{ text: plannerSystemPrompt(ctx) }] },
     contents: toContents(payload.messages),
-    tools: [{ functionDeclarations: PLANNER_TOOLS }],
+    ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
   });
-  return splitParts(parts);
+  const result = splitParts(parts);
+
+  // Post-call checks run on final text replies only.
+  if (result.text && result.toolCalls.length === 0) {
+    const guardMode = env("AI_NUMBER_GUARD") || "log";
+    if (guardMode === "log" || guardMode === "annotate") {
+      try {
+        const { unsourced } = findUnsourcedNumbers(result.text, collectNumberSources(ctx, payload.messages));
+        if (guardMode === "log") console.info("ai_number_guard", { count: unsourced.length });
+        else if (unsourced.length) result.text += `\n\n${NUMBER_GUARD_NOTE[detectLang(userText)]}`;
+      } catch {
+        // the guard must never break a reply
+      }
+    }
+    if (decisions) {
+      const brief = ctx.brief as { industry?: string } | null | undefined;
+      const check = await checkReply(decisions, { userMessage: userText, reply: result.text, industry: brief?.industry });
+      if (check.appendNotice) result.text += `\n\n${check.appendNotice}`;
+    }
+  }
+  return result;
 }
 
 // ---------- Task: json (onboarding refinement, report narrative) ----------
