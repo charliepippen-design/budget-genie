@@ -1,118 +1,75 @@
-# MediaPlanner Pro 🚀
+# MediaPlanner Pro (Budget Genie)
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue.svg) ![Status](https://img.shields.io/badge/status-production-green.svg)
+Budget planning and scaling tool for iGaming and digital marketing teams. Live at https://mediaplannerpro.com.
 
-## Official Launch v1.0
+## How it works
 
-MediaPlanner Pro is the ultimate budget scaling and allocation tool for iGaming professionals.
+- A deterministic planning engine (`src/lib/plan-generator.ts`, `computePlanSnapshot`) computes every number in a plan.
+- AI (Google Gemini only) is used for assistance and does not produce the figures. Calls go through a server-side gateway (`api/ai-gateway.ts`, logic in `api/_gateway.ts`) that checks the Clerk session. The Gemini key lives only on the server.
+- Projects are stored in the browser only (localStorage). There is no cloud save yet.
+- Payments are not yet configured in production. Billing code exists in `api/billing-checkout.ts` and `api/stripe-webhook.ts`, and `scripts/setup-payments.mjs` is the one-time setup helper.
 
-## Features
+## Tech stack
 
-- **Project Vault**: Save and load multiple media plans secured by Supabase.
-- **AI Advisor**: "MediaPlanner Pro Advisor" helps you optimize spend and identify waste.
-- **Multi-Month Strategy**: Distribute budgets across custom growth curves (Linear, Exponential, Seasonality).
-- **Cloud-Ready**: Auto-save, data validation, and offline support.
+React 18, Vite 7, TypeScript, Tailwind CSS, shadcn/ui, zustand. Auth is [Clerk](https://clerk.com). Serverless functions in `api/` run on Vercel.
 
-## Tech Stack
+`src/lib/supabase.ts` and the hooks that use it are legacy and are not part of the product's storage or auth.
 
-- **Frontend**: React + Vite + TailwindCSS + Shadcn/UI
-- **Auth**: [Clerk](https://clerk.com) (sign-in and session)
-- **Data**: [Supabase](https://supabase.com) (Postgres, realtime, and Edge Functions)
-- **AI**: Anthropic Claude and Google Gemini invoked from **Supabase Edge Functions** (keys stay server-side). The app calls those functions via `src/lib/ai-client.ts` using the Supabase anon key and project URL.
+## Getting started
 
-## AI Model Routing
+```bash
+npm ci
+cp .env.example .env.local   # then fill in your own values
+npm run dev
+```
 
-Provider keys are **not** bundled in the browser for the main flows. Edge Functions read secrets from the Supabase project:
-
-| Flow             | Model                                   | Edge Function        |
-| ---------------- | --------------------------------------- | -------------------- |
-| Onboarding plan  | Claude (Anthropic API)                  | `generate-plan`      |
-| Report narrative | Claude (Anthropic API)                  | `generate-narrative` |
-| Genie chat       | Gemini (Google Generative Language API) | `genie-chat`         |
+The dev server also serves `api/ai-gateway` locally, so `vercel dev` is not needed.
 
 ### Environment variables
 
-1. **Copy** [`.env.example`](./.env.example) to `.env.local` and fill in values. Do not commit `.env.local`.
+Set these in `.env.local` (never commit it). See `.env.example` for the template.
 
-2. **Client-safe variables** (Vite `import.meta.env`, prefixed with `VITE_`):
-   - `VITE_CLERK_PUBLISHABLE_KEY` — from the [Clerk dashboard](https://dashboard.clerk.com) → API Keys
-   - `VITE_SUPABASE_URL` — Supabase project URL
-   - `VITE_SUPABASE_ANON_KEY` — Supabase anon (public) key
+| Variable | Where | Purpose |
+| --- | --- | --- |
+| `VITE_CLERK_PUBLISHABLE_KEY` | browser | Clerk auth |
+| `GEMINI_API_KEY` | server only | Gemini access for the AI gateway |
+| `GEMINI_MODEL` | server only, optional | Override the default Gemini model |
+| `ALLOW_ANON` | server only, local dev | Lets the gateway skip the Clerk check |
+| `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_PRO_MONTHLY`, `STRIPE_PRICE_ENTERPRISE_MONTHLY`, `CLERK_SECRET_KEY` | server only | Billing endpoints (not yet live) |
 
-3. **Server-only secrets** for Edge Functions — set on Supabase, not in `.env.local`:
+Note: `.env.example` still lists some Supabase and Anthropic entries from earlier versions that the current code does not use for the product.
 
-   ```bash
-   supabase secrets set ANTHROPIC_API_KEY=...
-   supabase secrets set GOOGLE_GENERATIVE_AI_API_KEY=...
-   ```
-
-   Billing-related secrets (`STRIPE_*`, service role, etc.) are documented in the [Billing](#billing-stripe--supabase-edge-functions) section below.
-
-4. **Optional — Import Assistant modal**  
-   The spreadsheet import assistant still reads `VITE_GOOGLE_GENERATIVE_AI_API_KEY` in the browser. Prefer moving that flow to an Edge Function when possible so the key is not exposed. Until then, add that variable locally only if you use the feature.
-
-### CI / build
-
-GitHub Actions ([`.github/workflows/ci.yml`](./.github/workflows/ci.yml)) supplies stub `VITE_*` values for `npm run build`. Production deploys should use real values in your host’s environment.
-
-### Superuser access (Clerk)
-
-If you want one personal account to bypass paywall checks (for owner/admin access), set either of these values on your Clerk user `publicMetadata`:
-
-- `is_superuser: true`
-- `role: "superuser"`
-
-You can edit this in Clerk Dashboard -> Users -> your user -> Metadata -> Public metadata.
-
-When either flag is present, this app treats the account as having active access while normal users still require payment metadata.
-
-## Billing (Stripe + Supabase Edge Functions)
-
-Billing is handled via Supabase Edge Functions:
-
-- `create-checkout-session`: creates hosted Stripe Checkout sessions for Pro/Enterprise.
-- `stripe-webhook`: verifies Stripe webhook signatures and syncs subscription tier to Supabase Auth user metadata.
-
-The Settings billing flow includes a signed return-state parameter (`billing_state`) and polls Supabase Auth metadata after Stripe redirect to confirm webhook propagation.
-
-Webhook processing is idempotent via Deno KV keyed by Stripe `event.id`, so Stripe retries do not double-process subscription events.
-
-### Required Supabase Function secrets
-
-Set these in your Supabase project before deploying the functions:
-
-- `SUPABASE_URL`
-- `SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `STRIPE_SECRET_KEY`
-- `STRIPE_WEBHOOK_SECRET`
-- `STRIPE_PRICE_PRO_MONTHLY`
-- `STRIPE_PRICE_ENTERPRISE_MONTHLY`
-
-AI functions additionally require:
-
-- `ANTHROPIC_API_KEY`
-- `GOOGLE_GENERATIVE_AI_API_KEY`
-
-### Deploy functions
+### Local QA without Clerk
 
 ```bash
-supabase functions deploy genie-chat
-supabase functions deploy generate-plan
-supabase functions deploy generate-narrative
-supabase functions deploy create-checkout-session
-supabase functions deploy stripe-webhook
+MOCK_CLERK=1 npm run dev
 ```
 
-### Configure Stripe webhook endpoint
+This swaps `@clerk/clerk-react` for `src/dev/clerk-mock.tsx`, which simulates a signed-in superuser so `/app` is reachable. It only applies to the dev server, never to production builds.
 
-Point Stripe to:
+## Scripts
 
-`https://<your-project-ref>.functions.supabase.co/stripe-webhook`
+| Command | What it does |
+| --- | --- |
+| `npm run dev` | Start the Vite dev server |
+| `npm run lint` | ESLint |
+| `npx tsc -b --noEmit` | Type check |
+| `npm run test:run` | Unit tests (Vitest, single run) |
+| `npm run test:e2e` | Playwright end-to-end tests (starts the dev server with `MOCK_CLERK=1`) |
+| `npm run build` | Production build to `dist/` |
+| `npm run preview` | Preview the production build |
+| `npm run perf:analyze` | Build with a bundle size report |
 
-Subscribe to at least:
+The first time you run the e2e tests, install the browser with `npx playwright install chromium`.
 
-- `checkout.session.completed`
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
+## Deploy
+
+Vercel deploys automatically from `main`. `vercel.json` sets the build command, the `dist` output, and a SPA rewrite for non-`api/` routes. Set the server-only variables above in the Vercel project settings.
+
+## Routes
+
+`/` landing, `/auth`, `/pricing`, `/terms`, `/privacy`, `/refund-policy`, and the signed-in app at `/app` (plus `/onboard`, `/settings`, `/report`, `/output`).
+
+## License
+
+See `LICENSE.md`.
