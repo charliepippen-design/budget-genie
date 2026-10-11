@@ -43,50 +43,27 @@ import { useTheme } from '@/hooks/use-theme';
 import { Switch } from '@/components/ui/switch';
 import { SandboxSpendChart } from '@/components/dashboard/SandboxSpendChart';
 import { ScenarioChart } from '@/components/dashboard/ScenarioChart';
-import { computeSandboxChannel } from '@/components/dashboard/ltv-sandbox-calc';
 import { useSandboxStore, type ChannelSandboxAdjustment } from '@/store/useSandboxStore';
 
-interface ScenarioPoint {
-  scenario: 'Bear' | 'Base' | 'Bull';
-  projectedLtvPerUser: number;
-  projectedCohortValue: number;
-  ltvToCac: number;
-}
-
-interface AggregateMetrics {
-  totalSpend: number;
-  totalConversions: number;
-  projectedRevenue: number;
-  blendedCpa: number | null;
-  blendedRoas: number;
-  roi: number;
-}
-
-const SCENARIO_COLORS = {
-  Bear: '#ef4444',
-  Base: '#14b8a6',
-  Bull: '#22c55e',
-};
-
-const SCENARIO_DOT_CLASS = {
-  Bear: 'bg-rose-500',
-  Base: 'bg-teal-500',
-  Bull: 'bg-emerald-500',
-};
-
-const SANDBOX_INCREASE_FILL = 'rgba(34,197,94,0.82)';
-const SANDBOX_DECREASE_FILL = 'rgba(239,68,68,0.82)';
-const SANDBOX_NEUTRAL_FILL = 'rgba(99,102,241,0.82)';
-
-const SANDBOX_DEFAULT_ADJUSTMENT: ChannelSandboxAdjustment = {
-  spendPct: 0,
-  cpaPct: 0,
-  roasPct: 0,
-  churnPct: 0,
-};
-
-const CHANNEL_GROUPS: ChannelGroup[] = ['organic', 'paid', 'affiliate', 'influencer'];
-
+import {
+  CHANNEL_GROUPS,
+  SANDBOX_DEFAULT_ADJUSTMENT,
+  SCENARIO_COLORS,
+  SCENARIO_DOT_CLASS,
+} from './ltv-forecast/constants';
+import { buildExportSnapshot } from './ltv-forecast/export-snapshot';
+import { compareBaseScenario, scenarioRoiData } from './ltv-forecast/scenario-math';
+import {
+  aggregateMetrics,
+  buildSandboxSummary,
+  computeSandboxChannelMetrics,
+  filterGroupedChannels,
+  groupImpact,
+  spendDistributionSummary as buildSpendDistributionSummary,
+  toBaselineAggregate,
+  weightedChurnDeltaPct,
+} from './ltv-forecast/sandbox-math';
+import type { AggregateMetrics, ScenarioPoint } from './ltv-forecast/types';
 
 export function LtvForecastPanel() {
   const blended = useBlendedMetrics();
@@ -140,99 +117,26 @@ export function LtvForecastPanel() {
         };
 
   const baselineMetrics = useMemo<AggregateMetrics>(
-    () => ({
-      totalSpend: blended.totalSpend,
-      totalConversions: blended.totalConversions,
-      projectedRevenue: blended.projectedRevenue,
-      blendedCpa: blended.blendedCpa,
-      blendedRoas: blended.blendedRoas,
-      roi:
-        blended.totalSpend > 0
-          ? (blended.projectedRevenue - blended.totalSpend) / blended.totalSpend
-          : 0,
-    }),
+    () => toBaselineAggregate(blended),
     [blended]
   );
 
   const selectedSet = useMemo(() => new Set(selectedChannelIds), [selectedChannelIds]);
 
-  const sandboxChannelMetrics = useMemo(() => {
-    return channels.map((channel) => {
-      const group = getChannelGroup(channel);
-      const groupDelta = groupAdjustments[group] ?? 0;
-      const adjustment = selectedSet.has(channel.id)
-        ? (channelAdjustments[channel.id] ?? SANDBOX_DEFAULT_ADJUSTMENT)
-        : SANDBOX_DEFAULT_ADJUSTMENT;
+  const sandboxChannelMetrics = useMemo(
+    () => computeSandboxChannelMetrics(channels, selectedSet, channelAdjustments, groupAdjustments),
+    [channelAdjustments, channels, groupAdjustments, selectedSet]
+  );
 
-      const {
-        adjustedSpend,
-        baselineCpa,
-        adjustedCpa,
-        baselineRoas,
-        adjustedRoas,
-        adjustedConversions,
-        adjustedRevenue,
-      } = computeSandboxChannel(channel.metrics, adjustment, groupDelta);
+  const weightedSandboxChurnDeltaPct = useMemo(
+    () => weightedChurnDeltaPct(sandboxChannelMetrics, selectedSet),
+    [sandboxChannelMetrics, selectedSet]
+  );
 
-      return {
-        channelId: channel.id,
-        channelName: channel.name,
-        group,
-        baselineSpend: channel.metrics.spend,
-        adjustedSpend,
-        baselineCpa,
-        adjustedCpa,
-        baselineRoas,
-        adjustedRoas,
-        adjustedConversions,
-        adjustedRevenue,
-        churnPct: adjustment.churnPct,
-      };
-    });
-  }, [channelAdjustments, channels, groupAdjustments, selectedSet]);
-
-  const weightedSandboxChurnDeltaPct = useMemo(() => {
-    const activeChannels = sandboxChannelMetrics.filter((channel) =>
-      selectedSet.has(channel.channelId)
-    );
-    const totalSelectedSpend = activeChannels.reduce(
-      (sum, channel) => sum + channel.adjustedSpend,
-      0
-    );
-
-    if (totalSelectedSpend <= 0) {
-      return 0;
-    }
-
-    return activeChannels.reduce(
-      (sum, channel) => sum + (channel.adjustedSpend / totalSelectedSpend) * channel.churnPct,
-      0
-    );
-  }, [sandboxChannelMetrics, selectedSet]);
-
-  const sandboxMetrics = useMemo<AggregateMetrics>(() => {
-    const totals = sandboxChannelMetrics.reduce(
-      (acc, channel) => {
-        acc.spend += channel.adjustedSpend;
-        acc.revenue += channel.adjustedRevenue;
-        acc.conversions += channel.adjustedConversions;
-        return acc;
-      },
-      { spend: 0, revenue: 0, conversions: 0 }
-    );
-
-    const blendedCpa = totals.conversions > 0 ? totals.spend / totals.conversions : null;
-    const blendedRoas = totals.spend > 0 ? totals.revenue / totals.spend : 0;
-
-    return {
-      totalSpend: totals.spend,
-      totalConversions: totals.conversions,
-      projectedRevenue: totals.revenue,
-      blendedCpa,
-      blendedRoas,
-      roi: totals.spend > 0 ? (totals.revenue - totals.spend) / totals.spend : 0,
-    };
-  }, [sandboxChannelMetrics]);
+  const sandboxMetrics = useMemo<AggregateMetrics>(
+    () => aggregateMetrics(sandboxChannelMetrics),
+    [sandboxChannelMetrics]
+  );
 
   const activeMetrics = sandboxEnabled ? sandboxMetrics : baselineMetrics;
 
@@ -322,80 +226,26 @@ export function LtvForecastPanel() {
     [baselineScenarioData]
   );
 
-  const activeSummaryText = useMemo(() => {
-    const baselineRoiPct = baselineMetrics.roi * 100;
-    const sandboxRoiPct = sandboxMetrics.roi * 100;
-    const roiDeltaPct = sandboxRoiPct - baselineRoiPct;
+  const activeSummaryText = useMemo(
+    () =>
+      buildSandboxSummary(
+        baselineMetrics.roi,
+        sandboxMetrics.roi,
+        sandboxChannelMetrics,
+        weightedSandboxChurnDeltaPct
+      ),
+    [baselineMetrics.roi, sandboxChannelMetrics, sandboxMetrics.roi, weightedSandboxChurnDeltaPct]
+  );
 
-    const paidChannels = sandboxChannelMetrics.filter((item) => item.group === 'paid');
-    const paidBaselineSpend = paidChannels.reduce((sum, item) => sum + item.baselineSpend, 0);
-    const paidSandboxSpend = paidChannels.reduce((sum, item) => sum + item.adjustedSpend, 0);
+  const groupImpactData = useMemo(
+    () => groupImpact(sandboxChannelMetrics),
+    [sandboxChannelMetrics]
+  );
 
-    const paidBaselineRoas =
-      paidBaselineSpend > 0
-        ? paidChannels.reduce((sum, item) => sum + item.baselineRoas * item.baselineSpend, 0) /
-          paidBaselineSpend
-        : 0;
-    const paidSandboxRoas =
-      paidSandboxSpend > 0
-        ? paidChannels.reduce((sum, item) => sum + item.adjustedRoas * item.adjustedSpend, 0) /
-          paidSandboxSpend
-        : 0;
-
-    const paidRiskRaised =
-      paidSandboxRoas < paidBaselineRoas * 0.92 ||
-      (paidBaselineSpend > 0 && paidSandboxSpend > paidBaselineSpend * 1.18);
-
-    const direction = roiDeltaPct >= 0 ? 'increase' : 'reduce';
-    const riskSignals = [
-      paidRiskRaised ? 'raise risk in Paid Ads' : null,
-      weightedSandboxChurnDeltaPct > 2.5 ? 'increase churn pressure' : null,
-    ].filter(Boolean);
-
-    const riskText =
-      riskSignals.length > 0 ? `but ${riskSignals.join(' and ')}.` : 'while keeping risk stable.';
-
-    return `Your changes ${direction} total ROI by ${Math.abs(roiDeltaPct).toFixed(1)}% ${riskText}`;
-  }, [
-    baselineMetrics.roi,
-    sandboxChannelMetrics,
-    sandboxMetrics.roi,
-    weightedSandboxChurnDeltaPct,
-  ]);
-
-  const groupImpactData = useMemo(() => {
-    return CHANNEL_GROUPS.map((group) => {
-      const groupChannels = sandboxChannelMetrics.filter((channel) => channel.group === group);
-      const baselineSpend = groupChannels.reduce((sum, item) => sum + item.baselineSpend, 0);
-      const sandboxSpend = groupChannels.reduce((sum, item) => sum + item.adjustedSpend, 0);
-      const delta = sandboxSpend - baselineSpend;
-
-      return {
-        group: GROUP_LABELS[group],
-        baselineSpend,
-        sandboxSpend,
-        delta,
-        sandboxFill:
-          delta > 0
-            ? SANDBOX_INCREASE_FILL
-            : delta < 0
-              ? SANDBOX_DECREASE_FILL
-              : SANDBOX_NEUTRAL_FILL,
-      };
-    });
-  }, [sandboxChannelMetrics]);
-
-  const spendDistributionSummary = useMemo(() => {
-    const increases = groupImpactData.filter((item) => item.delta > 0).map((item) => item.group);
-    const decreases = groupImpactData.filter((item) => item.delta < 0).map((item) => item.group);
-
-    const increaseText =
-      increases.length > 0 ? `Increases: ${increases.join(', ')}.` : 'No group increases.';
-    const decreaseText =
-      decreases.length > 0 ? `Decreases: ${decreases.join(', ')}.` : 'No group decreases.';
-
-    return `${increaseText} ${decreaseText}`;
-  }, [groupImpactData]);
+  const spendDistributionSummary = useMemo(
+    () => buildSpendDistributionSummary(groupImpactData),
+    [groupImpactData]
+  );
 
   const baselineAllocationData = useMemo(
     () =>
@@ -417,66 +267,25 @@ export function LtvForecastPanel() {
 
   const shouldShowChannelScaling = channels.length > 6;
 
-  const filteredGroupedChannels = useMemo(() => {
-    const normalizedFilter = channelFilter.trim().toLowerCase();
-
-    return CHANNEL_GROUPS.map((group) => ({
-      group,
-      channels: channels.filter((channel) => {
-        const matchesGroup = getChannelGroup(channel) === group;
-        const matchesFilter =
-          normalizedFilter.length === 0 ||
-          channel.name.toLowerCase().includes(normalizedFilter) ||
-          GROUP_LABELS[group].toLowerCase().includes(normalizedFilter);
-
-        return matchesGroup && matchesFilter;
-      }),
-    })).filter((entry) => entry.channels.length > 0);
-  }, [channelFilter, channels]);
+  const filteredGroupedChannels = useMemo(
+    () => filterGroupedChannels(channels, channelFilter),
+    [channelFilter, channels]
+  );
 
   const baselineScenarioRoiData = useMemo(
-    () =>
-      baselineScenarioData.map((scenario) => ({
-        scenario: scenario.scenario,
-        roi:
-          baselineMetrics.totalSpend > 0
-            ? ((scenario.projectedCohortValue - baselineMetrics.totalSpend) /
-                baselineMetrics.totalSpend) *
-              100
-            : 0,
-      })),
+    () => scenarioRoiData(baselineScenarioData, baselineMetrics.totalSpend),
     [baselineMetrics.totalSpend, baselineScenarioData]
   );
 
   const adjustedScenarioRoiData = useMemo(
-    () =>
-      scenarioData.map((scenario) => ({
-        scenario: scenario.scenario,
-        roi:
-          sandboxMetrics.totalSpend > 0
-            ? ((scenario.projectedCohortValue - sandboxMetrics.totalSpend) /
-                sandboxMetrics.totalSpend) *
-              100
-            : 0,
-      })),
+    () => scenarioRoiData(scenarioData, sandboxMetrics.totalSpend),
     [sandboxMetrics.totalSpend, scenarioData]
   );
 
-  const scenarioComparisonSummary = useMemo(() => {
-    const baseScenario = baselineScenarioRoiData.find((scenario) => scenario.scenario === 'Base');
-    const adjustedBaseScenario = adjustedScenarioRoiData.find(
-      (scenario) => scenario.scenario === 'Base'
-    );
-
-    if (!baseScenario || !adjustedBaseScenario) {
-      return 'Scenario comparison unavailable.';
-    }
-
-    const delta = adjustedBaseScenario.roi - baseScenario.roi;
-    const direction = delta >= 0 ? 'up' : 'down';
-
-    return `Base-case ROI projection is ${direction} ${Math.abs(delta).toFixed(1)} points versus baseline.`;
-  }, [adjustedScenarioRoiData, baselineScenarioRoiData]);
+  const scenarioComparisonSummary = useMemo(
+    () => compareBaseScenario(baselineScenarioRoiData, adjustedScenarioRoiData),
+    [adjustedScenarioRoiData, baselineScenarioRoiData]
+  );
 
   const { curveData, monthlyChurn, monthlyExpansion, paybackMonth } = useMemo(() => {
     const curve = buildLtvCurve(activeMetrics, {
@@ -515,57 +324,17 @@ export function LtvForecastPanel() {
   };
 
   useEffect(() => {
-    setExportSnapshot({
-      enabled: sandboxEnabled,
-      summaryText: activeSummaryText,
-      baselineMetrics: {
-        ...baselineMetrics,
-        roiPct: baselineMetrics.roi * 100,
-      },
-      adjustedMetrics: {
-        ...sandboxMetrics,
-        roiPct: sandboxMetrics.roi * 100,
-      },
-      channelComparisons: sandboxChannelMetrics.map((channel) => ({
-        channelId: channel.channelId,
-        channelName: channel.channelName,
-        group: channel.group,
-        baselineSpend: channel.baselineSpend,
-        adjustedSpend: channel.adjustedSpend,
-        baselineCpa: channel.baselineCpa,
-        adjustedCpa: channel.adjustedCpa,
-        baselineRoas: channel.baselineRoas,
-        adjustedRoas: channel.adjustedRoas,
-        churnPct: channel.churnPct,
-      })),
-      scenarioComparisons: baselineScenarioData.map((baselineScenario) => {
-        const adjustedScenario =
-          scenarioData.find((scenario) => scenario.scenario === baselineScenario.scenario) ??
-          baselineScenario;
-        const baselineRoiPct =
-          baselineMetrics.totalSpend > 0
-            ? ((baselineScenario.projectedCohortValue - baselineMetrics.totalSpend) /
-                baselineMetrics.totalSpend) *
-              100
-            : 0;
-        const adjustedRoiPct =
-          sandboxMetrics.totalSpend > 0
-            ? ((adjustedScenario.projectedCohortValue - sandboxMetrics.totalSpend) /
-                sandboxMetrics.totalSpend) *
-              100
-            : 0;
-
-        return {
-          scenario: baselineScenario.scenario,
-          baselineProjectedCohortValue: baselineScenario.projectedCohortValue,
-          adjustedProjectedCohortValue: adjustedScenario.projectedCohortValue,
-          baselineLtvToCac: baselineScenario.ltvToCac,
-          adjustedLtvToCac: adjustedScenario.ltvToCac,
-          baselineRoiPct,
-          adjustedRoiPct,
-        };
-      }),
-    });
+    setExportSnapshot(
+      buildExportSnapshot({
+        sandboxEnabled,
+        activeSummaryText,
+        baselineMetrics,
+        sandboxMetrics,
+        sandboxChannelMetrics,
+        baselineScenarioData,
+        scenarioData,
+      })
+    );
   }, [
     activeSummaryText,
     baselineMetrics,
@@ -1071,7 +840,7 @@ export function LtvForecastPanel() {
                       <p className="text-[11px] uppercase tracking-wider text-slate-400">
                         Baseline vs Adjusted Spend
                       </p>
-                      <p className="text-xs text-slate-400">Channel comparison</p>
+                      <p className="text-xs text-slate-400">Realtime channel comparison</p>
                     </div>
                     <p className="mb-3 text-xs text-slate-400">
                       Baseline stays neutral, while adjusted bars change color by direction of spend
