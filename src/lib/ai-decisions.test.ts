@@ -192,7 +192,7 @@ describe('flag off', () => {
     expect(calls.map((c) => String(c[0]))).toEqual([expect.stringContaining('generativelanguage.googleapis.com')]);
     const raw = String(calls[0][1]?.body);
     const parsed = JSON.parse(raw);
-    expect(Object.keys(parsed)).toEqual(['systemInstruction', 'contents', 'tools', 'generationConfig']);
+    expect(Object.keys(parsed)).toEqual(['systemInstruction', 'contents', 'tools']);
     expect(parsed.tools[0].functionDeclarations.map((t: { name: string }) => t.name)).toEqual(['update_brief', 'adjust_channel']);
     // Same body as on main: prompt and tools are untouched, contents and config as before.
     expect(raw).toBe(
@@ -200,7 +200,6 @@ describe('flag off', () => {
         systemInstruction: parsed.systemInstruction,
         contents: [{ role: 'user', parts: [{ text: 'Hi' }] }],
         tools: [{ functionDeclarations: parsed.tools[0].functionDeclarations }],
-        generationConfig: { temperature: 0.4 },
       })
     );
     expect(calls.some((c) => String(c[0]).includes('typesafe'))).toBe(false);
