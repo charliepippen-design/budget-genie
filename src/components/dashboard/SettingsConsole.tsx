@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 // FIX: Use the requested relative import for the store
 // FIX: Use the requested relative import for the store
@@ -53,12 +53,13 @@ import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { ChannelEditor } from './ChannelEditor';
 import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
+import { BuyingModel, BUYING_MODEL_INFO, inferChannelFamily } from '@/types/channel';
 import {
-  BuyingModel,
-  BUYING_MODEL_INFO,
-  inferChannelFamily,
-  getLikelyModel,
-} from '@/types/channel';
+  defaultModelForCategory,
+  modelChoicesForCategory,
+  parsePriceInput,
+  sanitizePriceInput,
+} from '@/lib/add-channel-form';
 import type { GlobalMultipliers } from '@/hooks/use-media-plan-store';
 
 const BudgetWizard = lazy(() =>
@@ -556,9 +557,25 @@ export const SettingsConsole: React.FC = () => {
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
   const [newModel, setNewModel] = useState<BuyingModel>('CPM');
-  const [newPrice, setNewPrice] = useState(5);
+  const [newPriceRaw, setNewPriceRaw] = useState('5');
+  const [priceError, setPriceError] = useState<string | null>(null);
 
-  const modelChoices: BuyingModel[] = ['CPM', 'CPA', 'REV_SHARE', 'FLAT_FEE'];
+  const modelChoices = useMemo(() => modelChoicesForCategory(newCat), [newCat]);
+
+  const handleCategoryChange = useCallback((value: string) => {
+    const category = value as ChannelCategory;
+    setNewCat(category);
+    setNewModel(defaultModelForCategory(category));
+  }, []);
+
+  const handlePriceChange = useCallback((raw: string) => {
+    setNewPriceRaw(sanitizePriceInput(raw));
+    setPriceError(null);
+  }, []);
+
+  const handlePriceBlur = useCallback(() => {
+    setPriceError(parsePriceInput(newPriceRaw).error);
+  }, [newPriceRaw]);
 
   const priceMeta = useMemo(() => {
     switch (newModel) {
@@ -570,14 +587,14 @@ export const SettingsConsole: React.FC = () => {
         return { label: 'RevShare %', prefix: '', suffix: '%' };
       case 'FLAT_FEE':
         return { label: 'Flat Fee', prefix: symbol, suffix: 'total' };
+      case 'CPC':
+        return { label: 'CPC Price', prefix: symbol, suffix: 'per click' };
+      case 'RETAINER':
+        return { label: 'Monthly Retainer', prefix: symbol, suffix: 'per month' };
       default:
         return { label: 'Price', prefix: symbol, suffix: '' };
     }
   }, [newModel, symbol]);
-
-  useEffect(() => {
-    setNewModel(getLikelyModel(newCat));
-  }, [newCat]);
 
   const handleCreateChannel = useCallback(() => {
     // Sanitize channel name to prevent XSS and enforce constraints
@@ -591,10 +608,13 @@ export const SettingsConsole: React.FC = () => {
       return;
     }
 
-    if (!(newPrice > 0)) {
-      toast({ title: 'Price must be greater than zero', variant: 'destructive' });
+    const parsedPrice = parsePriceInput(newPriceRaw);
+    if (parsedPrice.error !== null) {
+      setPriceError(parsedPrice.error);
+      toast({ title: parsedPrice.error, variant: 'destructive' });
       return;
     }
+    const newPrice = parsedPrice.value;
 
     const family = inferChannelFamily(sanitizedName);
     addChannel({
@@ -615,7 +635,7 @@ export const SettingsConsole: React.FC = () => {
       title: 'Channel Added',
       description: `Channel created: ${sanitizedName}`,
     });
-  }, [addChannel, newCat, newModel, newName, newPrice, toast]);
+  }, [addChannel, newCat, newModel, newName, newPriceRaw, toast]);
 
   const channelItems = useMemo(
     () => channelsWithMetrics.map((channel) => <ChannelItem key={channel.id} channel={channel} />),
@@ -776,7 +796,7 @@ export const SettingsConsole: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label className="text-slate-300">Category</Label>
-                  <Select value={newCat} onValueChange={(v) => setNewCat(v as ChannelCategory)}>
+                  <Select value={newCat} onValueChange={handleCategoryChange}>
                     <SelectTrigger className="bg-slate-800 shadow-inner border-slate-700 transition-all focus:ring-2 focus:ring-cyan-500/50">
                       <Folder className="w-4 h-4 text-slate-500 mr-2" />
                       <SelectValue />
@@ -820,10 +840,12 @@ export const SettingsConsole: React.FC = () => {
                     <Percent className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
                   )}
                   <Input
-                    type="number"
-                    min={0}
-                    value={newPrice}
-                    onChange={(e) => setNewPrice(Math.max(0, parseFloat(e.target.value) || 0))}
+                    type="text"
+                    inputMode="decimal"
+                    value={newPriceRaw}
+                    onChange={(e) => handlePriceChange(e.target.value)}
+                    onBlur={handlePriceBlur}
+                    aria-invalid={priceError ? true : undefined}
                     className={cn(
                       'bg-slate-800 shadow-inner border-slate-700 transition-all focus:ring-2 focus:ring-cyan-500/50',
                       'pr-16',
@@ -836,6 +858,11 @@ export const SettingsConsole: React.FC = () => {
                     </span>
                   ) : null}
                 </div>
+                {priceError ? (
+                  <p role="alert" className="text-xs text-red-400">
+                    {priceError}
+                  </p>
+                ) : null}
               </div>
             </motion.div>
             <DialogFooter>
