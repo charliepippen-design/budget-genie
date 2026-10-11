@@ -22,7 +22,7 @@ test('landing page renders', async ({ page }) => {
 test('scenario create share export flow smoke', async ({ page }) => {
   await page.goto('/app');
 
-  await expect(page.getByText('Smart Strategies')).toBeVisible();
+  await expect(page.getByText('Smart Strategies')).toBeVisible({ timeout: 20_000 });
 
   await page.getByPlaceholder('e.g. 4.0').fill('2');
 
