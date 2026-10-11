@@ -6,9 +6,10 @@
 // most MAX_REQUESTS_PER_TURN requests, so a reused id cannot be a loophole.
 //
 // Storage is chosen at runtime by which env vars exist (no new env is required to deploy):
-//   1. Clerk privateMetadata via the Backend API  (CLERK_SECRET_KEY)
-//   2. Vercel KV / Upstash Redis REST             (KV_REST_API_URL + KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN)
-//   3. In-memory, per serverless instance         (best-effort only: resets on cold start, not shared)
+//   1. Vercel KV / Upstash Redis REST             (KV_REST_API_URL + KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN)
+//   2. In-memory, per serverless instance         (best-effort only: resets on cold start, not shared)
+//
+// Owner exemption: OWNER_USER_IDS / OWNER_EMAILS (non-secret allowlists, see isOwner).
 
 export const FREE_TURNS_PER_MONTH = 10;
 export const MAX_REQUESTS_PER_TURN = 6;
@@ -108,27 +109,6 @@ export const memoryStore: UsageStore = {
   },
 };
 
-export function clerkStore(): UsageStore {
-  return {
-    name: "clerk-private-metadata",
-    persistent: true,
-    async load(userId) {
-      const usage = (await clerkGetUser(userId)).private_metadata?.ai_usage;
-      return usage && typeof usage.month === "string" && usage.turns && typeof usage.turns === "object"
-        ? (usage as UsageRecord)
-        : null;
-    },
-    async save(userId, record) {
-      const res = await fetch(`https://api.clerk.com/v1/users/${encodeURIComponent(userId)}/metadata`, {
-        method: "PATCH",
-        headers: { Authorization: `Bearer ${env("CLERK_SECRET_KEY")}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ private_metadata: { ai_usage: record } }),
-      });
-      if (!res.ok) throw new Error(`Clerk usage save failed: ${res.status}`);
-    },
-  };
-}
-
 export function kvStore(url: string, token: string): UsageStore {
   const command = async (...args: (string | number)[]) => {
     const res = await fetch(url, {
@@ -158,9 +138,8 @@ export function kvStore(url: string, token: string): UsageStore {
   };
 }
 
-/** Picks the adapter from the environment. Clerk first, then KV/Upstash, else per-instance memory. */
+/** Picks the adapter from the environment: Vercel KV / Upstash REST if configured, else per-instance memory. */
 export function selectStore(): UsageStore {
-  if (env("CLERK_SECRET_KEY")) return clerkStore();
   const url = env("KV_REST_API_URL") || env("UPSTASH_REDIS_REST_URL");
   const token = env("KV_REST_API_TOKEN") || env("UPSTASH_REDIS_REST_TOKEN");
   if (url && token) return kvStore(url, token);
@@ -172,10 +151,33 @@ function warnIfMemory(store: UsageStore) {
   if (!store.persistent && !warnedMemory) {
     warnedMemory = true;
     console.warn(
-      "usage: no persistent store configured (CLERK_SECRET_KEY or KV_REST_API_URL/TOKEN). " +
+      "usage: no persistent store configured (KV_REST_API_URL/TOKEN or UPSTASH_REDIS_REST_URL/TOKEN). " +
         "Free-tier AI cap is best-effort, per serverless instance."
     );
   }
+}
+
+// ---------- Owner exemption ----------
+
+const listEnv = (k: string) =>
+  (env(k) ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+
+/**
+ * Owner accounts are never capped. Non-secret allowlists:
+ *   OWNER_USER_IDS: comma-separated Clerk user ids, matched against the verified JWT `sub`.
+ *   OWNER_EMAILS:   comma-separated emails, matched against an `email` claim in the verified JWT
+ *                   (only present if the Clerk session token is customised to include it).
+ * Only values from the verified session are used; nothing sent by the client is trusted.
+ */
+export function isOwner(userId: string, claims: Record<string, unknown> | undefined): boolean {
+  const ids = listEnv("OWNER_USER_IDS");
+  if (userId && ids.includes(userId.toLowerCase())) return true;
+  const emails = listEnv("OWNER_EMAILS");
+  const email = claims && typeof claims.email === "string" ? claims.email.trim().toLowerCase() : "";
+  return !!email && emails.includes(email);
 }
 
 // ---------- Counting ----------
@@ -228,6 +230,7 @@ export async function admitRequest(
   deps: { store?: UsageStore; now?: Date; resolve?: typeof resolvePlan } = {}
 ): Promise<AdmitResult> {
   const noop = { ok: true as const, commit: async () => {} };
+  if (isOwner(userId, claims)) return noop;
   if (userId === "anonymous") return noop; // ALLOW_ANON local dev
 
   const plan = await (deps.resolve ?? resolvePlan)(claims, userId);

@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SubscriptionTier } from '@/hooks/use-media-plan-store';
 import { cn } from '@/lib/utils';
-import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
 
 interface UpgradeGatewayModalProps {
   open: boolean;
@@ -49,17 +48,14 @@ export function UpgradeGatewayModal({
   const billableTier = selectedTier === 'free' ? 'pro' : selectedTier;
   const roi = ROI_BY_TIER[billableTier];
   const isStripeAvailable = enableStripe && typeof onPayWithStripe === 'function';
-  // With crypto hidden the card rail is the only option; without Stripe either, checkout is unavailable.
-  const initialMethod = (): 'card' | 'crypto' =>
-    !SHOW_CRYPTO_CHECKOUT ? 'card' : isStripeAvailable ? preferredPaymentMethod : 'crypto';
-  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'crypto'>(initialMethod);
-  const checkoutUnavailable = !SHOW_CRYPTO_CHECKOUT && !isStripeAvailable;
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<'card' | 'crypto'>(
+    isStripeAvailable ? preferredPaymentMethod : 'crypto'
+  );
 
   useEffect(() => {
     if (open) {
-      setSelectedPaymentMethod(initialMethod());
+      setSelectedPaymentMethod(isStripeAvailable ? preferredPaymentMethod : 'crypto');
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, preferredPaymentMethod, isStripeAvailable]);
 
   return (
@@ -112,15 +108,11 @@ export function UpgradeGatewayModal({
                   Checkout Rail
                 </p>
                 <p className="mt-2 text-sm text-slate-400">
-                  {!SHOW_CRYPTO_CHECKOUT
-                    ? isStripeAvailable
-                      ? 'Stripe opens a hosted card session.'
-                      : 'Checkout is temporarily unavailable. Please try again later.'
-                    : isStripeAvailable
-                      ? 'Pick your preferred payment rail. Stripe opens a hosted card session and crypto routes to NOWPayments.'
-                      : 'Crypto checkout is currently active. Card payments are temporarily hidden and can be re-enabled later.'}
+                  {isStripeAvailable
+                    ? 'Pick your preferred payment rail. Stripe opens a hosted card session and crypto routes to NOWPayments.'
+                    : 'Crypto checkout is currently active. Card payments are temporarily hidden and can be re-enabled later.'}
                 </p>
-                {isStripeAvailable && SHOW_CRYPTO_CHECKOUT ? (
+                {isStripeAvailable ? (
                   <div className="mt-4 inline-flex rounded-lg border border-slate-700 bg-slate-900/70 p-1">
                     <button
                       type="button"
@@ -150,7 +142,7 @@ export function UpgradeGatewayModal({
                 ) : null}
                 <div className="mt-4 flex flex-col gap-3 sm:flex-row">
                   <Button
-                    disabled={isProcessing || checkoutUnavailable}
+                    disabled={isProcessing}
                     className={cn(
                       'h-11 flex-1 text-white',
                       selectedPaymentMethod === 'card' && isStripeAvailable
@@ -170,13 +162,11 @@ export function UpgradeGatewayModal({
                     )}
                     {isProcessing
                       ? 'Preparing Checkout...'
-                      : checkoutUnavailable
-                        ? 'Checkout unavailable'
-                        : selectedPaymentMethod === 'card' && isStripeAvailable
-                          ? 'Pay with Credit Card (Stripe)'
-                          : 'Pay with Crypto (NOWPayments)'}
+                      : selectedPaymentMethod === 'card' && isStripeAvailable
+                        ? 'Pay with Credit Card (Stripe)'
+                        : 'Pay with Crypto (NOWPayments)'}
                   </Button>
-                  {isStripeAvailable && SHOW_CRYPTO_CHECKOUT ? (
+                  {isStripeAvailable ? (
                     <Button
                       disabled={isProcessing}
                       variant="outline"
@@ -201,7 +191,6 @@ export function UpgradeGatewayModal({
                     </Button>
                   ) : null}
                 </div>
-                {SHOW_CRYPTO_CHECKOUT ? (
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <a
                     href={NOWPAYMENTS_CHECKOUT_URL}
@@ -227,7 +216,6 @@ export function UpgradeGatewayModal({
                     </Button>
                   ) : null}
                 </div>
-                ) : null}
               </div>
             </div>
 

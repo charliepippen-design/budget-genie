@@ -10,6 +10,7 @@ import {
   planFromClaims,
   planFromMetadata,
   resolvePlan,
+  isOwner,
   selectStore,
   type UsageRecord,
   type UsageStore,
@@ -222,13 +223,17 @@ describe('store selection', () => {
     expect(s.persistent).toBe(false);
   });
 
-  it('prefers Clerk, then KV/Upstash', () => {
+  it('uses KV/Upstash when configured, even if a Clerk secret is present', () => {
     clear();
     vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://u.example');
     vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 't');
     expect(selectStore().name).toBe('kv-rest');
     vi.stubEnv('CLERK_SECRET_KEY', 'sk_test_x');
-    expect(selectStore().name).toBe('clerk-private-metadata');
+    expect(selectStore().name).toBe('kv-rest');
+    clear();
+    vi.stubEnv('KV_REST_API_URL', 'https://kv.example');
+    vi.stubEnv('KV_REST_API_TOKEN', 't');
+    expect(selectStore().name).toBe('kv-rest');
   });
 
   it('KV adapter round-trips through the REST API', async () => {
@@ -300,5 +305,39 @@ describe('resolvePlan', () => {
   it('does not cap the local-dev anonymous user', async () => {
     vi.stubEnv('ALLOW_ANON', 'true');
     expect(await resolvePlan({}, 'anonymous')).toBe('unknown');
+  });
+});
+
+describe('owner exemption', () => {
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('matches OWNER_USER_IDS against the verified user id', () => {
+    vi.stubEnv('OWNER_USER_IDS', 'user_owner, user_other');
+    expect(isOwner('user_owner', {})).toBe(true);
+    expect(isOwner('user_x', {})).toBe(false);
+  });
+
+  it('matches OWNER_EMAILS only against a verified email claim (case-insensitive)', () => {
+    vi.stubEnv('OWNER_EMAILS', 'Owner@Example.com');
+    expect(isOwner('user_x', { email: 'owner@example.com' })).toBe(true);
+    expect(isOwner('user_x', {})).toBe(false);
+    expect(isOwner('user_x', { email: 'someone@example.com' })).toBe(false);
+  });
+
+  it('is off when no allowlist is set', () => {
+    vi.stubEnv('OWNER_USER_IDS', '');
+    vi.stubEnv('OWNER_EMAILS', '');
+    expect(isOwner('user_owner', { email: 'owner@example.com' })).toBe(false);
+  });
+
+  it('owners bypass the cap even when over the limit', async () => {
+    vi.stubEnv('OWNER_USER_IDS', 'user_owner');
+    const turns: Record<string, number> = {};
+    for (let i = 0; i < FREE_TURNS_PER_MONTH; i++) turns[`t${i}`] = 1;
+    const store: UsageStore = { name: 'fake', persistent: true, load: async () => ({ month: '2026-10', turns }), save: async () => {} };
+    const res = await admitRequest('user_owner', {}, 'new-turn-xyz', { store, now: OCT, resolve: async () => 'free' });
+    expect(res.ok).toBe(true);
+    const other = await admitRequest('user_x', {}, 'new-turn-xyz', { store, now: OCT, resolve: async () => 'free' });
+    expect(other.ok).toBe(false);
   });
 });
