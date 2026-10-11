@@ -71,8 +71,8 @@ Respond with valid JSON matching this exact shape — no markdown, no explanatio
 export async function generateReportNarrative(
   input: ReportNarratorInput
 ): Promise<ReportNarrative | null> {
-  const prompt = buildPrompt(input);
   try {
+    const prompt = buildPrompt(input);
     // JSON must match the schema exactly; anything else is treated as no answer.
     const parsed = NarrativeSchema.safeParse(await generateJSON(`${prompt}
 
