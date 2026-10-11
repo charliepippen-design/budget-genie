@@ -1,15 +1,14 @@
 // AI gateway: the only place that holds the LLM key (runs as a Vercel Function).
 // Tasks are allow-listed; prompts live here, the browser only sends data.
 //
-// Env: GEMINI_API_KEY (required), GEMINI_MODEL (optional),
+// Env: GEMINI_API_KEY (required), GEMINI_MODEL and GEMINI_FALLBACK_MODEL (optional, see _models.ts),
 //      VITE_CLERK_PUBLISHABLE_KEY (used to verify signed-in users), ALLOW_ANON=true (local dev only)
 
 import { verifyClerkUser } from "./_auth.js";
+import { geminiModels } from "./_models.js";
 
 const env = (k: string) => process.env[k];
 
-const MODEL = env("GEMINI_MODEL") || "gemini-3.5-flash";
-const FALLBACK_MODEL = "gemini-flash-latest"; // alias, survives model retirements
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 6000;
 const MAX_PROMPT = 20000;
@@ -31,7 +30,7 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   const errors: string[] = [];
   let quotaExhausted = false;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
-  for (const model of [MODEL, FALLBACK_MODEL]) {
+  for (const model of geminiModels()) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
@@ -190,7 +189,6 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
     systemInstruction: { parts: [{ text: plannerSystemPrompt(payload.context ?? {}) }] },
     contents: toContents(payload.messages),
     tools: [{ functionDeclarations: PLANNER_TOOLS }],
-    generationConfig: { temperature: 0.4 },
   });
   return splitParts(parts);
 }
@@ -201,7 +199,7 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
 async function runJson(payload: { prompt: string }) {
   const { parts } = await callGemini({
     contents: [{ role: "user", parts: [{ text: String(payload.prompt ?? "").slice(0, MAX_PROMPT) }] }],
-    generationConfig: { temperature: 0.3, responseMimeType: "application/json" },
+    generationConfig: { responseMimeType: "application/json" },
   });
   return splitParts(parts);
 }
