@@ -118,3 +118,19 @@ describe('Plan generator', () => {
     expect(mixed.warnings.join(' ')).toMatch(/IT/);
   });
 });
+
+describe('market advertising notes', () => {
+  it('adds the neutral Brazil note (with official source) to iGaming plans targeting BR', () => {
+    const plan = generatePlan({ industry: 'igaming', monthlyBudget: 50000, markets: ['BR'] });
+    const note = plan.warnings.find((w) => w.startsWith('Brazil:'));
+    expect(note).toBeDefined();
+    expect(note).toContain('1.394/2026');
+    expect(note).toContain('Ministério da Fazenda');
+    expect(note?.toLowerCase()).not.toContain('banned');
+  });
+
+  it('does not add the Brazil note for other markets or industries', () => {
+    expect(generatePlan({ industry: 'igaming', monthlyBudget: 50000, markets: ['DE'] }).warnings.some((w) => w.startsWith('Brazil:'))).toBe(false);
+    expect(generatePlan({ industry: 'fintech', monthlyBudget: 50000, markets: ['BR'] }).warnings.some((w) => w.startsWith('Brazil:'))).toBe(false);
+  });
+});

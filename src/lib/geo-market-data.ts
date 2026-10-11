@@ -8,6 +8,29 @@ export interface GeoCountryProfile {
   baselineLtv: number;
 }
 
+/**
+ * Planning notes on gambling advertising rules per market, shown with plan warnings.
+ * Summaries only, current as of the date checked. Not legal advice.
+ *
+ * BR, checked 2026-10-11 against official sources:
+ * - Lei 14.790/2023 (regulated fixed-odds betting; licensed operators from Jan 2025):
+ *   https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14790.htm
+ * - Portaria SPA/MF 1.231/2024 (responsible gambling and advertising rules), amended by
+ *   Portaria SPA/MF 1.964/2026 (mandatory warning phrases):
+ *   https://www.gov.br/fazenda/pt-br/composicao/orgaos/secretaria-de-premios-e-apostas/apostas-de-quota-fixa/legislacao/apostas
+ * - Medida Provisoria 1.394, 25 Sep 2026 (in force on publication; needs Congress conversion within
+ *   120 days): prohibits exploitation, offer, intermediation and advertising of fixed-odds betting,
+ *   extinguishes existing authorizations after 30 days, sites and apps offline from 6 Oct 2026.
+ *   Ministry of Finance summary:
+ *   https://www.gov.br/fazenda/pt-br/composicao/orgaos/secretaria-de-premios-e-apostas/medida-provisoria-ndeg-1-394-2026-entenda-as-novas-regras-para-as-apostas-de-quota-fixa
+ *   Text: https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2026/Mpv/mpv1394.htm
+ * - Press (not official) reports challenges before the STF (ADI 8024, ADI 8027); no decision found as of 2026-10-11.
+ * - Other lottery types authorised by law are not covered by the MP (Art. 1, para 2).
+ */
+export const MARKET_ADVERTISING_NOTES: Record<string, string> = {
+  BR: 'Brazil: since 25 Sep 2026, Medida Provisória 1.394/2026 prohibits the offer and advertising of fixed-odds betting (sports betting and online casino games) nationwide; federal authorisations end 30 days after publication (25 Oct 2026) and betting sites and apps had to go offline from 6 Oct 2026. The measure must be approved by Congress to stay in force. Other lotteries authorised by law are not affected. Source: Ministério da Fazenda, Secretaria de Prêmios e Apostas (gov.br/fazenda). Check the current status before planning spend.'
+};
+
 export const TIER_LABELS: Record<GeoTierKey, string> = {
   tier1: 'Tier 1: Premium',
   tier2: 'Tier 2: Volume',

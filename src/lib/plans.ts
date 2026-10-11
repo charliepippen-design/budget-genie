@@ -1,15 +1,26 @@
-// One source for plan names and displayed prices (Pricing page and Settings).
+// One source for plan names, displayed prices and features (Pricing page and Settings).
 // The amount actually charged is the Stripe price behind STRIPE_PRICE_*_MONTHLY: keep them equal.
+// Only list features that exist in the app. Do not add claims about results, SLAs or integrations.
 
 export interface PlanInfo {
-  tier: 'pro' | 'enterprise';
+  tier: 'free' | 'pro' | 'enterprise';
   name: string;
   priceLabel: string; // per month
   tagline: string;
   features: string[];
 }
 
-export const PAID_PLANS: PlanInfo[] = [
+export type PaidPlanInfo = PlanInfo & { tier: 'pro' | 'enterprise' };
+
+export const FREE_PLAN: PlanInfo = {
+  tier: 'free',
+  name: 'Free',
+  priceLabel: '$0',
+  tagline: 'For trying the planner',
+  features: ['Budget planner and channel allocation', 'Scenario modeling', 'JSON config export'],
+};
+
+export const PAID_PLANS: PaidPlanInfo[] = [
   {
     tier: 'pro',
     name: 'Pro',
@@ -27,6 +38,6 @@ export const PAID_PLANS: PlanInfo[] = [
     name: 'Enterprise',
     priceLabel: '$39',
     tagline: 'For agencies and multi-brand teams',
-    features: ['Everything in Pro', 'Multi-month planning and P&L', 'Priority support'],
+    features: ['Everything in Pro', 'Multi-month planning and P&L'],
   },
 ];

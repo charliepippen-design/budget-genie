@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { createCheckoutSession } from '@/lib/billing';
-import { PAID_PLANS, type PlanInfo } from '@/lib/plans';
+import { PAID_PLANS, type PaidPlanInfo } from '@/lib/plans';
 import { LegalLinks } from '@/pages/Legal';
 
 export default function Pricing() {
@@ -15,7 +15,7 @@ export default function Pricing() {
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
   const { hasActivePayment } = usePaymentStatus();
-  const [processingTier, setProcessingTier] = useState<PlanInfo['tier'] | null>(null);
+  const [processingTier, setProcessingTier] = useState<PaidPlanInfo['tier'] | null>(null);
 
   // Redirect if already paid or not signed in
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function Pricing() {
     if (params.get('checkout') === 'cancelled') toast.info('Checkout cancelled. No charge was made.');
   }, [params]);
 
-  const startCheckout = async (tier: PlanInfo['tier']) => {
+  const startCheckout = async (tier: PaidPlanInfo['tier']) => {
     setProcessingTier(tier);
     try {
       const { url } = await createCheckoutSession({

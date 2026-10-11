@@ -1084,7 +1084,7 @@ export function LtvForecastPanel() {
                       <p className="text-[11px] uppercase tracking-wider text-slate-400">
                         Baseline vs Adjusted Spend
                       </p>
-                      <p className="text-xs text-slate-400">Realtime channel comparison</p>
+                      <p className="text-xs text-slate-400">Channel comparison</p>
                     </div>
                     <p className="mb-3 text-xs text-slate-400">
                       Baseline stays neutral, while adjusted bars change color by direction of spend

@@ -1,4 +1,4 @@
-import { PAID_PLANS } from '@/lib/plans';
+import { FREE_PLAN, PAID_PLANS, type PlanInfo } from '@/lib/plans';
 import { useCallback, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { z } from 'zod';
@@ -49,61 +49,9 @@ const ProjectListForCountSchema = z.array(
   })
 );
 
-const planPrice = (tier: 'pro' | 'enterprise') =>
-  PAID_PLANS.find((p) => p.tier === tier)?.priceLabel ?? '';
-
-const PRICING_TIERS: Array<{
-  key: SubscriptionTier;
-  title: string;
-  price: string;
-  cadence: string;
-  description: string;
-  features: string[];
-  highlighted?: boolean;
-}> = [
-  {
-    key: 'free',
-    title: 'Solo Arbitrage',
-    price: '$0',
-    cadence: '/month',
-    description: 'For solo operators validating channels and baseline acquisition plans.',
-    features: [
-      'Core budget planner and channel allocation',
-      'Up to 10 stored projects',
-      'Standard JSON config export',
-      'Advanced LTV modeling locked',
-      'Geo-Arbitrage matrix locked',
-    ],
-  },
-  {
-    key: 'pro',
-    title: 'Pro Acquisition',
-    price: planPrice('pro'),
-    cadence: '/month',
-    description: 'For teams optimizing LTV and GEO-level acquisition economics every week.',
-    highlighted: true,
-    features: [
-      'Advanced LTV Forecast Lab unlocked',
-      'Global Geo-Arbitrage token matrix unlocked',
-      'Priority optimization and sandbox modeling',
-      'Unlimited projects and scenario snapshots',
-      'Export analytics and strategy breakdowns',
-    ],
-  },
-  {
-    key: 'enterprise',
-    title: 'Enterprise Operator',
-    price: planPrice('enterprise'),
-    cadence: '/month',
-    description: 'For performance orgs syncing planning decisions across data, BI, and CDP.',
-    features: [
-      'Everything in Pro Acquisition',
-      'Server-Side CDP Exports unlocked',
-      'Dedicated model governance controls',
-      'Workspace roles and enterprise audit trail',
-      'Strategic onboarding and SLA support',
-    ],
-  },
+const PRICING_TIERS: Array<PlanInfo & { highlighted?: boolean }> = [
+  FREE_PLAN,
+  ...PAID_PLANS.map((plan, idx) => ({ ...plan, highlighted: idx === 0 })),
 ];
 
 export default function Settings() {
@@ -601,19 +549,18 @@ export default function Settings() {
                 </Badge>
               </div>
               <CardDescription className="text-slate-400">
-                Choose your growth stack. Pro unlocks advanced LTV modeling and Geo-Arbitrage.
-                Enterprise unlocks Server-Side CDP exports.
+                Compare plans. The features listed are available in the app today.
               </CardDescription>
             </CardHeader>
 
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 {PRICING_TIERS.map((tier) => {
-                  const isCurrent = tier.key === subscriptionTier;
+                  const isCurrent = tier.tier === subscriptionTier;
 
                   return (
                     <article
-                      key={tier.key}
+                      key={tier.tier}
                       className={cn(
                         'relative rounded-2xl border p-5 transition-all duration-300',
                         'bg-slate-950/55 border-slate-700 hover:border-slate-500',
@@ -630,13 +577,13 @@ export default function Settings() {
 
                       <div className="mb-4">
                         <p className="text-xs uppercase tracking-[0.16em] text-slate-400">
-                          {tier.title}
+                          {tier.name}
                         </p>
                         <div className="mt-2 flex items-end gap-1">
-                          <span className="text-3xl font-black text-white">{tier.price}</span>
-                          <span className="text-sm text-slate-400 pb-1">{tier.cadence}</span>
+                          <span className="text-3xl font-black text-white">{tier.priceLabel}</span>
+                          <span className="text-sm text-slate-400 pb-1">/month</span>
                         </div>
-                        <p className="mt-2 text-sm text-slate-400">{tier.description}</p>
+                        <p className="mt-2 text-sm text-slate-400">{tier.tagline}</p>
                       </div>
 
                       <ul className="space-y-2 text-sm text-slate-300">
@@ -649,7 +596,7 @@ export default function Settings() {
                       </ul>
 
                       <div className="mt-6">
-                        {tier.key === 'free' ? (
+                        {tier.tier === 'free' ? (
                           <Button
                             variant="outline"
                             className="w-full border-slate-600 text-slate-200 hover:bg-slate-800"
@@ -667,20 +614,20 @@ export default function Settings() {
                                   : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700'
                               )}
                               onClick={() =>
-                                openUpgrade(tier.key, ENABLE_STRIPE_CHECKOUT ? 'card' : 'crypto')
+                                openUpgrade(tier.tier, ENABLE_STRIPE_CHECKOUT ? 'card' : 'crypto')
                               }
                             >
                               {isCurrent
                                 ? 'Manage Plan'
                                 : ENABLE_STRIPE_CHECKOUT
-                                  ? `Upgrade to ${tier.title}`
+                                  ? `Upgrade to ${tier.name}`
                                   : `Upgrade with Crypto`}
                             </Button>
                             {ENABLE_STRIPE_CHECKOUT ? (
                               <Button
                                 variant="outline"
                                 className="mt-2 w-full border-emerald-400/45 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
-                                onClick={() => openUpgrade(tier.key, 'crypto')}
+                                onClick={() => openUpgrade(tier.tier, 'crypto')}
                               >
                                 Checkout with Crypto
                               </Button>
