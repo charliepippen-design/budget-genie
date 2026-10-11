@@ -8,6 +8,8 @@ import { verifyClerkSession } from "./_auth.js";
 import { geminiModels } from "./_models.js";
 import { admitRequest } from "./_usage.js";
 
+import { isModelExhausted, markModelExhausted } from "./_quota.js";
+
 const env = (k: string) => process.env[k];
 
 const MAX_MESSAGES = 60;
@@ -31,7 +33,10 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   const errors: string[] = [];
   let quotaExhausted = false;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
+  let attempted = 0;
   for (const model of geminiModels()) {
+    if (isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
+    attempted++;
     for (let attempt = 0; attempt < 2; attempt++) {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
@@ -51,13 +56,16 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
       // A spent daily/monthly quota won't recover by retrying.
       if (res.status === 429 && /quota/i.test(detail)) {
         quotaExhausted = true;
+        // Only a per-day limit is worth remembering; a per-minute 429 recovers on its own.
+        if (/PerDay|per day/i.test(detail) || !/PerMinute|per minute/i.test(detail)) markModelExhausted(model);
         break;
       }
       if (res.status !== 429 && res.status !== 503) break;
       await new Promise((r) => setTimeout(r, 1500));
     }
   }
-  console.error("Gemini failed:", errors);
+  if (attempted === 0) quotaExhausted = true; // every model is exhausted: no fetch was made
+  else console.error("Gemini failed:", errors);
   if (quotaExhausted) {
     throw new GatewayError(
       "The AI usage limit has been reached for now. Your plan and sliders still work; try the chat again later.",
