@@ -47,6 +47,7 @@ import { CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { useToast } from '@/hooks/use-toast';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn, sanitizeChannelName } from '@/lib/utils';
+import { BRAND_NAME } from '@/lib/brand';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { ChannelEditor } from './ChannelEditor';
@@ -645,7 +646,7 @@ export const SettingsConsole: React.FC = () => {
                 isDark ? 'text-white' : 'text-slate-900'
               )}
             >
-              MediaPlan Pro
+              {BRAND_NAME}
             </h2>
           </div>
 

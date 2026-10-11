@@ -1,5 +1,6 @@
 import { Helmet } from 'react-helmet';
 import { useEffect } from 'react';
+import { BRAND_NAME } from '@/lib/brand';
 import { useNavigate } from 'react-router-dom';
 import { BudgetGenieAI } from '@/components/dashboard/BudgetGenieAI';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
@@ -17,7 +18,7 @@ const Index = () => {
   return (
     <>
       <Helmet>
-        <title>MediaPlanner Pro - Interactive Budget Scaler | iGaming Media Planning</title>
+        <title>{`${BRAND_NAME} - Interactive Budget Scaler | iGaming Media Planning`}</title>
         <meta
           name="description"
           content="Professional media plan budget calibrator for iGaming and digital marketing."

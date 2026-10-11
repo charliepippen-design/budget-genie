@@ -6,9 +6,9 @@ import { AI_PRIVACY_PARAGRAPH, AI_PRIVACY_PARAGRAPH_IT } from '@/lib/ai-disclosu
 // Payment providers review these during merchant onboarding: keep the operator details accurate.
 
 const LEGAL = {
-  product: 'MediaPlan Pro',
+  product: 'MediaPlanner Pro',
   site: 'mediaplannerpro.com',
-  operator: 'MediaPlan Pro',
+  operator: 'MediaPlanner Pro',
   contactEmail: 'info@mediaplannerpro.com',
   governingLaw: 'Italy',
   lastUpdated: 'September 25, 2026',

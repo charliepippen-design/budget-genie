@@ -2,6 +2,7 @@ import { DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 // jspdf, jspdf-autotable and exceljs are large (~1.5 MB minified together), so they are
 // loaded on demand inside the export functions instead of shipping with the dashboard.
 import type jsPDF from 'jspdf';
+import { BRAND_NAME } from './brand';
 import { ChannelWithMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
 import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
 import {
@@ -73,7 +74,7 @@ export async function exportToPdf(
     // Title
     doc.setFontSize(20);
     doc.setTextColor(40, 40, 40);
-    doc.text('MediaPlan Pro - Budget Report', 14, 20);
+    doc.text(`${BRAND_NAME} - Budget Report`, 14, 20);
 
     // Date
     doc.setFontSize(10);
@@ -157,7 +158,7 @@ export async function exportToPdf(
       doc.setFontSize(8);
       doc.setTextColor(150, 150, 150);
       doc.text(
-        `Page ${i} of ${pageCount} | MediaPlan Pro`,
+        `Page ${i} of ${pageCount} | ${BRAND_NAME}`,
         doc.internal.pageSize.width / 2,
         doc.internal.pageSize.height - 10,
         { align: 'center' }
@@ -398,7 +399,7 @@ export async function exportToExcel(
 
     const { default: ExcelJS } = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
-    workbook.creator = 'MediaPlanner Pro';
+    workbook.creator = BRAND_NAME;
     workbook.created = new Date();
 
     // ── Sheet 1: Allocation Table ──────────────────────────────────────────────
@@ -587,7 +588,7 @@ export function exportEnterpriseConfigJson(
   channels: ChannelWithMetrics[],
   totalBudget: number,
   globalMultipliers: Pick<GlobalMultipliers, 'cpaTarget' | 'roasTarget'>,
-  planName = 'MediaPlanner Pro Plan'
+  planName = `${BRAND_NAME} Plan`
 ): void {
   const payload: EnterpriseExportPayload = {
     event_name: 'media_plan_configuration_ready',

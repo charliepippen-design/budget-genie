@@ -1,4 +1,5 @@
 import { getIndustryPack } from '@/lib/industries';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import {
   Download,
   FileText,
@@ -128,24 +129,7 @@ export function DashboardHeader({
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h1
-                  className={cn(
-                    'text-xl font-bold tracking-tight',
-                    isDark ? 'text-slate-100' : 'text-slate-900'
-                  )}
-                >
-                  MediaPlanner{' '}
-                  <span
-                    className={cn(
-                      'font-bold',
-                      isDark
-                        ? 'bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent'
-                        : 'bg-gradient-to-r from-blue-600 to-cyan-600 bg-clip-text text-transparent'
-                    )}
-                  >
-                    Pro
-                  </span>
-                </h1>
+                <BrandLogo size="md" as="h1" tone={isDark ? 'dark' : 'light'} />
                 <span className="text-xs text-slate-400 border border-slate-700 rounded-full px-2 py-0.5 ml-2">
                   {vc.emoji} {brief ? getIndustryPack(brief.industry).label : vc.label}
                 </span>

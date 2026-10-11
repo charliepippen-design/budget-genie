@@ -1,6 +1,7 @@
 
 import { SignIn } from '@clerk/clerk-react';
-import { DollarSign, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function Auth() {
     return (
@@ -8,12 +9,7 @@ export default function Auth() {
             <div className="w-full max-w-md bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
                 {/* Header */}
                 <div className="p-8 text-center border-b border-slate-700 bg-[#0f172a]/50">
-                    <div className="mx-auto h-16 w-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/30">
-                        <DollarSign className="h-8 w-8 text-blue-500" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-white tracking-tight mb-2">
-                        MediaPlanner <span className="text-blue-500">Pro</span>
-                    </h1>
+                    <BrandLogo size="lg" as="h1" stacked className="mb-2" />
                     <p className="text-slate-400 text-sm">
                         Please sign in to access your media plans
                     </p>

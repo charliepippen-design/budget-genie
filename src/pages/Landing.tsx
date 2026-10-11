@@ -4,6 +4,8 @@ import { useUser, useAuth } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { LegalLinks } from '@/pages/Legal';
+import { BrandLogo } from '@/components/common/BrandLogo';
+import { BRAND_DOMAIN, BRAND_NAME, BRAND_TAGLINE } from '@/lib/brand';
 
 export default function Landing() {
   const navigate = useNavigate();
@@ -40,13 +42,11 @@ export default function Landing() {
         {/* Logo/Brand */}
         <div className="mb-8">
           <p className="text-sm uppercase tracking-[0.4em] text-blue-100/80 mb-3">
-            MediaPlannerPro presents
+            {BRAND_DOMAIN}
           </p>
-          <h1 className="text-6xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg">
-            MediaPlannerPro Budget Genie
-          </h1>
+          <BrandLogo size="lg" as="h1" stacked className="mb-4 [&_h1]:text-6xl md:[&_h1]:text-7xl [&_h1]:drop-shadow-lg" />
           <p className="text-xl md:text-2xl text-blue-100 drop-shadow">
-            AI-Powered Media Planning Intelligence
+            {BRAND_TAGLINE}
           </p>
         </div>
 
@@ -78,7 +78,7 @@ export default function Landing() {
           size="lg"
           className="px-8 py-6 text-lg font-semibold bg-white text-blue-600 hover:bg-blue-50 shadow-2xl hover:shadow-3xl transition-all duration-300 transform hover:scale-105"
         >
-          Enter Budget Genie →
+          Enter {BRAND_NAME} →
         </Button>
 
         {/* Footer text */}

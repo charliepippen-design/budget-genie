@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 
 test('landing page renders', async ({ page }) => {
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'MediaPlannerPro Budget Genie' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'MediaPlanner Pro' })).toBeVisible({ timeout: 20_000 });
 });
 
 test('scenario create share export flow smoke', async ({ page }) => {

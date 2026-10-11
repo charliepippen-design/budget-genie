@@ -8,6 +8,7 @@ import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { createCheckoutSession } from '@/lib/billing';
 import { PAID_PLANS, type PaidPlanInfo } from '@/lib/plans';
 import { LegalLinks } from '@/pages/Legal';
+import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function Pricing() {
   const navigate = useNavigate();
@@ -49,6 +50,7 @@ export default function Pricing() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
+          <BrandLogo size="md" tone="light" className="justify-center mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
           <p className="text-xl text-gray-600">Plan your media budget with an AI planner</p>
         </div>
