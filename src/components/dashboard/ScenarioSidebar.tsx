@@ -26,7 +26,7 @@ import {
 } from '@/lib/distribution-logic';
 import { optimizeBudget } from '@/lib/optimization-logic';
 
-import { RotateCcw, SlidersHorizontal } from 'lucide-react';
+import { FolderOpen, RotateCcw, Save, SlidersHorizontal, Trash2 } from 'lucide-react';
 
 interface ScenarioSidebarProps {
   totalBudget: number;
@@ -53,7 +53,11 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
     channels,
     setChannels,
     savePreset,
+    loadPreset,
+    deletePreset,
+    presets,
   } = useMediaPlanStore();
+  const [presetName, setPresetName] = React.useState('');
   const channelsWithMetrics = useChannelsWithMetrics();
 
   const handlePresetClick = (
@@ -89,6 +93,19 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
     toast.success('Optimized Scenario Generated', {
       description: `Boosted ${result.changes.boosted.length}, reduced ${result.changes.slashed.length}, and saved as ${scenarioName}.`,
     });
+  };
+
+  const handleSavePreset = () => {
+    const name = presetName.trim();
+    if (!name) return;
+    savePreset(name);
+    setPresetName('');
+    toast.success(`Saved scenario: ${name}`);
+  };
+
+  const handleLoadPreset = (name: string) => {
+    loadPreset(name);
+    toast.success(`Loaded scenario: ${name}`);
   };
 
   return (
@@ -298,6 +315,65 @@ export const ScenarioSidebar: React.FC<ScenarioSidebarProps> = ({
             </div>
           </Button>
         </div>
+      </div>
+
+      {/* SAVED SCENARIOS */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4" data-testid="saved-scenarios">
+        <h3 className="font-semibold text-slate-100 mb-4 flex items-center gap-2">
+          <Save className="w-4 h-4 text-emerald-400" /> Saved Scenarios
+        </h3>
+        <div className="flex gap-2 mb-3">
+          <input
+            type="text"
+            aria-label="Scenario name"
+            className="min-w-0 flex-1 bg-slate-950 border border-slate-700 rounded px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+            placeholder="Name this scenario"
+            value={presetName}
+            onChange={(e) => setPresetName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSavePreset();
+            }}
+          />
+          <Button variant="outline" className="border-slate-700" onClick={handleSavePreset} disabled={!presetName.trim()}>
+            Save
+          </Button>
+        </div>
+        {presets.length === 0 ? (
+          <p className="text-xs text-slate-500">No saved scenarios yet.</p>
+        ) : (
+          <ul className="space-y-1">
+            {presets.map((preset) => (
+              <li
+                key={preset.name}
+                className="flex items-center gap-1 rounded border border-slate-800 bg-slate-950/50 p-2 text-sm"
+              >
+                <span className="flex-1 truncate text-slate-200" title={preset.name}>
+                  {preset.name}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-slate-300"
+                  title="Load"
+                  aria-label={`Load ${preset.name}`}
+                  onClick={() => handleLoadPreset(preset.name)}
+                >
+                  <FolderOpen className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7 text-slate-400 hover:text-red-400"
+                  title="Delete"
+                  aria-label={`Delete ${preset.name}`}
+                  onClick={() => deletePreset(preset.name)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </li>
+            ))}
+          </ul>
+        )}
       </div>
 
       {/* SCENARIO ACTIONS (NEW) */}
