@@ -118,6 +118,7 @@ export interface PlanScenario {
   patternParams: Record<string, number>;
   globalSettings: GlobalPlanSettings;
   months: MonthData[];
+  monthsCustomized?: boolean;
 }
 
 export interface OptimizationResult {
@@ -997,6 +998,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           patternParams: { ...state.patternParams },
           globalSettings: { ...state.globalSettings },
           months: JSON.parse(JSON.stringify(state.months)),
+          monthsCustomized: state.monthsCustomized,
         };
 
         set((s) => ({
@@ -1017,6 +1019,8 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           patternParams: { ...scenario.patternParams },
           globalSettings: { ...scenario.globalSettings },
           months: JSON.parse(JSON.stringify(scenario.months)),
+          // A loaded scenario is a saved state: stop the month panel regenerating over it.
+          monthsCustomized: true,
           activeScenarioId: id,
         });
       },
@@ -1179,6 +1183,18 @@ export const useMultiMonthStore = create<MultiMonthState>()(
         pdfSections: state.pdfSections,
         userNotes: state.userNotes,
       }),
+      // JSON turns createdAt into a string; bring it back to a Date.
+      merge: (persisted, current) => {
+        const saved = (persisted ?? {}) as Partial<MultiMonthState>;
+        return {
+          ...current,
+          ...saved,
+          scenarios: (saved.scenarios ?? current.scenarios).map((sc) => ({
+            ...sc,
+            createdAt: new Date(sc.createdAt),
+          })),
+        };
+      },
     }
   )
 );
