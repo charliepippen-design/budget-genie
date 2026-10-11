@@ -25,6 +25,21 @@ export interface AIResponse {
 
 type AITask = 'planner' | 'json';
 
+/** Error from the gateway; `code` is FREE_TIER_LIMIT or USAGE_UNAVAILABLE for free-tier cap responses. */
+export class AIError extends Error {
+  constructor(message: string, readonly code?: string, readonly status?: number) {
+    super(message);
+    this.name = 'AIError';
+  }
+}
+
+export const isFreeTierLimit = (err: unknown): boolean => err instanceof AIError && err.code === 'FREE_TIER_LIMIT';
+
+/** One turn = one user chat message or one one-shot generation. All requests of a turn share the id. */
+export function newTurnId(): string {
+  return globalThis.crypto?.randomUUID?.() ?? `t-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 type TokenGetter = (() => Promise<string | null>) | undefined;
 
 // Clerk's getToken is only reachable from hooks; plain modules (report narrator, onboarding)
@@ -61,14 +76,14 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ task, ...body }),
+      body: JSON.stringify({ turnId: newTurnId(), task, ...body }),
     });
   } catch {
     throw new Error('Cannot reach the AI server. Check your connection and try again.');
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data?.error || `AI request failed (${res.status})`);
+  if (!res.ok) throw new AIError(data?.error || `AI request failed (${res.status})`, data?.code, res.status);
   return { text: data.text ?? '', toolCalls: data.toolCalls ?? [], raw: data.raw ?? [] };
 }
 

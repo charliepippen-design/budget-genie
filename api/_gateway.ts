@@ -4,8 +4,9 @@
 // Env: GEMINI_API_KEY (required), GEMINI_MODEL and GEMINI_FALLBACK_MODEL (optional, see _models.ts),
 //      VITE_CLERK_PUBLISHABLE_KEY (used to verify signed-in users), ALLOW_ANON=true (local dev only)
 
-import { verifyClerkUser } from "./_auth.js";
+import { verifyClerkSession } from "./_auth.js";
 import { geminiModels } from "./_models.js";
+import { admitRequest } from "./_usage.js";
 
 const env = (k: string) => process.env[k];
 
@@ -208,20 +209,27 @@ async function runJson(payload: { prompt: string }) {
 
 export async function handleAIRequest(req: Request): Promise<Response> {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
-  if (!(await verifyClerkUser(req))) return json({ error: "Sign in to use the AI planner." }, 401);
+  const session = await verifyClerkSession(req);
+  if (!session) return json({ error: "Sign in to use the AI planner." }, 401);
 
   try {
     const body = await req.json();
     const messages = trimHistory(Array.isArray(body.messages) ? body.messages : []);
 
-    switch (body.task) {
-      case "planner":
-        return json(await runPlanner({ messages, context: body.context }));
-      case "json":
-        return json(await runJson({ prompt: body.prompt }));
-      default:
-        return json({ error: "Unknown task" }, 400);
+    if (body.task !== "planner" && body.task !== "json") return json({ error: "Unknown task" }, 400);
+
+    // Free-tier cap (see _usage.ts). Paid and superuser accounts pass straight through.
+    const admit = await admitRequest(session.userId, session.claims, body.turnId);
+    if (!admit.ok) {
+      return json({ error: admit.message, code: admit.code, used: admit.used, limit: admit.limit }, admit.status);
     }
+
+    const result =
+      body.task === "planner"
+        ? await runPlanner({ messages, context: body.context })
+        : await runJson({ prompt: body.prompt });
+    await admit.commit();
+    return json(result);
   } catch (err) {
     console.error("ai-gateway error:", err);
     if (err instanceof GatewayError) return json({ error: err.message }, err.status);
