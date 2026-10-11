@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Bot, Loader2, MessageSquare, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart } from '@/lib/ai-client';
@@ -314,6 +315,10 @@ export function PlannerChat() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
+      <div className="space-y-1 px-3 pb-3 text-[11px] leading-snug text-slate-500">
+        <p>{AI_DISCLOSURE_SHORT}</p>
+        <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
+      </div>
     </aside>
   );
 }

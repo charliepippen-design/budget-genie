@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { AI_PRIVACY_PARAGRAPH, AI_PRIVACY_PARAGRAPH_IT } from '@/lib/ai-disclosure';
 
 // Public legal pages (/terms, /refund-policy, /privacy), linked from the landing and pricing pages.
 // Payment providers review these during merchant onboarding: keep the operator details accurate.
@@ -165,6 +166,12 @@ function Privacy() {
           <li>Billing data: handled by our payment provider. We do not see or store full card numbers.</li>
           <li>Basic technical logs (such as IP address and request times) kept by our hosting provider (Vercel) for security.</li>
         </ul>
+      </Section>
+      <Section title="AI assistant and data use">
+        <p>{AI_PRIVACY_PARAGRAPH}</p>
+        <p lang="it">
+          <strong>Assistente AI e uso dei dati (italiano).</strong> {AI_PRIVACY_PARAGRAPH_IT}
+        </p>
       </Section>
       <Section title="Why we use it">
         <p>

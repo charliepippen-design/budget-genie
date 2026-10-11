@@ -11,6 +11,7 @@ import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/li
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
+import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 
 type WizardState = WizardDraft;
@@ -939,6 +940,10 @@ export const OnboardWizard = () => {
                   Build my plan -&gt;
                 </Button>
               </div>
+            </div>
+            <div className="mt-4 space-y-1 text-xs text-slate-500">
+              <p>{AI_DISCLOSURE_SHORT}</p>
+              <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
             </div>
           </section>
         )}

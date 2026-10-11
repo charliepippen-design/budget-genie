@@ -12,7 +12,6 @@ import {
   AlertTriangle,
   CheckCircle,
   Sparkles,
-  Share2,
   Printer,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,7 +21,6 @@ import { getEfficiencyAlerts } from '@/lib/planning-insights';
 import { generateReportNarrative, type ReportNarrative } from '@/lib/report-narrator';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
-import { toast } from 'sonner';
 
 const PIE_COLORS = [
   '#6366f1',
@@ -209,22 +207,8 @@ const Output = () => {
               <Printer className="w-4 h-4" />
               Print
             </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-muted-foreground hover:text-foreground"
-              onClick={async () => {
-                try {
-                  await navigator.clipboard.writeText(window.location.href);
-                  toast('Link copied to clipboard');
-                } catch {
-                  toast.error('Could not copy link');
-                }
-              }}
-            >
-              <Share2 className="w-4 h-4" />
-              Copy Link
-            </Button>
+            {/* "Copy Link" share button hidden until real share links exist (see dev/SHARE-LINK-DESIGN.md):
+                it copied window.location.href, which shows the recipient their own local plan. */}
           </div>
         </div>
       </nav>
