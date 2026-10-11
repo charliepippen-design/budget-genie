@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { isFreeTierLimit } from '@/lib/ai-client';
+import { aiErrorKind, aiErrorMessage, isFreeTierLimit } from '@/lib/ai-client';
 import { getCachedNarrative, hashNarratorInput, setCachedNarrative } from '@/lib/narrative-cache';
 import {
   generateReportNarrative,
@@ -74,8 +74,8 @@ export function useReportNarrative(base: ReportNarratorInput) {
     } catch (err) {
       if (mounted.current) {
         setError({
-          message: isFreeTierLimit(err) && err instanceof Error
-            ? err.message
+          message: aiErrorKind(err) !== 'generic'
+            ? aiErrorMessage(err)
             : 'Could not write the AI summary. Please try again.',
           limit: isFreeTierLimit(err),
         });

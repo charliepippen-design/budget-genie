@@ -3,7 +3,7 @@
 
 import { withDecisionTimeout, type DecisionModel, type Question } from "./_decisions.js";
 import { PROMISES_RESULTS_MIN } from "./_decision-thresholds.js";
-import { detectLang, type Lang } from "./_language.js";
+import { resolveLang, type Lang } from "./_language.js";
 
 export const RESULTS_NOTICE: Record<Lang, string> = {
   it: "Le cifre sono stime del motore di pianificazione, non garanzie.",
@@ -26,7 +26,7 @@ export type ReplyCheck = { appendNotice?: string; flags: { promisesResults?: num
 
 export async function checkReply(
   model: DecisionModel,
-  input: { userMessage: string; reply: string; industry?: string }
+  input: { userMessage: string; reply: string; industry?: string; uiLang?: string }
 ): Promise<ReplyCheck> {
   try {
     const answers = await withDecisionTimeout(
@@ -39,7 +39,7 @@ export async function checkReply(
       sameLanguage: s?.type === "noul" ? s.noul : undefined,
     };
     if (flags.promisesResults !== undefined && flags.promisesResults >= PROMISES_RESULTS_MIN) {
-      return { appendNotice: RESULTS_NOTICE[detectLang(input.userMessage)], flags };
+      return { appendNotice: RESULTS_NOTICE[resolveLang(input.userMessage, input.uiLang)], flags };
     }
     return { flags };
   } catch {

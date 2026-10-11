@@ -4,6 +4,7 @@ import { handleAIRequest } from '../../api/_gateway';
 import { __setDecisionModelForTests, createHttpDecisionModel, decisionModelFromEnv, DECISION_URL } from '../../api/_decisions';
 import { routeMessage } from '../../api/_decision-router';
 import { checkReply } from '../../api/_reply-check';
+import { resolveLang } from '../../api/_language';
 import { choiceAnswer, mockDecisionModel, noulAnswer } from './__mocks__/decision-model';
 
 const post = (body: unknown) => new Request('http://localhost/api/ai-gateway', { method: 'POST', body: JSON.stringify(body) });
@@ -66,6 +67,19 @@ describe('D2 router', () => {
     const r = await routeMessage(mockDecisionModel(answers('off_topic')), { ...input, message: 'Mi dici la ricetta della carbonara per la cena?' });
     expect(r.action).toBe('canned');
     expect(r.cannedText).toMatch(/piano media/);
+  });
+
+  it('uses the UI language for fixed texts, not the word "budget"', async () => {
+    const en = await routeMessage(mockDecisionModel(answers('off_topic')), { ...input, message: 'budget', uiLang: 'en' });
+    expect(en.cannedText).toMatch(/media plan/);
+    const it = await routeMessage(mockDecisionModel(answers('off_topic')), { ...input, message: 'weather', uiLang: 'it' });
+    expect(it.cannedText).toMatch(/piano media/);
+    // no uiLang: an English message that only shares "budget" with Italian stays English
+    const none = await routeMessage(mockDecisionModel(answers('off_topic')), { ...input, message: 'my budget is low' });
+    expect(none.cannedText).toMatch(/media plan/);
+    expect(resolveLang('budget budget budget')).toBe('en');
+    expect(resolveLang('Mi dici la ricetta della carbonara?')).toBe('it');
+    expect(resolveLang('the piano della casa')).toBe('en');
   });
 
   it('returns a canned English reply for off-topic messages', async () => {

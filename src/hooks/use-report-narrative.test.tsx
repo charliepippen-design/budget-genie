@@ -168,6 +168,16 @@ describe('useReportNarrative', () => {
     expect(api.error).toEqual({ message: 'Limit reached', limit: true });
   });
 
+  it('says the AI is busy, with the wait, instead of a generic failure', async () => {
+    generateJSON.mockRejectedValue(new AIError('raw', 'AI_BUSY', 503, 60));
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mount(input());
+    await act(async () => {
+      await api.generate();
+    });
+    expect(api.error).toEqual({ message: 'The AI is busy, try again in 60 seconds.', limit: false });
+  });
+
   it('recovers from a generic failure', async () => {
     generateJSON.mockRejectedValue(new Error('boom'));
     vi.spyOn(console, 'error').mockImplementation(() => {});

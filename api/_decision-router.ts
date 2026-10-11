@@ -11,7 +11,7 @@ import {
   MUTATES_MAX_FOR_READONLY,
   OFFTOPIC_MIN_P,
 } from "./_decision-thresholds.js";
-import { detectLang } from "./_language.js";
+import { resolveLang } from "./_language.js";
 
 export type RouteResult = {
   action: "full" | "narrow" | "canned";
@@ -26,6 +26,7 @@ export type RouteInput = {
   briefExists: boolean;
   channelNames: string[];
   availableTools: string[];
+  uiLang?: string;
 };
 
 const INTENT_TOOLS: Record<string, string[]> = {
@@ -83,7 +84,7 @@ export async function routeMessage(model: DecisionModel, input: RouteInput): Pro
       channelNames: input.channelNames,
     };
     const answers = await withDecisionTimeout(model.decide(state, QUESTIONS));
-    const canned = (reason: string): RouteResult => ({ action: "canned", cannedText: CANNED[detectLang(input.message)], reason });
+    const canned = (reason: string): RouteResult => ({ action: "canned", cannedText: CANNED[resolveLang(input.message, input.uiLang)], reason });
 
     const injection = noul(answers.injection);
     const mutates = noul(answers.mutatesPlan);

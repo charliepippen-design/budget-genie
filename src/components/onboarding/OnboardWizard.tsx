@@ -10,7 +10,13 @@ import { Card } from '@/components/ui/card';
 import { ChannelData, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/lib/geo-market-data';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
-import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
+import {
+  ONBOARDING_AI_UNAVAILABLE_NOTICE,
+  WizardAnswers,
+  generateOnboardingPlan,
+  generateWizardPlan,
+  type OnboardingAIResult,
+} from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import {
@@ -231,12 +237,11 @@ export const OnboardWizard = () => {
       goToStep('generating');
 
       const startedAt = Date.now();
-      let refinedPlan: Awaited<ReturnType<typeof generateOnboardingPlan>> = null;
-      try {
-        refinedPlan = await generateOnboardingPlan(answers, code);
-      } catch {
-        // AI generation failed — continue with preset defaults
-      }
+      // AI failure never blocks onboarding: continue with the standard template and say so.
+      const aiResult = await generateOnboardingPlan(answers, code).catch(
+        (): OnboardingAIResult => ({ ok: false, reason: 'error' })
+      );
+      const refinedPlan = aiResult.ok ? aiResult.plan : null;
       const elapsed = Date.now() - startedAt;
       if (elapsed < 2000) {
         await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
@@ -348,6 +353,7 @@ export const OnboardWizard = () => {
 
       const planReadyToast = buildPlanReadyToast();
       toast(planReadyToast.title, planReadyToast.options);
+      if (!aiResult.ok) toast.info(ONBOARDING_AI_UNAVAILABLE_NOTICE);
     },
     [
       code,

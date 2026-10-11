@@ -6,7 +6,7 @@ vi.mock('@/lib/ai-client', () => ({
   generateJSON: (...args: unknown[]) => mockGenerateJSON(...args),
 }));
 
-import { buildPrompt, generateOnboardingPlan, generateWizardPlan, type WizardAnswers } from '@/lib/onboarding-ai';
+import { ONBOARDING_AI_UNAVAILABLE_NOTICE, buildPrompt, generateOnboardingPlan, generateWizardPlan, type WizardAnswers } from '@/lib/onboarding-ai';
 import { getOnboardingMarkets } from '@/lib/geo-market-data';
 
 const answers: WizardAnswers = {
@@ -34,21 +34,28 @@ describe('generateOnboardingPlan', () => {
 
   it('returns the plan when the gateway answers with valid JSON', async () => {
     mockGenerateJSON.mockResolvedValueOnce(validPlan);
-    expect(await generateOnboardingPlan(answers)).toEqual(validPlan);
+    expect(await generateOnboardingPlan(answers)).toEqual({ ok: true, plan: validPlan });
 
     const prompt = mockGenerateJSON.mock.calls[0][0] as string;
     expect(prompt).toContain('Germany');
     expect(prompt).not.toContain('QQ');
   });
 
-  it('returns null when the JSON does not match the schema', async () => {
+  it('returns a typed failure when the JSON does not match the schema', async () => {
     mockGenerateJSON.mockResolvedValueOnce({ rationale: 'missing fields' });
-    expect(await generateOnboardingPlan(answers)).toBeNull();
+    expect(await generateOnboardingPlan(answers)).toEqual({ ok: false, reason: 'invalid' });
   });
 
-  it('returns null when the gateway fails', async () => {
+  it('returns a typed failure when the gateway fails', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
     mockGenerateJSON.mockRejectedValueOnce(new Error('Sign in to use the AI planner.'));
-    expect(await generateOnboardingPlan(answers)).toBeNull();
+    expect(await generateOnboardingPlan(answers)).toEqual({ ok: false, reason: 'error' });
+  });
+
+  it('has a plain notice for the wizard to show on failure', () => {
+    expect(ONBOARDING_AI_UNAVAILABLE_NOTICE).toBe(
+      'AI suggestions are unavailable right now; your plan uses the standard template.'
+    );
   });
 });
 
