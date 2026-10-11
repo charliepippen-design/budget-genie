@@ -28,7 +28,11 @@ import {
   Clock,
   Shield,
   Sun,
+  Loader2,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { exportToPdf } from '@/lib/export-service';
+import { useExportRunner } from '@/hooks/use-export-runner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -59,7 +63,7 @@ const Report = () => {
   const vc = useVerticalConfig();
   const channels = useChannelsWithMetrics();
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore();
-  const { format, code } = useCurrency();
+  const { format, code, symbol } = useCurrency();
 
   const {
     active,
@@ -158,6 +162,29 @@ const Report = () => {
 
   const roasTarget = globalMultipliers.roasTarget ?? 2;
 
+  const userStatus = useMediaPlanStore((s) => s.userStatus);
+  const { exporting, run: runExportTask } = useExportRunner();
+  const handleExportPdf = () => {
+    if (userStatus === 'demo') {
+      toast.error('Exporting requires a Pro Acquisition License.');
+      return;
+    }
+    void runExportTask('PDF', () =>
+      exportToPdf(
+        active,
+        totalBudget,
+        {
+          totalSpend,
+          totalConversions: projectedFtds,
+          blendedCpa,
+          projectedRevenue,
+          blendedRoas,
+        },
+        { currencySymbol: symbol, formatCurrency: format }
+      )
+    );
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <nav className="w-full border-b border-border bg-background/95">
@@ -190,12 +217,16 @@ const Report = () => {
             </Button>
             <Button
               variant="ghost"
-              disabled
-              title="Coming soon"
-              className="gap-2 text-muted-foreground"
+              onClick={handleExportPdf}
+              disabled={exporting !== null}
+              className="gap-2 text-muted-foreground hover:text-foreground"
             >
-              <Download className="h-4 w-4" />
-              Export PDF
+              {exporting !== null ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
+              {exporting !== null ? 'Exporting...' : 'Export PDF'}
             </Button>
           </div>
         </div>
