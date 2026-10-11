@@ -126,6 +126,9 @@ describe('market advertising notes', () => {
     expect(note).toBeDefined();
     expect(note).toContain('1.394/2026');
     expect(note).toContain('Ministério da Fazenda');
+    expect(note).toContain('Art. 2 §1');
+    expect(note).toContain('Constituição Federal Art. 62');
+    expect(note).toContain('25 Oct 2026');
     expect(note?.toLowerCase()).not.toContain('banned');
   });
 
