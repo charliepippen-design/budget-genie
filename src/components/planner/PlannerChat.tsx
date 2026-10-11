@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useAI, type AgentMessage, type AIPart } from '@/lib/ai-client';
+import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
@@ -17,7 +17,7 @@ type ChatItem =
   | { kind: 'user'; text: string }
   | { kind: 'assistant'; text: string; raw?: AIPart[] }
   | { kind: 'tool'; id?: string; name: string; response: Record<string, unknown> }
-  | { kind: 'error'; text: string };
+  | { kind: 'error'; text: string; upgrade?: boolean };
 
 const STORAGE_KEY = 'mediaplan-planner-chat-v1';
 const MAX_TOOL_ROUNDS = 4;
@@ -164,9 +164,10 @@ export function PlannerChat() {
     setItems(convo);
     setBusy(true);
 
+    const turnId = newTurnId(); // every model round trip of this chat message counts as one turn
     try {
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const res = await callAI('planner', { messages: toAgentMessages(convo), context: buildPlannerContext() });
+        const res = await callAI('planner', { turnId, messages: toAgentMessages(convo), context: buildPlannerContext() });
         convo = [...convo, { kind: 'assistant', text: res.text, raw: res.raw }];
         if (res.toolCalls.length === 0) break;
 
@@ -178,7 +179,14 @@ export function PlannerChat() {
       }
       setItems(convo);
     } catch (err) {
-      setItems([...convo, { kind: 'error', text: err instanceof Error ? err.message : 'Something went wrong.' }]);
+      setItems([
+        ...convo,
+        {
+          kind: 'error',
+          text: err instanceof Error ? err.message : 'Something went wrong.',
+          upgrade: isFreeTierLimit(err),
+        },
+      ]);
     } finally {
       setBusy(false);
     }
@@ -264,6 +272,9 @@ export function PlannerChat() {
           return (
             <div key={i} className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-300">
               ⚠ {it.text}
+              {it.upgrade && (
+                <a href="/pricing" className="ml-2 font-semibold text-indigo-300 underline">See plans</a>
+              )}
               {/sign in/i.test(it.text) && (
                 <a href="/auth" className="ml-2 font-semibold text-indigo-300 underline">Sign in</a>
               )}

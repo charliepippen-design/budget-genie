@@ -4,15 +4,29 @@
 // Never bundled in production builds (the alias is only set for `vite serve`).
 import type { ReactNode } from 'react';
 
-const user = {
-  id: 'qa_superuser',
-  firstName: 'QA',
-  fullName: 'QA Superuser',
-  primaryEmailAddress: { emailAddress: 'qa@example.com' },
-  emailAddresses: [{ emailAddress: 'qa@example.com' }],
-  publicMetadata: { is_superuser: true, payment_status: true, subscription_tier: 'enterprise' },
-  reload: async () => undefined,
-};
+// localStorage 'qa-mock-user' = 'free' simulates a newly signed-up user without a paid plan
+// (empty publicMetadata). Anything else keeps the default superuser.
+const mockFreeUser = typeof window !== 'undefined' && window.localStorage.getItem('qa-mock-user') === 'free';
+
+const user = mockFreeUser
+  ? {
+      id: 'qa_free_user',
+      firstName: 'QA',
+      fullName: 'QA Free User',
+      primaryEmailAddress: { emailAddress: 'qa-free@example.com' },
+      emailAddresses: [{ emailAddress: 'qa-free@example.com' }],
+      publicMetadata: {},
+      reload: async () => undefined,
+    }
+  : {
+      id: 'qa_superuser',
+      firstName: 'QA',
+      fullName: 'QA Superuser',
+      primaryEmailAddress: { emailAddress: 'qa@example.com' },
+      emailAddresses: [{ emailAddress: 'qa@example.com' }],
+      publicMetadata: { is_superuser: true, payment_status: true, subscription_tier: 'enterprise' },
+      reload: async () => undefined,
+    };
 
 export const ClerkProvider = ({ children }: { children: ReactNode; publishableKey?: string }) => <>{children}</>;
 

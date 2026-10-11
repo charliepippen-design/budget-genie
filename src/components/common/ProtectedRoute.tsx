@@ -8,7 +8,9 @@ interface ProtectedRouteProps {
   requirePayment?: boolean;
 }
 
-export const ProtectedRoute = ({ children, requirePayment = true }: ProtectedRouteProps) => {
+// Signed-in free users may use the app; only AI usage is capped (server-side, api/_usage.ts).
+// Pass requirePayment for a route that should stay paid-only.
+export const ProtectedRoute = ({ children, requirePayment = false }: ProtectedRouteProps) => {
   const { isLoaded, isSignedIn } = useAuth();
   const { hasActivePayment } = usePaymentStatus();
 
