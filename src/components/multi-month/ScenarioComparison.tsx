@@ -19,7 +19,7 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { cn } from '@/lib/utils';
-import { formatCurrency, formatNumber } from '@/lib/mediaplan-data';
+import { formatNumber } from '@/lib/mediaplan-data';
 import {
   useMultiMonthStore,
   useMultiMonthMetrics,
@@ -40,7 +40,7 @@ interface ComparisonMetric {
 export function ScenarioComparison() {
   const { scenarios, comparisonScenarioId, setComparisonScenario } = useMultiMonthStore();
 
-  const { symbol } = useCurrency();
+  const { symbol, format: formatCurrency } = useCurrency();
   const currentMetrics = useMultiMonthMetrics();
   // Same revenue model as the active plan, so A and B are compared like for like.
   const comparisonMetrics = useScenarioMetrics(comparisonScenarioId);

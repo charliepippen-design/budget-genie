@@ -44,7 +44,6 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
-import { formatCurrency } from '@/lib/mediaplan-data';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { useToast } from '@/hooks/use-toast';
@@ -55,7 +54,7 @@ export function MultiMonthGlobalSettings() {
   const [cloneName, setCloneName] = useState('');
   const [cloneId, setCloneId] = useState<string | null>(null);
   const { toast } = useToast();
-  const { symbol } = useCurrency();
+  const { symbol, format: formatCurrency } = useCurrency();
 
   const {
     globalSettings,
