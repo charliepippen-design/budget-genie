@@ -1070,11 +1070,11 @@ export function LtvForecastPanel() {
                       <p className="text-[11px] uppercase tracking-wider text-slate-400">ROI</p>
                       <p className="mt-1 text-sm text-slate-300">Baseline</p>
                       <p className="text-lg font-semibold text-white">
-                        {(baselineMetrics.roi * 100).toFixed(1)}%
+                        {baselineMetrics.totalSpend > 0 ? `${(baselineMetrics.roi * 100).toFixed(1)}%` : 'n/a'}
                       </p>
                       <p className="mt-1 text-sm text-slate-300">Sandbox</p>
                       <p className="text-lg font-semibold text-cyan-300">
-                        {(sandboxMetrics.roi * 100).toFixed(1)}%
+                        {sandboxMetrics.totalSpend > 0 ? `${(sandboxMetrics.roi * 100).toFixed(1)}%` : 'n/a'}
                       </p>
                     </div>
                   </div>
