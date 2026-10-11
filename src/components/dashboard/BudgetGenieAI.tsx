@@ -42,6 +42,7 @@ import {
   getMetricIntegrityIssues,
 } from '@/lib/planning-insights';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useExportRunner } from '@/hooks/use-export-runner';
 
 const BudgetWizard = lazy(() =>
   import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard }))
@@ -50,6 +51,12 @@ const ImportWizard = lazy(() =>
   import('../multi-month/ImportWizard').then((m) => ({ default: m.ImportWizard }))
 );
 const PLTable = lazy(() => import('../multi-month/PLTable').then((m) => ({ default: m.PLTable })));
+const MultiMonthCharts = lazy(() =>
+  import('../multi-month/MultiMonthCharts').then((m) => ({ default: m.MultiMonthCharts }))
+);
+const ScenarioComparison = lazy(() =>
+  import('../multi-month/ScenarioComparison').then((m) => ({ default: m.ScenarioComparison }))
+);
 const ChartSection = lazy(() =>
   import('./ChartSection').then((m) => ({ default: m.ChartSection }))
 );
@@ -155,69 +162,66 @@ export const BudgetGenieAI = () => {
     return [...modelAlerts, ...integrityAlerts];
   }, [channels]);
 
+  const { exporting, run: runExportTask } = useExportRunner();
+
   const handleExport = useCallback(
     async (formatType: 'pdf' | 'csv' | 'xlsx' | 'json') => {
-      try {
-        if (userStatus === 'demo') {
-          toast.error(
-            'Deployment Blocked. Exporting optimized CPA and ROAS targets requires a Pro Acquisition License.'
+      if (userStatus === 'demo') {
+        toast.error(
+          'Deployment Blocked. Exporting optimized CPA and ROAS targets requires a Pro Acquisition License.'
+        );
+        return;
+      }
+
+      const exportOptions = {
+        currencySymbol: symbol,
+        formatCurrency: format,
+      };
+
+      switch (formatType) {
+        case 'pdf':
+          await runExportTask('PDF', () =>
+            exportToPdf(channels, vm.totalBudget, vm.blendedMetrics, exportOptions)
           );
           return;
-        }
-
-        const exportOptions = {
-          currencySymbol: symbol,
-          formatCurrency: format,
-        };
-
-        if (formatType === 'pdf') {
-          await exportToPdf(channels, vm.totalBudget, vm.blendedMetrics, exportOptions);
-          toast.success('PDF export complete');
-          return;
-        }
-
-        if (formatType === 'csv') {
-          exportToCsv(
-            channels,
-            vm.totalBudget,
-            vm.blendedMetrics,
-            exportOptions,
-            scenarioOutputs,
-            efficiencyAlerts,
-            sandboxSnapshot
+        case 'csv':
+          await runExportTask('CSV', () =>
+            exportToCsv(
+              channels,
+              vm.totalBudget,
+              vm.blendedMetrics,
+              exportOptions,
+              scenarioOutputs,
+              efficiencyAlerts,
+              sandboxSnapshot
+            )
           );
-          toast.success('CSV export complete');
           return;
-        }
-
-        if (formatType === 'json') {
-          exportEnterpriseConfigJson(
-            channels,
-            vm.totalBudget,
-            {
-              cpaTarget: globalMultipliers.cpaTarget,
-              roasTarget: globalMultipliers.roasTarget,
-            },
-            vm.projectName
+        case 'json':
+          await runExportTask('JSON config', () =>
+            exportEnterpriseConfigJson(
+              channels,
+              vm.totalBudget,
+              {
+                cpaTarget: globalMultipliers.cpaTarget,
+                roasTarget: globalMultipliers.roasTarget,
+              },
+              vm.projectName
+            )
           );
-          toast.success('JSON config export complete');
           return;
-        }
-
-        if (formatType === 'xlsx') {
-          exportToExcel(
-            channels,
-            vm.totalBudget,
-            vm.blendedMetrics,
-            scenarioOutputs,
-            efficiencyAlerts,
-            sandboxSnapshot
+        case 'xlsx':
+          await runExportTask('Excel', () =>
+            exportToExcel(
+              channels,
+              vm.totalBudget,
+              vm.blendedMetrics,
+              scenarioOutputs,
+              efficiencyAlerts,
+              sandboxSnapshot
+            )
           );
-          toast.success('Excel export complete');
           return;
-        }
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Export failed');
       }
     },
     [
@@ -226,6 +230,7 @@ export const BudgetGenieAI = () => {
       format,
       globalMultipliers.cpaTarget,
       globalMultipliers.roasTarget,
+      runExportTask,
       sandboxSnapshot,
       scenarioOutputs,
       symbol,
@@ -290,6 +295,7 @@ export const BudgetGenieAI = () => {
             budgetPreset={preset}
             onPresetChange={setPreset}
             onExport={handleExport}
+            exportingLabel={exporting}
             onImport={() => setIsImportOpen(true)}
             onReset={() => vm.resetAll()}
             onLaunchMasterWizard={() => setIsBudgetWizardOpen(true)}
@@ -435,6 +441,28 @@ export const BudgetGenieAI = () => {
                   >
                     Multi-Month Detailed View
                   </TabsTrigger>
+                  <TabsTrigger
+                    value="multi-charts"
+                    className={cn(
+                      'transition-all',
+                      isDark
+                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                    )}
+                  >
+                    Multi-Month Charts
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="scenarios"
+                    className={cn(
+                      'transition-all',
+                      isDark
+                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
+                    )}
+                  >
+                    Scenario Comparison
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="single" className="mt-0">
@@ -459,6 +487,18 @@ export const BudgetGenieAI = () => {
                     }
                   >
                     <PLTable />
+                  </Suspense>
+                </TabsContent>
+
+                <TabsContent value="multi-charts" className="mt-0">
+                  <Suspense fallback={<ChartSectionSkeleton />}>
+                    <MultiMonthCharts />
+                  </Suspense>
+                </TabsContent>
+
+                <TabsContent value="scenarios" className="mt-0">
+                  <Suspense fallback={<ChartSectionSkeleton />}>
+                    <ScenarioComparison />
                   </Suspense>
                 </TabsContent>
               </Tabs>

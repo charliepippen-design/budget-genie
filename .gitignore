@@ -34,3 +34,6 @@ vite.config.ts.timestamp-*.mjs
 
 # Local Claude Code agent worktrees
 .claude/worktrees/
+
+# Per-machine Claude Code settings
+.claude/settings.local.json
