@@ -1,4 +1,5 @@
 import { usePlanEconomics } from '@/hooks/use-plan-economics';
+import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -58,7 +59,7 @@ const PIE_COLORS = [
   '#84cc16',
 ];
 
-const Report = () => {
+const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const channels = useChannelsWithMetrics();
@@ -118,10 +119,13 @@ const Report = () => {
       vertical: vc.vertical,
       geos: activeGeos,
       currency: code,
-    }).then((result) => {
-      setNarrative(result);
-      setNarrativeLoading(false);
-    });
+    })
+      .then((result) => setNarrative(result))
+      .catch((error) => {
+        console.error('Failed to generate report narrative:', error);
+        setNarrative(null);
+      })
+      .finally(() => setNarrativeLoading(false));
     // Intentionally mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -745,5 +749,11 @@ const Report = () => {
     </div>
   );
 };
+
+const Report = () => (
+  <SectionErrorBoundary name="report">
+    <ReportContent />
+  </SectionErrorBoundary>
+);
 
 export default Report;

@@ -58,6 +58,25 @@ export async function getAuthToken(): Promise<string | null> {
   }
 }
 
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
+
+/** Gateway output is untrusted: anything that is not the expected shape becomes '' / []. */
+export function normalizeAIResponse(data: unknown): AIResponse {
+  const d = isRecord(data) ? data : {};
+  const toolCalls: AIToolCall[] = Array.isArray(d.toolCalls)
+    ? d.toolCalls.filter(isRecord).flatMap((c) =>
+        typeof c.name === 'string'
+          ? [{ ...(typeof c.id === 'string' ? { id: c.id } : {}), name: c.name, args: isRecord(c.args) ? c.args : {} }]
+          : []
+      )
+    : [];
+  return {
+    text: typeof d.text === 'string' ? d.text : '',
+    toolCalls,
+    raw: Array.isArray(d.raw) ? d.raw.filter(isRecord) : [],
+  };
+}
+
 export async function callAI(task: AITask, body: Record<string, unknown>, userToken?: string | null): Promise<AIResponse> {
   let token = userToken ?? null;
   if (token === null && registeredGetToken) {
@@ -84,7 +103,7 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new AIError(data?.error || `AI request failed (${res.status})`, data?.code, res.status);
-  return { text: data.text ?? '', toolCalls: data.toolCalls ?? [], raw: data.raw ?? [] };
+  return normalizeAIResponse(data);
 }
 
 /** One-shot structured generation: returns parsed JSON, or null when the model output is not JSON. */
