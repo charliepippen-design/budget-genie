@@ -24,7 +24,6 @@ import {
   useMultiMonthStore,
   useMultiMonthMetrics,
   useScenarioMetrics,
-  calculatePlanMetrics,
 } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
@@ -39,16 +38,12 @@ interface ComparisonMetric {
 }
 
 export function ScenarioComparison() {
-  const { scenarios, comparisonScenarioId, setComparisonScenario, globalSettings, months } =
-    useMultiMonthStore();
+  const { scenarios, comparisonScenarioId, setComparisonScenario } = useMultiMonthStore();
 
   const { symbol } = useCurrency();
   const currentMetrics = useMultiMonthMetrics();
-  const comparisonScenario = scenarios.find((s) => s.id === comparisonScenarioId);
-  const comparisonMetrics = useMemo(() => {
-    if (!comparisonScenario) return null;
-    return calculatePlanMetrics(comparisonScenario.months, comparisonScenario.globalSettings);
-  }, [comparisonScenario]);
+  // Same revenue model as the active plan, so A and B are compared like for like.
+  const comparisonMetrics = useScenarioMetrics(comparisonScenarioId);
 
   const metrics: ComparisonMetric[] = useMemo(() => {
     if (!comparisonMetrics) return [];
@@ -214,6 +209,14 @@ export function ScenarioComparison() {
           </div>
         </CardContent>
       </Card>
+
+      {!comparisonMetrics && (
+        <Card className="border-border">
+          <CardContent className="py-8 text-center text-sm text-muted-foreground">
+            Pick a saved scenario above to compare it with the current plan.
+          </CardContent>
+        </Card>
+      )}
 
       {comparisonMetrics && (
         <>
