@@ -18,18 +18,28 @@ function clerkJwks() {
   return jwks;
 }
 
-/** Clerk user id of the caller, or null. With ALLOW_ANON=true (local dev) returns "anonymous". */
-export async function verifyClerkUser(req: Request): Promise<string | null> {
-  if (env("ALLOW_ANON") === "true") return "anonymous";
+export interface ClerkSession {
+  userId: string;
+  claims: Record<string, unknown>;
+}
+
+/** Verified Clerk session of the caller, or null. With ALLOW_ANON=true (local dev) returns user "anonymous". */
+export async function verifyClerkSession(req: Request): Promise<ClerkSession | null> {
+  if (env("ALLOW_ANON") === "true") return { userId: "anonymous", claims: {} };
   const keySet = clerkJwks();
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
   if (!keySet || !token) return null;
   try {
     const { payload } = await jwtVerify(token, keySet);
-    return typeof payload.sub === "string" && payload.sub ? payload.sub : null;
+    return typeof payload.sub === "string" && payload.sub ? { userId: payload.sub, claims: payload } : null;
   } catch {
     return null;
   }
+}
+
+/** Clerk user id of the caller, or null. With ALLOW_ANON=true (local dev) returns "anonymous". */
+export async function verifyClerkUser(req: Request): Promise<string | null> {
+  return (await verifyClerkSession(req))?.userId ?? null;
 }
 
 export const json = (body: unknown, status = 200) =>

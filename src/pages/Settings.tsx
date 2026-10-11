@@ -23,6 +23,7 @@ import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
+import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
 
 const NOWPAYMENTS_CHECKOUT_URL = 'https://nowpayments.io/payment/?iid=4321051348&source=button';
 const NOWPAYMENTS_BUTTON_SRC = 'https://nowpayments.io/images/embeds/payment-button-white.svg';
@@ -667,16 +668,19 @@ export default function Settings() {
                                   : 'bg-gradient-to-r from-violet-600 to-indigo-600 text-white hover:from-violet-700 hover:to-indigo-700'
                               )}
                               onClick={() =>
-                                openUpgrade(tier.key, ENABLE_STRIPE_CHECKOUT ? 'card' : 'crypto')
+                                openUpgrade(
+                                  tier.key,
+                                  ENABLE_STRIPE_CHECKOUT || !SHOW_CRYPTO_CHECKOUT ? 'card' : 'crypto'
+                                )
                               }
                             >
                               {isCurrent
                                 ? 'Manage Plan'
-                                : ENABLE_STRIPE_CHECKOUT
+                                : ENABLE_STRIPE_CHECKOUT || !SHOW_CRYPTO_CHECKOUT
                                   ? `Upgrade to ${tier.title}`
                                   : `Upgrade with Crypto`}
                             </Button>
-                            {ENABLE_STRIPE_CHECKOUT ? (
+                            {ENABLE_STRIPE_CHECKOUT && SHOW_CRYPTO_CHECKOUT ? (
                               <Button
                                 variant="outline"
                                 className="mt-2 w-full border-emerald-400/45 bg-emerald-500/10 text-emerald-100 hover:bg-emerald-500/20"
@@ -695,7 +699,8 @@ export default function Settings() {
             </CardContent>
           </Card>
 
-          <Card className="md:col-span-2 overflow-hidden border-emerald-500/30 bg-[radial-gradient(circle_at_10%_20%,rgba(16,185,129,0.22),transparent_38%),radial-gradient(circle_at_85%_0%,rgba(34,211,238,0.18),transparent_35%),linear-gradient(150deg,#052e2b_0%,#0b1f34_55%,#111827_100%)]">
+          {SHOW_CRYPTO_CHECKOUT ? (
+          <Card className="md:col-span-2 overflow-hidden border-emerald-500/30bg-[radial-gradient(circle_at_10%_20%,rgba(16,185,129,0.22),transparent_38%),radial-gradient(circle_at_85%_0%,rgba(34,211,238,0.18),transparent_35%),linear-gradient(150deg,#052e2b_0%,#0b1f34_55%,#111827_100%)]">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-400/20 text-emerald-200 hover:bg-emerald-400/20">
@@ -749,6 +754,7 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+          ) : null}
         </div>
       </div>
     </div>
