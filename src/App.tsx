@@ -9,6 +9,7 @@ import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { SIGN_IN_PATH, SIGN_UP_PATH } from '@/lib/auth-routes';
 import { BRAND_NAME } from '@/lib/brand';
+import { ROUTE_REDIRECTS } from '@/lib/route-redirects';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ClerkProvider } from '@clerk/clerk-react';
@@ -113,9 +114,9 @@ const AppShell = () => {
                   <Route path="/output" element={<RouteBoundary name="route:/output"><ProtectedRoute>
                         <Output />
                       </ProtectedRoute></RouteBoundary>} />
-                  {/* Common guessed URLs go to the app instead of a 404. */}
-                  {['/dashboard', '/planner', '/demo'].map((path) => (
-                    <Route key={path} path={path} element={<Navigate to="/app" replace />} />
+                  {/* Guessed URLs and aliases redirect deliberately instead of a 404 (see route-redirects.ts). */}
+                  {ROUTE_REDIRECTS.map(({ from, to }) => (
+                    <Route key={from} path={from} element={<Navigate to={to} replace />} />
                   ))}
                   <Route path="*" element={<RouteBoundary name="route:404"><NotFound /></RouteBoundary>} />
                 </Routes>
