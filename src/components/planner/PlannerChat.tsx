@@ -163,8 +163,14 @@ export function PlannerChat() {
     if (window.innerWidth < 768) setOpen(false);
   }, [setOpen]);
 
-  useEffect(() => saveChat(items), [items]);
-  useEffect(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), [items, busy]);
+  // Block bodies on purpose: an effect must return nothing or a cleanup function. scrollIntoView
+  // returns a Promise in Chrome 150+, which React would try to call as a cleanup.
+  useEffect(() => {
+    saveChat(items);
+  }, [items]);
+  useEffect(() => {
+    endRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [items, busy]);
 
   const send = async (text: string) => {
     const trimmed = text.trim();
