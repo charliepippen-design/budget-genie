@@ -83,9 +83,18 @@ for (const [route, marker] of [
     await seed(page);
     await mockGateway(page, { text: JSON.stringify(NARRATIVE), toolCalls: [], raw: [] });
 
+    let aiCalls = 0;
+    page.on('request', (req) => {
+      if (req.url().includes('/api/ai-gateway')) aiCalls++;
+    });
+
     await page.goto(route);
     await expect(page.getByText(marker)).toBeVisible({ timeout: 30_000 });
+    // Since AI-1 (#27) a visit spends no AI message: the narrative appears only after the user asks.
+    expect(aiCalls).toBe(0);
+    await page.getByRole('button', { name: /Write AI summary/ }).first().click();
     await expect(page.getByText(NARRATIVE.biggestRisk).first()).toBeVisible({ timeout: 15_000 });
+    expect(aiCalls).toBe(1);
     await expect(page.getByText('Something went wrong')).toHaveCount(0);
     await expect(page.getByText('This section hit an error')).toHaveCount(0);
   });
