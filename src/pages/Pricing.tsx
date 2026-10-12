@@ -52,7 +52,7 @@ export default function Pricing() {
         <div className="text-center mb-12">
           <BrandLogo size="md" tone="light" className="justify-center mb-6" />
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
-          <p className="text-xl text-gray-600">Plan your media budget with an AI planner</p>
+          <p className="text-lg md:text-xl text-gray-700">Plan your media budget with an AI planner</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
@@ -66,23 +66,23 @@ export default function Pricing() {
               }
             >
               {idx === 0 && (
-                <div className="absolute top-4 right-4 bg-blue-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                <div className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-1 rounded-full text-sm font-semibold">
                   Most Popular
                 </div>
               )}
               <CardHeader>
                 <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <p className="text-gray-600 mt-2">{plan.tagline}</p>
+                <p className="text-gray-700 mt-2">{plan.tagline}</p>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
                   <span className="text-4xl font-bold">{plan.priceLabel}</span>
-                  <span className="text-gray-600 ml-2">/month</span>
+                  <span className="text-gray-700 ml-2">/month</span>
                 </div>
-                <ul className="space-y-3 text-gray-700">
+                <ul className="space-y-3 text-gray-900">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <span className="text-green-500">✓</span>
+                      <span className="text-green-700" aria-hidden="true">✓</span>
                       {feature}
                     </li>
                   ))}
@@ -99,7 +99,7 @@ export default function Pricing() {
           ))}
         </div>
 
-        <p className="text-center text-sm text-gray-600 mb-4">
+        <p className="text-center text-sm text-gray-700 mb-4">
           Billed monthly. Cancel any time. 14-day money-back guarantee on your first payment.
         </p>
         <LegalLinks />
