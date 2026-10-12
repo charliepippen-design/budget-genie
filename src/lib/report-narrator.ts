@@ -7,7 +7,10 @@ export interface ReportNarratorInput {
   projectedRevenue: number;
   projectedFtds: number;
   blendedCpa: number | null;
+  /** Lifetime (cohort) return on spend. */
   blendedRoas: number;
+  /** Month-1 return on spend; null when not computable. */
+  month1Roas?: number | null;
   paybackMonths: number | null;
   topChannel: string;
   weakestChannel: string | null;
@@ -71,7 +74,8 @@ ${profitLines}- Total monthly budget: ${$(input.totalBudget)}
 - ${input.revenueLabel ?? 'Projected customer value (not first-month revenue)'}: ${$(input.projectedRevenue)}
 - Projected new customers: ${Math.round(input.projectedFtds).toLocaleString()}
 - Blended cost per customer: ${input.blendedCpa ? $(input.blendedCpa) : 'Not calculable'}
-- Blended ROAS: ${input.blendedRoas.toFixed(2)}x
+- Lifetime ROAS (cohort): ${input.blendedRoas.toFixed(2)}x
+- Month-1 ROAS: ${input.month1Roas == null ? 'Not calculable' : input.month1Roas.toFixed(2) + 'x'}
 - Estimated payback period: ${input.paybackMonths ? input.paybackMonths + ' months' : 'Not calculable'}
 - Top performing channel: ${input.topChannel}
 - Weakest channel: ${input.weakestChannel ?? 'None identified'}

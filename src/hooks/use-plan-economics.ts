@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { useChannelsWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { computePlanEconomics } from '@/lib/plan-economics';
+import { roasPairFromEconomics } from '@/lib/roas-pair';
 import { buildLtvCurve, buildPlanScenarios, DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 
 /**
@@ -40,6 +41,8 @@ export function usePlanEconomics() {
       projectedFtds,
       blendedCpa,
       blendedRoas,
+      // Lifetime (cohort) and Month-1 ROAS, the pair every screen labels the same way.
+      roasPair: roasPairFromEconomics(economics, blendedRoas),
       // Net value per month (month-1 value minus spend): the dashboard loss banner's number.
       netPnl: economics.netValuePerMonth,
       // Lifetime value of this month's cohort minus this month's spend.

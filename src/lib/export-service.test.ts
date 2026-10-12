@@ -63,7 +63,18 @@ describe('buildCsvContent', () => {
   it('includes summary block with formatted currency', () => {
     const csv = buildCsvContent([makeChannel()], 1000, defaultBlended, defaultOptions);
     expect(csv).toContain('"Total Budget","$1000.00"');
-    expect(csv).toContain('"Blended ROAS","4.00x"');
+    expect(csv).toContain('"Lifetime ROAS (cohort)","4.00x"');
+    expect(csv).toContain('"Month-1 ROAS","N/A"');
+  });
+
+  it('prints Month-1 ROAS next to lifetime ROAS when provided', () => {
+    const csv = buildCsvContent(
+      [makeChannel()],
+      1000,
+      { ...defaultBlended, month1Roas: 0.6 },
+      defaultOptions
+    );
+    expect(csv).toContain('"Month-1 ROAS","0.60x"');
   });
 
   it('shows N/A for null CPA in channel rows', () => {

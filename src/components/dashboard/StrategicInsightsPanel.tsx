@@ -275,7 +275,7 @@ export const StrategicInsightsPanel = () => {
                   <span className="text-green-300 font-semibold">{arbitrage.winner.name}</span> returns more per unit of spend
                   than <span className="text-red-300">{arbitrage.loser.name}</span>.{' '}
                   <span className="text-green-400 font-bold">Estimated effect on this plan: +{fmt(arbitrage.revenueDelta)} projected revenue</span>,
-                  blended return on spend {arbitrage.blendedRoasBefore.toFixed(2)}x to {arbitrage.blendedRoasAfter.toFixed(2)}x.
+                  blended lifetime ROAS (cohort) {arbitrage.blendedRoasBefore.toFixed(2)}x to {arbitrage.blendedRoasAfter.toFixed(2)}x.
                 </h4>
 
                 {/* Real progress bar */}

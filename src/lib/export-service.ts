@@ -1,4 +1,5 @@
 import { DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 // jspdf, jspdf-autotable and exceljs are large (~1.5 MB minified together), so they are
 // loaded on demand inside the export functions instead of shipping with the dashboard.
 import type jsPDF from 'jspdf';
@@ -25,6 +26,8 @@ interface BlendedMetricsData {
   blendedCpa: number | null;
   projectedRevenue: number;
   blendedRoas: number;
+  /** Month-1 ROAS from computePlanEconomics; omitted when unknown. */
+  month1Roas?: number | null;
 }
 
 interface ExportAlert {
@@ -38,6 +41,10 @@ type JsPdfWithAutoTable = jsPDF & {
 };
 
 // ========== HELPERS ==========
+
+function month1RoasText(m: BlendedMetricsData): string {
+  return m.month1Roas == null ? 'N/A' : `${safeNumber(m.month1Roas).toFixed(2)}x`;
+}
 
 function safeFamilyName(family?: string): string {
   if (!family) return 'Paid Media';
@@ -94,7 +101,8 @@ export async function exportToPdf(
       ],
       ['Total FTDs', Math.round(safeNumber(blendedMetrics.totalConversions)).toLocaleString()],
       ['Projected Revenue', formatCurrency(safeNumber(blendedMetrics.projectedRevenue))],
-      ['Blended ROAS', `${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x`],
+      [LIFETIME_ROAS_LABEL, `${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x`],
+      [MONTH1_ROAS_LABEL, month1RoasText(blendedMetrics)],
     ];
 
     autoTable(doc, {
@@ -363,7 +371,8 @@ export function buildCsvContent(
     `"Blended CPA","${blendedMetrics.blendedCpa ? formatCurrency(blendedMetrics.blendedCpa) : 'N/A'}"`,
     `"Total FTDs","${Math.round(safeNumber(blendedMetrics.totalConversions))}"`,
     `"Projected Revenue","${formatCurrency(safeNumber(blendedMetrics.projectedRevenue))}"`,
-    `"Blended ROAS","${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x"`,
+    `"${LIFETIME_ROAS_LABEL}","${safeNumber(blendedMetrics.blendedRoas).toFixed(2)}x"`,
+    `"${MONTH1_ROAS_LABEL}","${month1RoasText(blendedMetrics)}"`,
   ].join('\n');
 }
 
@@ -478,7 +487,11 @@ export async function exportToExcel(
       { Metric: 'Blended CPA', Value: blendedMetrics.blendedCpa ? Number(blendedMetrics.blendedCpa.toFixed(4)) : 'N/A' },
       { Metric: 'Total Conversions', Value: Number(safeNumber(blendedMetrics.totalConversions).toFixed(2)) },
       { Metric: 'Projected Revenue', Value: Number(safeNumber(blendedMetrics.projectedRevenue).toFixed(4)) },
-      { Metric: 'Blended ROAS', Value: Number(safeNumber(blendedMetrics.blendedRoas).toFixed(4)) },
+      { Metric: LIFETIME_ROAS_LABEL, Value: Number(safeNumber(blendedMetrics.blendedRoas).toFixed(4)) },
+      {
+        Metric: MONTH1_ROAS_LABEL,
+        Value: blendedMetrics.month1Roas == null ? 'N/A' : Number(safeNumber(blendedMetrics.month1Roas).toFixed(4)),
+      },
     ]);
 
     // ── Optional sandbox sheets ────────────────────────────────────────────────

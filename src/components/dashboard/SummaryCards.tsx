@@ -118,7 +118,7 @@ export function SummaryCards({
     {
       title: 'Projected Revenue',
       value: formatCurrency(projectedRevenue, true),
-      subtitle: `${blendedRoas.toFixed(1)}x ROAS`,
+      subtitle: `${blendedRoas.toFixed(1)}x lifetime ROAS (cohort)`,
       trend: blendedRoas > 2 ? 'up' as const : 'neutral' as const,
       icon: <TrendingUp className="h-5 w-5 text-warning" />,
       accentColor: 'hsl(var(--warning))',
