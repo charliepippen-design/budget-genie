@@ -2,7 +2,7 @@ import { Undo2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { hasPreApplyBackup, restorePreApplyBackup } from '@/lib/crash-recovery';
+import { hasPreApplyBackup, planFingerprint, restorePreApplyBackup } from '@/lib/crash-recovery';
 
 /** Restores the plan saved before the last AI change, without a page reload. */
 function undoAiChange(): boolean {
@@ -13,11 +13,11 @@ function undoAiChange(): boolean {
 }
 
 /**
- * Shown only while a pre-apply snapshot exists. The snapshot is written just before
+ * Shown only while an AI snapshot exists that differs from the current plan. The snapshot is written just before
  * the store changes, so re-checking on every store update keeps the button in sync.
  */
 export function UndoAiChangeButton() {
-  const visible = useMediaPlanStore(() => hasPreApplyBackup());
+  const visible = useMediaPlanStore((state) => hasPreApplyBackup(planFingerprint(state)));
   if (!visible) return null;
 
   const onClick = () => {

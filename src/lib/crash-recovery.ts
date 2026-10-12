@@ -39,24 +39,43 @@ export function saveCrashBackup(name: string, error: unknown) {
   }
 }
 
-/** Snapshots the persisted plan before an AI or wizard plan replaces it, so it can be undone. Never throws. */
-export function snapshotPlanBeforeApply() {
+/** Fingerprint of the number-bearing plan fields, to tell whether an undo would change anything. */
+export function planFingerprint(state: { totalBudget: number; channels: unknown; activeGeos: string[]; activeTiers: unknown }): string {
+  return JSON.stringify([state.totalBudget, state.channels, state.activeGeos, state.activeTiers]);
+}
+
+/**
+ * Snapshots the persisted plan before an AI tool call changes it, so it can be undone.
+ * Only AI tool applies call this (not the wizard or onboarding). `fingerprint` is the
+ * plan fingerprint at snapshot time. Never throws.
+ */
+export function snapshotPlanBeforeApply(fingerprint?: string) {
   try {
     const plan = read(PLAN_KEY);
     if (plan === null) {
       localStorage.removeItem(PRE_APPLY_BACKUP_KEY);
       return;
     }
-    localStorage.setItem(PRE_APPLY_BACKUP_KEY, JSON.stringify({ savedAt: new Date().toISOString(), plan }));
+    localStorage.setItem(
+      PRE_APPLY_BACKUP_KEY,
+      JSON.stringify({ source: 'ai', savedAt: new Date().toISOString(), plan, fingerprint })
+    );
   } catch {
     // storage unavailable or full
   }
 }
 
-export function hasPreApplyBackup(): boolean {
+/**
+ * True when an AI-tagged snapshot exists and, if the current plan fingerprint is given,
+ * the snapshot differs from it. Untagged (legacy, wizard) snapshots never count.
+ */
+export function hasPreApplyBackup(currentFingerprint?: string): boolean {
   try {
     const raw = read(PRE_APPLY_BACKUP_KEY);
-    return !!raw && typeof JSON.parse(raw)?.plan === 'string';
+    const backup = raw ? JSON.parse(raw) : null;
+    if (!backup || backup.source !== 'ai' || typeof backup.plan !== 'string') return false;
+    if (currentFingerprint !== undefined && backup.fingerprint === currentFingerprint) return false;
+    return true;
   } catch {
     return false;
   }

@@ -22,6 +22,7 @@ export interface PlanBrief {
   months: number;
   objectives: Partial<Record<Objective, number>>; // relative weights, normalized internally
   markets: string[];                              // ISO country codes
+  marketSplit?: Record<string, number>;           // ISO code -> relative weight, when the user gave a split
   riskProfile: RiskProfile;
   includeChannels: string[];                      // template keys the user wants
   excludeChannels: string[];                      // template keys the user refuses
@@ -162,7 +163,7 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
   const pack = getIndustryPack(brief.industry);
   const budget = Math.max(0, Number(brief.monthlyBudget) || 0);
   const objectives = normalizeObjectives(brief.objectives);
-  const geo = marketsToGeoSelection(brief.markets);
+  const geo = marketsToGeoSelection(brief.markets, brief.marketSplit);
   const geoProfile = getGeoMarketProfile(geo.activeTiers, geo.activeGeos);
   // Cheaper markets reach saturation at lower spend and have cheaper fixed fees.
   const costIndex = geoProfile.blendedCpa > 0 ? geoProfile.blendedCpa / TIER1_REFERENCE.cpa : 1;

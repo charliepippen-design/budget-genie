@@ -1,7 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useMemo } from 'react';
-import { snapshotPlanBeforeApply } from '@/lib/crash-recovery';
 import { ChannelCategory } from '@/lib/mediaplan-data';
 import {
   ChannelFamily,
@@ -169,7 +168,7 @@ export interface MediaPlanState {
   planRationale: ChannelRationale[];
   planWarnings: string[];
   /** `snapshot: false` when the caller already took the pre-apply snapshot for this change. */
-  applyGeneratedPlan: (plan: GeneratedPlan, options?: { snapshot?: boolean }) => void;
+  applyGeneratedPlan: (plan: GeneratedPlan) => void;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
@@ -267,9 +266,9 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       planRationale: [],
       planWarnings: [],
 
-      applyGeneratedPlan: (plan, options) => {
-        // Keep the previous plan so a crash screen can offer "Undo last AI plan change".
-        if (options?.snapshot !== false) snapshotPlanBeforeApply();
+      applyGeneratedPlan: (plan) => {
+        // No undo snapshot here: the wizard and onboarding use this too. AI tool applies
+        // snapshot themselves (planner-agent).
         set((state) => ({
           brief: plan.brief,
           totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, plan.totalBudget)),
