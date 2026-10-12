@@ -18,12 +18,12 @@ import {
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { StrategicSummary } from '@/components/StrategicSummary';
 import { getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
-import { StrategicSummary } from '@/components/StrategicSummary';
 
 const PIE_COLORS = [
   '#6366f1',
