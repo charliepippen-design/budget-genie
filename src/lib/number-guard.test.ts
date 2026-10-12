@@ -112,3 +112,32 @@ describe('collectNumberSources', () => {
     expect(collectNumberSources(undefined, [])).toEqual([]);
   });
 });
+
+describe('number guard: profitability figures (loss regression)', () => {
+  const planSummary = {
+    blended: { spend: 20000, conversions: 113, costPerConversion: 178, grossValue: 28700, roas: 1.44 },
+    profitability: { source: 'engine', losesMoney: true, monthlyContribution: -18783, breakEvenCpa: 11, blendedCpa: 177.54, netValueBasis: 'NGR' },
+  };
+  const sources = collectNumberSources({ plan: planSummary }, []);
+
+  it('accepts the screenshot reply with zero unsourced numbers', () => {
+    const reply = 'This plan loses about -€18,783 per month; break-even cost per customer is €11 vs €177.54 now. ROAS 1.44x';
+    expect(un(reply, sources)).toEqual([]);
+  });
+
+  it.each(['-EUR 18,783', '-€18,783', '€-18.783', 'a loss of €18,783', '18.8k', '18.783 €'])(
+    'accepts the loss written as %s',
+    (form) => {
+      expect(un(`The plan loses ${form} per month`, sources)).toEqual([]);
+    }
+  );
+
+  it('accepts profitability figures from a tool result', () => {
+    const fromTool = collectNumberSources({}, [{ role: 'tool', results: [{ response: { plan: planSummary } }] }]);
+    expect(un('Loss of -€18,783 per month, break-even €11', fromTool)).toEqual([]);
+  });
+
+  it('still flags an invented loss', () => {
+    expect(un('The plan loses €9,999 per month', sources)).toEqual(['€9,999']);
+  });
+});
