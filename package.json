@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:prod": "playwright test -c playwright.prod.config.ts"
   },
   "dependencies": {
     "@clerk/clerk-react": "^5.61.4",
@@ -76,6 +77,7 @@
     "react-tooltip": "^5.30.0",
     "recharts": "^2.15.4",
     "sonner": "^1.7.4",
+    "source-map-js": "^1.2.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss-animate": "^1.0.7",
     "vaul": "^0.9.9",

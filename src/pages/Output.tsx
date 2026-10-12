@@ -1,4 +1,5 @@
 import { usePlanEconomics } from '@/hooks/use-plan-economics';
+import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
@@ -34,7 +35,7 @@ const PIE_COLORS = [
   '#84cc16',
 ];
 
-const Output = () => {
+const OutputContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
@@ -655,5 +656,11 @@ const Output = () => {
     </div>
   );
 };
+
+const Output = () => (
+  <SectionErrorBoundary name="output">
+    <OutputContent />
+  </SectionErrorBoundary>
+);
 
 export default Output;

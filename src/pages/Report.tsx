@@ -1,4 +1,5 @@
 import { usePlanEconomics } from '@/hooks/use-plan-economics';
+import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -59,7 +60,7 @@ const PIE_COLORS = [
   '#84cc16',
 ];
 
-const Report = () => {
+const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const channels = useChannelsWithMetrics();
@@ -739,5 +740,11 @@ const Report = () => {
     </div>
   );
 };
+
+const Report = () => (
+  <SectionErrorBoundary name="report">
+    <ReportContent />
+  </SectionErrorBoundary>
+);
 
 export default Report;

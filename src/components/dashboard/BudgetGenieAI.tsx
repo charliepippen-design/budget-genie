@@ -1,15 +1,8 @@
 import { buildPlanScenarios, DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 import { PlannerChat } from '../planner/PlannerChat';
-import {
-  useState,
-  useMemo,
-  useCallback,
-  Component,
-  ErrorInfo,
-  ReactNode,
-  Suspense,
-  lazy,
-} from 'react';
+import { useState, useMemo, useCallback, Suspense } from 'react';
+import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
+import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
 import { SettingsConsole } from './SettingsConsole';
 import { DashboardHeader } from './DashboardHeader';
@@ -44,74 +37,25 @@ import {
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useExportRunner } from '@/hooks/use-export-runner';
 
-const BudgetWizard = lazy(() =>
-  import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard }))
-);
-const ImportWizard = lazy(() =>
-  import('../multi-month/ImportWizard').then((m) => ({ default: m.ImportWizard }))
-);
-const PLTable = lazy(() => import('../multi-month/PLTable').then((m) => ({ default: m.PLTable })));
-const MultiMonthCharts = lazy(() =>
-  import('../multi-month/MultiMonthCharts').then((m) => ({ default: m.MultiMonthCharts }))
-);
-const ScenarioComparison = lazy(() =>
-  import('../multi-month/ScenarioComparison').then((m) => ({ default: m.ScenarioComparison }))
-);
-const ChartSection = lazy(() =>
-  import('./ChartSection').then((m) => ({ default: m.ChartSection }))
-);
-const ScenarioSidebar = lazy(() =>
-  import('./ScenarioSidebar').then((m) => ({ default: m.ScenarioSidebar }))
-);
-const StrategicInsightsPanel = lazy(() =>
-  import('./StrategicInsightsPanel').then((m) => ({ default: m.StrategicInsightsPanel }))
-);
-const LtvForecastPanel = lazy(() =>
-  import('./LtvForecastPanel').then((m) => ({ default: m.LtvForecastPanel }))
-);
-
-// --- DEBUG: ERROR BOUNDARY ---
-class ErrorBoundary extends Component<
-  { children: ReactNode },
-  { hasError: boolean; error: Error | null }
-> {
-  constructor(props: { children: ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="p-12 text-center text-white bg-slate-900 h-screen flex flex-col items-center justify-center">
-          <h1 className="text-3xl font-bold text-red-500 mb-4">💥 CRASH DETECTED</h1>
-          <div className="bg-slate-800 p-6 rounded-lg border border-red-500/30 max-w-2xl text-left font-mono text-sm overflow-auto">
-            <p className="text-red-300 mb-2 font-bold">{this.state.error?.toString()}</p>
-          </div>
-          <button
-            onClick={() => window.location.reload()}
-            className="mt-8 px-6 py-2 bg-indigo-600 hover:bg-indigo-700 rounded-lg text-white font-medium transition-colors"
-          >
-            Reload Page
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+const BudgetWizard = lazyWithReload(() =>
+  import('./BudgetWizard').then((m) => ({ default: m.BudgetWizard })), 'BudgetWizard');
+const ImportWizard = lazyWithReload(() =>
+  import('../multi-month/ImportWizard').then((m) => ({ default: m.ImportWizard })), 'ImportWizard');
+const PLTable = lazyWithReload(() => import('../multi-month/PLTable').then((m) => ({ default: m.PLTable })), 'PLTable');
+const MultiMonthCharts = lazyWithReload(() =>
+  import('../multi-month/MultiMonthCharts').then((m) => ({ default: m.MultiMonthCharts })), 'MultiMonthCharts');
+const ScenarioComparison = lazyWithReload(() =>
+  import('../multi-month/ScenarioComparison').then((m) => ({ default: m.ScenarioComparison })), 'ScenarioComparison');
+const ChartSection = lazyWithReload(() =>
+  import('./ChartSection').then((m) => ({ default: m.ChartSection })), 'ChartSection');
+const ScenarioSidebar = lazyWithReload(() =>
+  import('./ScenarioSidebar').then((m) => ({ default: m.ScenarioSidebar })), 'ScenarioSidebar');
+const StrategicInsightsPanel = lazyWithReload(() =>
+  import('./StrategicInsightsPanel').then((m) => ({ default: m.StrategicInsightsPanel })), 'StrategicInsightsPanel');
+const LtvForecastPanel = lazyWithReload(() =>
+  import('./LtvForecastPanel').then((m) => ({ default: m.LtvForecastPanel })), 'LtvForecastPanel');
 
 export const BudgetGenieAI = () => {
-  console.log('Rendering BudgetGenieAI...'); // Trace log
-
   // 1. VIEW MODEL (The Brain)
   // Connects to store, handles math, provides stable data
   const vm = useBudgetGenieViewModel();
@@ -242,7 +186,7 @@ export const BudgetGenieAI = () => {
   );
 
   return (
-    <ErrorBoundary>
+    <SectionErrorBoundary name="dashboard">
       <div
         className={cn(
           'flex h-screen overflow-hidden font-inter selection:bg-indigo-500/30 transition-colors duration-300',
@@ -506,13 +450,15 @@ export const BudgetGenieAI = () => {
           </main>
         </div>
 
-        <PlannerChat />
+        <SectionErrorBoundary name="planner-chat">
+          <PlannerChat />
+        </SectionErrorBoundary>
 
         {/* MODALS */}
         <Suspense fallback={null}>
           <ImportWizard open={isImportOpen} onOpenChange={setIsImportOpen} />
         </Suspense>
       </div>
-    </ErrorBoundary>
+    </SectionErrorBoundary>
   );
 };
