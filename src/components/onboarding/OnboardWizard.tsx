@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Users, TrendingUp, FlaskConical, Shield, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { buildPlanReadyToast } from '@/lib/plan-ready-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -381,19 +382,8 @@ export const OnboardWizard = () => {
       goToStep('done');
       window.requestAnimationFrame(() => navigate('/app', { replace: true }));
 
-      if (refinedPlan) {
-        toast('Your plan is ready', {
-          description: refinedPlan.rationale,
-          duration: 6000,
-        });
-      } else {
-        toast('Your plan is ready', {
-          description: generatedPlan
-            ? `We've built your plan from your goal and markets using ${preset.label} benchmarks.`
-            : `We've built your plan using ${preset.label} industry defaults.`,
-          duration: 6000,
-        });
-      }
+      const planReadyToast = buildPlanReadyToast();
+      toast(planReadyToast.title, planReadyToast.options);
     },
     [
       hasExistingPlan,
