@@ -22,6 +22,7 @@ import { getEfficiencyAlerts } from '@/lib/planning-insights';
 import { generateReportNarrative, type ReportNarrative } from '@/lib/report-narrator';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
+import { StrategicSummary } from '@/components/StrategicSummary';
 
 const PIE_COLORS = [
   '#6366f1',
@@ -89,7 +90,6 @@ const OutputContent = () => {
   // ─── AI narrative ────────────────────────────────────────────────────────
 
   const [narrative, setNarrative] = useState<ReportNarrative | null>(null);
-  const [narrativeLoading, setNarrativeLoading] = useState(true);
 
   useEffect(() => {
     generateReportNarrative({
@@ -112,8 +112,7 @@ const OutputContent = () => {
       .catch((error) => {
         console.error('Failed to generate report narrative:', error);
         setNarrative(null);
-      })
-      .finally(() => setNarrativeLoading(false));
+      });
     // Intentionally mount-only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -293,13 +292,7 @@ const OutputContent = () => {
             Strategic Approach
           </h2>
 
-          {narrativeLoading ? (
-            <div className="space-y-3">
-              <div className="bg-muted animate-pulse rounded h-4 w-full" />
-              <div className="bg-muted animate-pulse rounded h-4 w-4/5" />
-              <div className="bg-muted animate-pulse rounded h-4 w-3/5" />
-            </div>
-          ) : narrative ? (
+          {narrative ? (
             <>
               <div className="flex items-center gap-1.5 text-xs text-primary mb-4">
                 <Sparkles className="w-3 h-3" />
@@ -330,13 +323,16 @@ const OutputContent = () => {
               </div>
             </>
           ) : (
-            <div className="border-l-4 border-primary pl-6 py-2">
-              <p className="text-xl leading-relaxed text-foreground font-light">
-                This plan deploys {$(totalBudget)} across {active.length} channels, projecting{' '}
-                {$(projectedRevenue)} in {vc.terms.revenueMetric.toLowerCase()} at a{' '}
-                {blendedRoas.toFixed(2)}x return on spend.
-              </p>
-            </div>
+            <StrategicSummary
+              channels={active.map((c) => ({ name: c.name, spend: c.metrics.spend }))}
+              totalBudget={totalBudget}
+              blendedCpa={blendedCpa}
+              blendedRoas={blendedRoas}
+              projectedRevenue={projectedRevenue}
+              geos={activeGeos}
+              revenueMetric={vc.terms.revenueMetric}
+              format={$}
+            />
           )}
         </section>
 
