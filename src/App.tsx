@@ -3,10 +3,11 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, type ReactNode } from 'react';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
+import { SIGN_IN_PATH, SIGN_UP_PATH } from '@/lib/auth-routes';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ClerkProvider } from '@clerk/clerk-react';
@@ -45,6 +46,22 @@ const queryClient = new QueryClient();
 const clerkPubKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
 const clerkEnabled = !!clerkPubKey;
 
+// Clerk navigates through react-router so multi-step flows never trigger a full page reload.
+const ClerkWithRouter = ({ children }: { children: ReactNode }) => {
+  const navigate = useNavigate();
+  return (
+    <ClerkProvider
+      publishableKey={clerkPubKey}
+      routerPush={(to) => navigate(to)}
+      routerReplace={(to) => navigate(to, { replace: true })}
+      signInUrl={SIGN_IN_PATH}
+      signUpUrl={SIGN_UP_PATH}
+    >
+      {children}
+    </ClerkProvider>
+  );
+};
+
 const AppShell = () => {
   const { theme } = useTheme();
 
@@ -70,12 +87,12 @@ const AppShell = () => {
           <KeyboardManager />
           <SubscriptionAccessSync />
           <AITokenBridge />
-          <BrowserRouter>
-            <CurrencyProvider>
+          <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
                   <Route path="/" element={<RouteBoundary name="route:/"><Landing /></RouteBoundary>} />
-                  <Route path="/auth" element={<RouteBoundary name="route:/auth"><Auth /></RouteBoundary>} />
+                  <Route path="/auth/*" element={<RouteBoundary name="route:/auth"><Auth mode="sign-in" /></RouteBoundary>} />
+                  <Route path="/sign-up/*" element={<RouteBoundary name="route:/sign-up"><Auth mode="sign-up" /></RouteBoundary>} />
                   <Route path="/pricing" element={<RouteBoundary name="route:/pricing"><Pricing /></RouteBoundary>} />
                   <Route path="/terms" element={<RouteBoundary name="route:/terms"><Legal doc="terms" /></RouteBoundary>} />
                   <Route path="/refund-policy" element={<RouteBoundary name="route:/refund-policy"><Legal doc="refund" /></RouteBoundary>} />
@@ -102,8 +119,7 @@ const AppShell = () => {
                   <Route path="*" element={<RouteBoundary name="route:404"><NotFound /></RouteBoundary>} />
                 </Routes>
               </Suspense>
-            </CurrencyProvider>
-          </BrowserRouter>
+          </CurrencyProvider>
           {/* REPAIR 3: Force-Mount outside of everything else */}
           {/* NetworkStatus moved to dashboard layout */}
         </TooltipProvider>
@@ -130,7 +146,11 @@ const AppShell = () => {
     );
   }
 
-  return <ClerkProvider publishableKey={clerkPubKey}>{appContent}</ClerkProvider>;
+  return (
+    <BrowserRouter>
+      <ClerkWithRouter>{appContent}</ClerkWithRouter>
+    </BrowserRouter>
+  );
 };
 
 const App = () => {

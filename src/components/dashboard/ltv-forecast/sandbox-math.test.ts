@@ -117,14 +117,26 @@ describe('computeSandboxChannelMetrics', () => {
     expect(run(adj({}), { ...noGroups, paid: -150 }).adjustedSpend).toBe(0);
   });
 
-  it('floors adjusted CPA at 0.01', () => {
-    const zeroCpa = computeSandboxChannelMetrics(
-      [channel('a', 'Google Ads', { cpa: 0 })],
+  it('treats CPA 0 as missing and falls back to spend / conversions (#26)', () => {
+    const m = computeSandboxChannelMetrics(
+      [channel('a', 'Google Ads', { cpa: 0, spend: 900, conversions: 30 })],
       new Set(['a']),
       {},
       noGroups
     )[0];
-    expect(zeroCpa.adjustedCpa).toBe(0.01);
+    expect(m.baselineCpa).toBe(30);
+    expect(m.adjustedCpa).toBe(30);
+  });
+
+  it('floors adjusted CPA at 0.01 without inventing conversions when no CPA exists (#26)', () => {
+    const m = computeSandboxChannelMetrics(
+      [channel('a', 'Google Ads', { cpa: 0, conversions: 0 })],
+      new Set(['a']),
+      {},
+      noGroups
+    )[0];
+    expect(m.adjustedCpa).toBe(0.01);
+    expect(m.adjustedConversions).toBe(0);
   });
 
   it('floors churn effect at 0.35', () => {

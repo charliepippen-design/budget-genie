@@ -93,3 +93,39 @@ describe('Planner agent tool bridge', () => {
     expect(total).toBeCloseTo(100, 0);
   });
 });
+
+describe('Planner profitability (engine, same check as LossBanner)', () => {
+  beforeEach(() => {
+    useMediaPlanStore.getState().resetAll();
+    useMediaPlanStore.setState({ brief: null, planRationale: [], planWarnings: [] });
+  });
+
+  it('flags a losing iGaming plan with a negative contribution and break-even CPA', () => {
+    // Regression: the chat quoted ROAS 1.44x while the plan lost money per month.
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 20000 } });
+    useMediaPlanStore.setState({ onboardingVertical: 'igaming' });
+    const { profitability: p, blended } = summarizePlan();
+    expect(p.source).toBe('engine');
+    expect(p.netValueBasis).toBe('NGR');
+    expect(p.losesMoney).toBe(true);
+    expect(p.monthlyContribution).toBeLessThan(0);
+    expect(p.breakEvenCpa).not.toBeNull();
+    expect(p.breakEvenCpa!).toBeLessThan(p.blendedCpa!);
+    expect(p.blendedCpa).toBe(blended.costPerConversion);
+  });
+
+  it('reaches the tool result and the context too', () => {
+    const res = applyPlannerToolCall({ name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 20000 } });
+    expect((res.plan as ReturnType<typeof summarizePlan>).profitability.source).toBe('engine');
+    expect(buildPlannerContext().plan?.profitability).toBeDefined();
+  });
+
+  it('reports a profitable plan consistently with the engine numbers', () => {
+    applyPlannerToolCall({ name: 'update_brief', args: { industry: 'ecommerce', monthlyBudget: 50000 } });
+    useMediaPlanStore.setState({ onboardingVertical: 'ecommerce' });
+    const { profitability: p, blended } = summarizePlan();
+    expect(p.netValueBasis).toBe('revenue');
+    expect(p.losesMoney).toBe(blended.grossValue! < blended.spend!);
+    if (!p.losesMoney) expect(p.monthlyContribution).toBeGreaterThanOrEqual(0);
+  });
+});
