@@ -1,6 +1,7 @@
 import { defineConfig, loadEnv, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react-swc';
 import path from 'path';
+import fs from 'fs';
 import { visualizer } from 'rollup-plugin-visualizer';
 
 // Serves api/ai-gateway locally so `npm run dev` works without `vercel dev`.
@@ -34,8 +35,48 @@ function aiGatewayDev(mode: string): Plugin {
   };
 }
 
+// Build id shown in crash reports: Vercel's commit SHA (system variable, read only) or a local stamp.
+const buildId = process.env.VERCEL_GIT_COMMIT_SHA
+  ? process.env.VERCEL_GIT_COMMIT_SHA.slice(0, 12)
+  : `local-${new Date().toISOString()}`;
+
+// Sourcemaps are built hidden and moved out of the output dir, so no .map is ever served as a static
+// file. api/client-error.ts reads them from .sourcemaps/ to decode crash stacks.
+function moveSourcemaps(): Plugin {
+  let outDir = 'dist';
+  let root = process.cwd();
+  return {
+    name: 'move-sourcemaps',
+    apply: 'build',
+    configResolved(config) {
+      outDir = path.resolve(config.root, config.build.outDir);
+      root = config.root;
+    },
+    closeBundle() {
+      const target = path.resolve(root, '.sourcemaps');
+      fs.rmSync(target, { recursive: true, force: true });
+      fs.mkdirSync(target, { recursive: true });
+      const walk = (dir: string) => {
+        for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+          const full = path.join(dir, entry.name);
+          if (entry.isDirectory()) walk(full);
+          else if (entry.name.endsWith('.map')) {
+            fs.copyFileSync(full, path.join(target, entry.name));
+            fs.rmSync(full);
+          }
+        }
+      };
+      if (fs.existsSync(outDir)) walk(outDir);
+    },
+  };
+}
+
 // MOCK_CLERK=1 npm run dev: local QA with a fake signed-in superuser (dev server only).
+// `vite build --mode qa` with MOCK_CLERK=1 also uses it, for the prod-build e2e (test:e2e:prod).
+// A normal `npm run build` never does.
 const mockClerk = process.env.MOCK_CLERK === '1';
+const useClerkMock = (command: string, mode: string) =>
+  process.env.MOCK_CLERK === '1' && (command === 'serve' || (command === 'build' && mode === 'qa'));
 if (mockClerk) process.env.ALLOW_ANON = 'true';
 
 // https://vitejs.dev/config/
@@ -43,6 +84,7 @@ export default defineConfig(({ mode, command }) => ({
   plugins: [
     react(),
     aiGatewayDev(mode),
+    moveSourcemaps(),
     mode === 'analyze' &&
       visualizer({
         filename: 'dist/stats.html',
@@ -55,16 +97,19 @@ export default defineConfig(({ mode, command }) => ({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      ...(mockClerk && command === 'serve'
+      ...(useClerkMock(command, mode)
         ? { '@clerk/clerk-react': path.resolve(__dirname, './src/dev/clerk-mock.tsx') }
         : {}),
     },
   },
-  define:
-    mockClerk && command === 'serve'
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+    ...(useClerkMock(command, mode)
       ? { 'import.meta.env.VITE_CLERK_PUBLISHABLE_KEY': JSON.stringify('pk_test_qa_mock') }
-      : {},
+      : {}),
+  },
   build: {
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         // Only React itself gets a manual vendor chunk (every page needs it). Rollup pulls the

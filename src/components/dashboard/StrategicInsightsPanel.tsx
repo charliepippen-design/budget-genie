@@ -11,6 +11,8 @@ import { planAutoFixAllocation, planReallocation } from '@/lib/insight-actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
+import { useCurrency } from '@/contexts/CurrencyContext';
+import { computeArbitrage } from '@/lib/insights/arbitrage';
 
 /** Sets bar width imperatively so no style prop appears in JSX. */
 function BarFill({ pct, className }: { pct: number; className: string }) {
@@ -21,11 +23,9 @@ function BarFill({ pct, className }: { pct: number; className: string }) {
   return <div ref={ref} className={className} />;
 }
 
-const fmt = (n: number, currency = 'USD') =>
-  new Intl.NumberFormat('en-US', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n);
-
 export const StrategicInsightsPanel = () => {
   const { toast } = useToast();
+  const { format: fmt } = useCurrency();
   const channels = useChannelsWithMetrics();
   const { setChannelAllocation, setAllocations, toggleChannelLock } = useMediaPlanStore();
   const dispatchActionPulse = useActionPulseStore((state) => state.dispatchActionPulse);
@@ -66,31 +66,25 @@ export const StrategicInsightsPanel = () => {
     return { d, points, maxRoas };
   }, [channels]);
 
-  // Card 2: Arbitrage Opportunity — real underfunded channel vs overfunded
-  const arbitrage = useMemo(() => {
-    const active = channels.filter(
-      (c) => c.isActive && c.metrics.spend > 0 && c.metrics.roas > 0
-    );
-    if (active.length < 2) return null;
-
-    const sorted = [...active].sort((a, b) => b.metrics.roas - a.metrics.roas);
-    const winner = sorted[0];
-    const loser = sorted[sorted.length - 1];
-
-    if (winner.id === loser.id) return null;
-    // Only surface if the gap is meaningful (winner is ≥20% better ROAS)
-    if (winner.metrics.roas < loser.metrics.roas * 1.2) return null;
-
-    const shiftAmount = loser.metrics.spend * 0.2; // shift 20% of loser's spend
-    const revenueGain = (winner.metrics.roas - loser.metrics.roas) * shiftAmount;
-    const roasUpliftPct = Math.round(((winner.metrics.roas / loser.metrics.roas) - 1) * 100);
-
-    // Progress bar: winner share vs total active spend
-    const totalSpend = active.reduce((sum, c) => sum + c.metrics.spend, 0);
-    const winnerSharePct = Math.round((winner.metrics.spend / totalSpend) * 100);
-
-    return { winner, loser, shiftAmount, revenueGain, roasUpliftPct, winnerSharePct };
-  }, [channels]);
+  // Card 2: Arbitrage Opportunity. The numbers are the engine's modelled effect of the move.
+  const totalBudget = useMediaPlanStore((state) => state.totalBudget);
+  const storeChannels = useMediaPlanStore((state) => state.channels);
+  const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
+  const activeTiers = useMediaPlanStore((state) => state.activeTiers);
+  const activeGeos = useMediaPlanStore((state) => state.activeGeos);
+  const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
+  const arbitrage = useMemo(
+    () =>
+      computeArbitrage({
+        totalBudget,
+        channels: storeChannels,
+        globalMultipliers,
+        activeTiers,
+        activeGeos,
+        geoOverrides,
+      }),
+    [totalBudget, storeChannels, globalMultipliers, activeTiers, activeGeos, geoOverrides]
+  );
 
   // Card 3: Market Saturation — real saturation channels
   const saturationChannels = useMemo(
@@ -278,16 +272,17 @@ export const StrategicInsightsPanel = () => {
                 </div>
 
                 <h4 className={cn('font-medium leading-snug mb-4', isDark ? 'text-slate-200' : 'text-slate-800')}>
-                  <span className="text-green-300 font-semibold">{arbitrage.winner.name}</span> is under-funded
-                  vs <span className="text-red-300">{arbitrage.loser.name}</span>.{' '}
-                  <span className="text-green-400 font-bold">+{arbitrage.roasUpliftPct}% return on spend</span> potential.
+                  <span className="text-green-300 font-semibold">{arbitrage.winner.name}</span> returns more per unit of spend
+                  than <span className="text-red-300">{arbitrage.loser.name}</span>.{' '}
+                  <span className="text-green-400 font-bold">Estimated effect on this plan: +{fmt(arbitrage.revenueDelta)} projected revenue</span>,
+                  blended return on spend {arbitrage.blendedRoasBefore.toFixed(2)}x to {arbitrage.blendedRoasAfter.toFixed(2)}x.
                 </h4>
 
                 {/* Real progress bar */}
                 <div className="space-y-2 mb-6 mt-2">
                   <div className={cn('flex justify-between text-[10px] uppercase tracking-wider', isDark ? 'text-slate-500' : 'text-slate-400')}>
                     <span>Current ({arbitrage.winner.name})</span>
-                    <span>Potential Impact</span>
+                    <span>Modelled shift</span>
                   </div>
                   <div className={cn('h-2 rounded-full overflow-hidden flex', isDark ? 'bg-slate-700' : 'bg-slate-200')}>
                     <BarFill pct={arbitrage.winnerSharePct} className="h-full bg-slate-500 rounded-full" />
@@ -297,7 +292,7 @@ export const StrategicInsightsPanel = () => {
                     <span className={cn(isDark ? 'text-slate-400' : 'text-slate-600')}>
                       {fmt(arbitrage.winner.metrics.spend)} Spend
                     </span>
-                    <span className="text-green-400 font-mono">+{fmt(arbitrage.revenueGain)} Rev</span>
+                    <span className="text-green-400 font-mono">+{fmt(arbitrage.revenueDelta)} Rev (modelled)</span>
                   </div>
                 </div>
 
