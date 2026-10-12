@@ -46,6 +46,8 @@ export function usePlanEconomics() {
       netCohort: economics.netValueCohort,
       // Month in which a customer's 12-month value first covers their acquisition cost.
       paybackMonths: curve.paybackMonth,
+      // 12-month cumulative value per customer from the same curve payback is read from.
+      paybackLtvPerUser: curve.points[11]?.cumulativeLtvPerUser ?? 0,
       ltvToCac12m: curve.points[11]?.ltvToCac ?? 0,
       scenarioEnvelope: buildPlanScenarios(plan, model),
     };

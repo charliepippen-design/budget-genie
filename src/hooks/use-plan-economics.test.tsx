@@ -30,3 +30,28 @@ describe('usePlanEconomics vs plan health banner (same store)', () => {
     expect(losesMoney).toBe(report < 0);
   });
 });
+
+describe('usePlanEconomics payback value', () => {
+  it('payback is measured against the 12-month LTV it reports, not the raw player value input', () => {
+    const base = useMediaPlanStore.getState().globalMultipliers;
+    useMediaPlanStore.setState({
+      onboardingVertical: 'igaming',
+      globalMultipliers: { ...base, playerValue: 250 },
+    });
+    let eco: ReturnType<typeof usePlanEconomics> | null = null;
+    function Probe() {
+      eco = usePlanEconomics();
+      return null;
+    }
+    const root = createRoot(document.createElement('div'));
+    act(() => root.render(<Probe />));
+    const e = eco!;
+    expect(e.paybackLtvPerUser).toBeGreaterThan(0);
+    // The curve terminal differs from the raw input the old "based on" label showed.
+    expect(e.paybackLtvPerUser).not.toBe(250);
+    // Payback month and the reported 12-month value come from the same curve.
+    expect(e.ltvToCac12m).toBeCloseTo(e.paybackLtvPerUser / (e.blendedCpa ?? 1), 6);
+    if (e.paybackMonths === null) expect(e.ltvToCac12m).toBeLessThan(1);
+    else expect(e.ltvToCac12m).toBeGreaterThanOrEqual(1);
+  });
+});
