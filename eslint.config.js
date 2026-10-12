@@ -21,6 +21,21 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector:
+            "CallExpression[callee.name=/^use(Layout)?Effect$/] > ArrowFunctionExpression[expression=true]:first-child",
+          message:
+            "Do not use an expression-bodied arrow in useEffect/useLayoutEffect: its value is used as the cleanup. Chrome 150+ scroll APIs (scrollIntoView, scrollTo) return a Promise, which React then calls and crashes with 'n is not a function'. Use a block body: useEffect(() => { ... }, []).",
+        },
+        {
+          selector:
+            "CallExpression[callee.type='MemberExpression'][callee.property.name=/^use(Layout)?Effect$/] > ArrowFunctionExpression[expression=true]:first-child",
+          message:
+            "Do not use an expression-bodied arrow in React.useEffect/useLayoutEffect: its value is used as the cleanup. Chrome 150+ scroll APIs (scrollIntoView, scrollTo) return a Promise, which React then calls and crashes with 'n is not a function'. Use a block body: React.useEffect(() => { ... }, []).",
+        },
+      ],
     },
   },
 );
