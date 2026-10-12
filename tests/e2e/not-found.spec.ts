@@ -11,6 +11,12 @@ test.describe('branded 404', () => {
     await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0);
   });
 
+  test('/refund redirects to /refund-policy', async ({ page }) => {
+    await page.goto('/refund');
+    await expect(page).toHaveURL(/\/refund-policy$/, { timeout: 20_000 });
+    await expect(page.getByRole('heading', { name: 'Page not found' })).toHaveCount(0);
+  });
+
   for (const path of ['/dashboard', '/planner', '/demo']) {
     test(`${path} redirects to the app instead of a 404`, async ({ page }) => {
       await page.addInitScript(() => {

@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+import { BRAND_DOMAIN } from '@/lib/brand';
 import { PAID_PLANS } from '@/lib/plans';
 
 vi.mock('@clerk/clerk-react', () => ({
@@ -43,6 +44,8 @@ describe('Landing', () => {
     expect(container.querySelector('a[href="/pricing"]')?.textContent).toBe('See pricing');
     // Brand heading stays available for the e2e heading selector.
     expect(container.querySelector('h2')?.textContent).toBe('MediaPlanner Pro');
+    // The domain is not shown as an eyebrow.
+    expect(container.textContent?.toLowerCase()).not.toContain(BRAND_DOMAIN);
   });
 });
 
