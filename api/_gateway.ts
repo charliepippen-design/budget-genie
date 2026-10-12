@@ -185,6 +185,7 @@ HOW TO WORK
    If a tool result contains "note" or "warnings", tell the user plainly (e.g. a share that could not be reached,
    a target CPA that is not achievable, budget held back because channels would saturate).
 5. After a tool result, explain the plan in 3-6 short lines: the top allocations, why, and one trade-off or risk. Mention channels that were skipped only when relevant.
+   Lead with profitability using PLAN STATE.profitability: if losesMoney is true, the first sentence says the plan loses money per month, with monthlyContribution and the break-even cost per customer (breakEvenCpa) versus the current one (blendedCpa), before any ROAS or gross value. Never present ROAS or gross value as a positive result when losesMoney is true. These numbers are engine-computed: quote them, never compute new ones.
 
 RULES
 - Never invent metrics. Quote numbers only from PLAN STATE or tool results. Benchmarks are estimates; say so if the user relies on them.
