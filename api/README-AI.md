@@ -19,3 +19,12 @@ All flags are read on the server from `process.env`. Their values are not secret
 ## Fail-open behaviour
 
 Every decision call has a 1500 ms timeout and no retries. On a timeout, network error, non-2xx status, malformed response, low confidence or unknown intent, the router returns `full` (today's behaviour) and the reply check leaves the reply unchanged. The number guard never throws.
+
+## Thinking level (latency)
+
+Gemini calls send `generationConfig.thinkingConfig.thinkingLevel` so each round trip stays fast. Each fetch also logs `ai_gemini_timing {model, ms, status, attempt}` (no content).
+
+| Env | Values | Default | Effect |
+|---|---|---|---|
+| `AI_PLANNER_THINKING` | `minimal` / `low` / `medium` / `high` / `default` | `low` | Thinking level for planner chat calls. `default` sends nothing, so the model uses its own default (medium). |
+| `AI_JSON_THINKING` | same | `low` | Same for the `json` task (onboarding refinement, report narrative). |

@@ -129,6 +129,35 @@ describe('useReportNarrative', () => {
     expect(generateJSON).toHaveBeenCalledTimes(1);
   });
 
+  it('fills profitability and the value label from the plan and sends them to the AI', async () => {
+    // Eval seed d2-007: "Write me a short summary of this plan for my boss"
+    mount(input());
+    await act(async () => {
+      await api.generate();
+    });
+    const prompt = generateJSON.mock.calls[0][0] as string;
+    expect(prompt).toContain('Monthly profit or loss (engine):');
+    expect(prompt).toContain('Break-even cost per customer (engine):');
+    expect(prompt).not.toMatch(/Month 1/);
+  });
+
+  it('hashes profitability so a summary from a different verdict is not reused', async () => {
+    const profit = { losesMoney: false, monthlyContribution: 900, breakEvenCpa: 40, blendedCpa: 22 };
+    const loss = { losesMoney: true, monthlyContribution: -18783, breakEvenCpa: 11, blendedCpa: 177.54 };
+    expect(hashNarratorInput(input({ profitability: profit }))).not.toBe(
+      hashNarratorInput(input({ profitability: loss }))
+    );
+    expect(hashNarratorInput(input())).not.toBe(hashNarratorInput(input({ revenueLabel: 'Projected Revenue' })));
+
+    mount(input({ profitability: profit }));
+    await act(async () => {
+      await api.generate();
+    });
+    expect(container.textContent).toBe('sum');
+    act(() => root.render(<Harness data={input({ profitability: loss })} />));
+    expect(container.textContent).toBe('none');
+  });
+
   it('surfaces the free-tier limit and never spins forever', async () => {
     generateJSON.mockRejectedValue(new AIError('Limit reached', 'FREE_TIER_LIMIT', 402));
     mount(input());

@@ -7,6 +7,8 @@ export interface StrategySummaryInput {
   geos: string[];
   revenueMetric: string;
   format: (n: number) => string;
+  /** Engine plan health (same as LossBanner). When it loses money the summary opens with the loss. */
+  health?: import('@/lib/plan-health').PlanHealth;
 }
 
 /**
@@ -37,5 +39,25 @@ export function buildStrategySummary(input: StrategySummaryInput): string {
       ? `The main market${geos.length > 1 ? 's are' : ' is'} ${geos.slice(0, 3).join(', ')}.`
       : 'The plan targets a global reach.'
   );
-  return parts.join(' ');
+  return withProfitability(parts, input).join(' ');
+}
+
+/** Puts the engine profit or loss around the opening sentence (parts[0]). */
+function withProfitability(parts: string[], input: StrategySummaryInput): string[] {
+  const { health, format } = input;
+  if (!health) return parts;
+  const [opening, ...rest] = parts;
+  if (health.losesMoney && health.breakEvenCpa !== null) {
+    const current = health.blendedCpa === null ? 'n/a' : format(health.blendedCpa);
+    return [
+      `At these assumptions this plan loses about ${format(Math.abs(health.monthlyContribution))} per month. Break-even cost per customer is ${format(health.breakEvenCpa)} (current ${current}).`,
+      opening,
+      'At these assumptions that projected value does not cover the media cost.',
+      ...rest,
+    ];
+  }
+  if (health.monthlyContribution > 0) {
+    return [opening, `At these assumptions the plan earns about ${format(health.monthlyContribution)} per month.`, ...rest];
+  }
+  return parts;
 }
