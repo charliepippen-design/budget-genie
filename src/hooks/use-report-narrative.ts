@@ -1,7 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { useVerticalConfig } from '@/hooks/use-vertical-config';
-import { computePlanHealth } from '@/lib/plan-health';
 import { isFreeTierLimit } from '@/lib/ai-client';
 import { getCachedNarrative, hashNarratorInput, setCachedNarrative } from '@/lib/narrative-cache';
 import {
@@ -9,6 +6,9 @@ import {
   type ReportNarrative,
   type ReportNarratorInput,
 } from '@/lib/report-narrator';
+import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { computePlanHealth } from '@/lib/plan-health';
 
 export interface NarrativeError {
   message: string;
