@@ -1,7 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { generateReportNarrative, type ReportNarratorInput } from './report-narrator';
 
-vi.mock('@/lib/ai-client', () => ({ generateJSON: vi.fn(async () => ({ nope: true })) }));
+vi.mock('@/lib/ai-client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/ai-client')>()),
+  generateJSON: vi.fn(async () => ({ nope: true })),
+}));
 
 describe('generateReportNarrative', () => {
   it('resolves null instead of throwing on bad input', async () => {

@@ -21,9 +21,9 @@ export default function Pricing() {
   // Redirect if already paid or not signed in
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
-      navigate('/auth');
+      navigate('/sign-up');
     }
-    if (isLoaded && hasActivePayment) {
+    if (isLoaded && isSignedIn && hasActivePayment) {
       navigate('/app');
     }
   }, [isLoaded, isSignedIn, hasActivePayment, navigate]);

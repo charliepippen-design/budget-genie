@@ -6,7 +6,7 @@ vi.mock('@clerk/clerk-react', () => ({
   useAuth: () => ({ getToken: async () => 'user-token' }),
 }));
 
-import { PlannerChat } from '@/components/planner/PlannerChat';
+import { PlannerChat, ToolCard } from '@/components/planner/PlannerChat';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 
@@ -103,6 +103,52 @@ describe('PlannerChat', () => {
     });
     await act(async () => {
       await vi.waitFor(() => expect(container.querySelector('a[href="/auth"]')).not.toBeNull());
+    });
+  });
+
+  describe('Plan rebuilt card totals', () => {
+    // Seed d2-001 message, sent as the user turn that triggers the rebuild
+    const seedMessage = 'Aumenta il budget mensile a 50k';
+    const ch = (id: string, name: string, sharePct: number, active = true, budget = 20000) => ({
+      id, name, model: 'CPA', spend: Math.round((sharePct / 100) * budget), sharePct, conversions: 1, cpa: 1, roas: 1, locked: false, active,
+    });
+    const renderCard = (plan: unknown) =>
+      act(() =>
+        root.render(
+          <CurrencyProvider>
+            <ToolCard name="update_brief" response={{ ok: true, plan }} />
+          </CurrencyProvider>
+        )
+      );
+    const totalRow = () => [...container.querySelectorAll('div')].find((d) => d.firstElementChild?.textContent === 'Total')!;
+
+    it('lists all 6 active channels and a Total of 100% (regression: top 5 showed 90.7%)', () => {
+      const channels = [
+        ch('a', 'Affiliates - CPA', 29.4),
+        ch('b', 'Google Search (Licensed)', 21.5),
+        ch('c', 'Affiliates - Hybrid (CPA + RevShare)', 15.2),
+        ch('d', 'SEO - Content & Links', 12.4),
+        ch('e', 'Meta Ads (Licensed)', 12.2),
+        ch('f', 'Native Ads', 9.3),
+      ];
+      renderCard({ totalBudget: 20000, channels, blended: { spend: 20000, costPerConversion: 10 } });
+      expect(seedMessage).toContain('budget');
+      for (const c of channels) expect(container.textContent).toContain(c.name);
+      expect(totalRow().textContent).toContain('100%');
+      expect(totalRow().textContent).toMatch(/20[,.\s]?000/);
+    });
+
+    it('excludes inactive and zero-spend channels from list and total', () => {
+      const channels = [
+        ch('a', 'Affiliates - CPA', 60),
+        ch('b', 'Google Search (Licensed)', 40),
+        ch('c', 'Inactive Channel', 25, false),
+        ch('d', 'Zero Spend Channel', 0),
+      ];
+      renderCard({ totalBudget: 20000, channels, blended: { spend: 20000, costPerConversion: 10 } });
+      expect(container.textContent).not.toContain('Inactive Channel');
+      expect(container.textContent).not.toContain('Zero Spend Channel');
+      expect(totalRow().textContent).toContain('100%');
     });
   });
 });

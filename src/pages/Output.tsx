@@ -19,7 +19,8 @@ import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { getEfficiencyAlerts } from '@/lib/planning-insights';
-import { generateReportNarrative, type ReportNarrative } from '@/lib/report-narrator';
+import { useReportNarrative } from '@/hooks/use-report-narrative';
+import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
 import { BrandLogo } from '@/components/common/BrandLogo';
@@ -56,6 +57,7 @@ const OutputContent = () => {
     blendedCpa,
     blendedRoas,
     netPnl,
+    netCohort,
     paybackMonths,
     scenarioEnvelope,
   } = usePlanEconomics();
@@ -90,35 +92,22 @@ const OutputContent = () => {
 
   // ─── AI narrative ────────────────────────────────────────────────────────
 
-  const [narrative, setNarrative] = useState<ReportNarrative | null>(null);
-  const [narrativeLoading, setNarrativeLoading] = useState(true);
-
-  useEffect(() => {
-    generateReportNarrative({
-      totalBudget,
-      totalSpend,
-      projectedRevenue,
-      projectedFtds,
-      blendedCpa,
-      blendedRoas,
-      paybackMonths,
-      topChannel: topChannel?.name ?? 'Unknown',
-      weakestChannel: weakestChannel?.name ?? null,
-      scenarioBase: scenarioEnvelope[1],
-      alertCount: alerts.length,
-      vertical: vc.vertical,
-      geos: activeGeos,
-      currency: code,
-    })
-      .then((result) => setNarrative(result))
-      .catch((error) => {
-        console.error('Failed to generate report narrative:', error);
-        setNarrative(null);
-      })
-      .finally(() => setNarrativeLoading(false));
-    // Intentionally mount-only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    totalBudget,
+    totalSpend,
+    projectedRevenue,
+    projectedFtds,
+    blendedCpa,
+    blendedRoas,
+    paybackMonths,
+    topChannel: topChannel?.name ?? 'Unknown',
+    weakestChannel: weakestChannel?.name ?? null,
+    scenarioBase: scenarioEnvelope[1],
+    alertCount: alerts.length,
+    vertical: vc.vertical,
+    geos: activeGeos,
+    currency: code,
+  });
 
   // ─── Print styles (injected once on mount) ───────────────────────────────
 
@@ -341,6 +330,11 @@ const OutputContent = () => {
               </p>
             </div>
           )}
+          {!narrative && (
+            <div className="mt-6">
+              <NarrativePrompt loading={narrativeLoading} error={narrativeError} onGenerate={generate} />
+            </div>
+          )}
         </section>
 
         {/* ── AllocationSection ────────────────────────────────────── */}
@@ -456,7 +450,7 @@ const OutputContent = () => {
             <div className="w-px bg-border self-stretch mx-8 hidden sm:block" />
             <div className="min-w-[8rem]">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                Net Result (Month 1)
+                Net Value per month (Month 1)
               </p>
               <p
                 className={`text-3xl font-bold mt-1 ${netPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}
@@ -464,7 +458,7 @@ const OutputContent = () => {
                 {$(netPnl)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {blendedRoas.toFixed(2)}x return on spend
+                {blendedRoas.toFixed(2)}x return on spend. Lifetime cohort net: {$(netCohort)}
               </p>
             </div>
           </div>
