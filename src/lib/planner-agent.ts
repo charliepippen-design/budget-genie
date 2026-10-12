@@ -2,7 +2,9 @@ import { computePlanSnapshot, useMediaPlanStore, type ChannelData } from '@/hook
 import { DEFAULT_BRIEF, generatePlan, type PlanBrief } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, getIndustryPack, type ChannelTag, type IndustryId, type Objective, type RiskProfile } from '@/lib/industries';
 import type { AIToolCall } from '@/lib/ai-client';
-import { snapshotPlanBeforeApply } from '@/lib/crash-recovery';
+import { PRE_APPLY_BACKUP_KEY, planFingerprint, snapshotPlanBeforeApply } from '@/lib/crash-recovery';
+import { selectMarketSplit } from '@/hooks/use-media-plan-store';
+import { normalizeMarketCode } from '@/lib/geo-market-data';
 import { computePlanHealth } from '@/lib/plan-health';
 import { isIgamingVertical } from '@/lib/igaming-revenue-model';
 
@@ -103,6 +105,19 @@ function mergeBrief(current: PlanBrief, args: Record<string, unknown>): PlanBrie
   }
   const markets = strArray(args.markets);
   if (markets) next.markets = markets.map(m => m.toUpperCase());
+  if (args.marketSplit && typeof args.marketSplit === 'object') {
+    const split: Record<string, number> = {};
+    for (const [code, w] of Object.entries(args.marketSplit as Record<string, unknown>)) {
+      if (typeof w === 'number' && w > 0) split[code.toUpperCase()] = w;
+    }
+    next.marketSplit = split;
+    // A split names its markets: make sure the engine targets them all.
+    next.markets = [...new Set([...next.markets, ...Object.keys(split)])];
+  } else if (markets) {
+    // New market list without a new split: weights of dropped markets must not linger.
+    const keep = new Set(next.markets.map(normalizeMarketCode));
+    next.marketSplit = Object.fromEntries(Object.entries(current.marketSplit ?? {}).filter(([c]) => keep.has(normalizeMarketCode(c))));
+  }
   if (['conservative', 'balanced', 'aggressive'].includes(args.riskProfile as string)) next.riskProfile = args.riskProfile as RiskProfile;
   const inc = strArray(args.includeChannels);
   if (inc) next.includeChannels = inc;
@@ -174,24 +189,76 @@ let snapshotTaken = false;
 /**
  * Takes the pre-apply snapshot once per batch of tool calls. The calls of one AI turn
  * run synchronously, so a single undo reverts the whole turn instead of only its last call.
+ * If the whole batch changed nothing, the earlier snapshot (if any) is put back.
  */
 function snapshotOncePerBatch() {
   if (snapshotTaken) return;
   snapshotTaken = true;
-  snapshotPlanBeforeApply();
+  const fingerprint = planFingerprint(useMediaPlanStore.getState());
+  let prior: string | null = null;
+  try {
+    prior = localStorage.getItem(PRE_APPLY_BACKUP_KEY);
+  } catch {
+    // storage unavailable
+  }
+  snapshotPlanBeforeApply(fingerprint);
   queueMicrotask(() => {
     snapshotTaken = false;
+    if (planFingerprint(useMediaPlanStore.getState()) !== fingerprint) return;
+    try {
+      if (prior === null) localStorage.removeItem(PRE_APPLY_BACKUP_KEY);
+      else localStorage.setItem(PRE_APPLY_BACKUP_KEY, prior);
+    } catch {
+      // storage unavailable
+    }
   });
+}
+
+/** The headline numbers and market split the result card compares before and after a tool call. */
+export interface PlanDiffSide {
+  totalBudget: number;
+  revenue: number | null;
+  roas: number | null;
+  markets: string[];
+  tiers: { tier1: number; tier2: number; tier3: number };
+}
+
+function diffSide(state: Store): PlanDiffSide {
+  const { blended } = computePlanSnapshot(state);
+  const split = selectMarketSplit(state);
+  return {
+    totalBudget: state.totalBudget,
+    revenue: round(blended.projectedRevenue),
+    roas: round(blended.blendedRoas, 2),
+    markets: split.markets,
+    tiers: {
+      tier1: Math.round(split.tiers.tier1),
+      tier2: Math.round(split.tiers.tier2),
+      tier3: Math.round(split.tiers.tier3),
+    },
+  };
 }
 
 export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> {
   const store = useMediaPlanStore.getState();
-  if (call.name === 'update_brief' || call.name === 'adjust_channel') snapshotOncePerBatch();
+  const mutates = call.name === 'update_brief' || call.name === 'adjust_channel';
+  if (mutates) snapshotOncePerBatch();
+  const fingerprintBefore = planFingerprint(store);
+  const before = mutates ? diffSide(store) : null;
 
+  const result = runToolCall(call, store);
+  if (!mutates || !result.ok) return result;
+
+  const after = useMediaPlanStore.getState();
+  const changed = planFingerprint(after) !== fingerprintBefore;
+  return { ...result, changed, diff: { before, after: diffSide(after) } };
+}
+
+function runToolCall(call: AIToolCall, store: Store): Record<string, unknown> {
   if (call.name === 'update_brief') {
     const brief = mergeBrief(store.brief ?? DEFAULT_BRIEF, call.args);
     const plan = generatePlan(brief);
-    store.applyGeneratedPlan(plan, { snapshot: false });
+    store.applyGeneratedPlan(plan);
     return {
       ok: true,
       brief,

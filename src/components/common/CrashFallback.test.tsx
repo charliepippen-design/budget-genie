@@ -11,6 +11,7 @@ import {
 } from '@/lib/crash-recovery';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { generatePlan } from '@/lib/plan-generator';
+import { applyPlannerToolCall } from '@/lib/planner-agent';
 
 const err = Object.assign(new Error('n is not a function'), { stack: 'stack-here' });
 const info = { message: err.message, stack: 'stack-here', componentStack: 'comp-here' };
@@ -77,7 +78,7 @@ describe('CrashFallback actions', () => {
 
   it('Undo restores the pre-apply backup', async () => {
     localStorage.setItem(PLAN_KEY, 'new-plan');
-    localStorage.setItem(PRE_APPLY_BACKUP_KEY, JSON.stringify({ savedAt: 'now', plan: 'old-plan' }));
+    localStorage.setItem(PRE_APPLY_BACKUP_KEY, JSON.stringify({ source: 'ai', savedAt: 'now', plan: 'old-plan' }));
     const assign = vi.fn();
     vi.stubGlobal('location', { ...window.location, assign, pathname: '/x' });
     const el = await mount(<CrashFallback title="T" error={err} componentStack="c" onRetry={() => undefined} />);
@@ -89,11 +90,18 @@ describe('CrashFallback actions', () => {
 });
 
 describe('pre-apply snapshot', () => {
-  it('is written before applyGeneratedPlan replaces the plan', () => {
+  it('is written, tagged as AI, before an AI tool call replaces the plan', () => {
     localStorage.setItem(PLAN_KEY, 'previous-persisted-plan');
-    useMediaPlanStore.getState().applyGeneratedPlan(generatePlan({ industry: 'igaming', monthlyBudget: 50000 }));
+    applyPlannerToolCall({ id: 'c', name: 'update_brief', args: { industry: 'igaming', monthlyBudget: 50000 } });
     const backup = JSON.parse(localStorage.getItem(PRE_APPLY_BACKUP_KEY)!);
     expect(backup.plan).toBe('previous-persisted-plan');
+    expect(backup.source).toBe('ai');
     expect(typeof backup.savedAt).toBe('string');
+  });
+
+  it('is not written by the wizard path (applyGeneratedPlan)', () => {
+    localStorage.setItem(PLAN_KEY, 'previous-persisted-plan');
+    useMediaPlanStore.getState().applyGeneratedPlan(generatePlan({ industry: 'igaming', monthlyBudget: 50000 }));
+    expect(localStorage.getItem(PRE_APPLY_BACKUP_KEY)).toBeNull();
   });
 });

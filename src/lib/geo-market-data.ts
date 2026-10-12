@@ -100,22 +100,35 @@ export function marketTier(code: string): GeoTierKey {
  * ISO country codes -> the store's geo selection.
  * All codes known: pick those countries. Otherwise weight the tiers by how many markets fall in each.
  */
-export function marketsToGeoSelection(codes: string[]): {
+export function marketsToGeoSelection(
+  codes: string[],
+  split?: Record<string, number>
+): {
   activeGeos: string[];
   activeTiers: Record<GeoTierKey, number>;
 } {
   const normalized = codes.map(normalizeMarketCode);
   if (normalized.length === 0) return { activeGeos: [], activeTiers: { tier1: 100, tier2: 0, tier3: 0 } };
 
-  const known = normalized.map((c) => TOP_IGAMING_GEOS.find((g) => g.code === c));
-  if (known.every(Boolean)) {
-    return { activeGeos: known.map((g) => g!.name), activeTiers: { ...TIER_DEFAULTS } };
-  }
+  // The engine averages selected geos equally, so an explicit weighted split
+  // (e.g. UK 40 / CA 35 / DE 25) can only be expressed through the tier mix.
+  const normalizedSplit: Record<string, number> = {};
+  Object.entries(split ?? {}).forEach(([code, w]) => {
+    if (typeof w === 'number' && w > 0) normalizedSplit[normalizeMarketCode(code)] = w;
+  });
+  const weights = normalized.map((c) => normalizedSplit[c] ?? 0);
+  const weightSum = weights.reduce((a, b) => a + b, 0);
+  const weighted = weightSum > 0;
 
   const counts: Record<GeoTierKey, number> = { tier1: 0, tier2: 0, tier3: 0 };
-  normalized.forEach((c) => (counts[marketTier(c)] += 1));
-  const toPct = (n: number) => Math.round((n / normalized.length) * 100);
-  return { activeGeos: [], activeTiers: { tier1: toPct(counts.tier1), tier2: toPct(counts.tier2), tier3: toPct(counts.tier3) } };
+  normalized.forEach((c, i) => (counts[marketTier(c)] += weighted ? weights[i] : 1));
+  const total = weighted ? weightSum : normalized.length;
+  const toPct = (n: number) => Math.round((n / total) * 100);
+  const activeTiers = { tier1: toPct(counts.tier1), tier2: toPct(counts.tier2), tier3: toPct(counts.tier3) };
+
+  const known = normalized.map((c) => TOP_IGAMING_GEOS.find((g) => g.code === c));
+  if (!weighted && known.every(Boolean)) return { activeGeos: known.map((g) => g!.name), activeTiers };
+  return { activeGeos: [], activeTiers };
 }
 
 export interface OnboardingMarket {

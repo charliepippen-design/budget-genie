@@ -6,10 +6,11 @@ import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
-import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
+import { applyPlannerToolCall, buildPlannerContext, summarizePlan, type PlanDiffSide } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
 import { UndoAiChangeButton } from './UndoAiChangeButton';
+import { PlanDiff } from './PlanDiff';
 
 // Conversational planner: the user describes the business, the AI fills the brief,
 // the engine builds the plan and the dashboard updates live.
@@ -116,6 +117,7 @@ export function ToolCard({ name, response }: { name: string; response: Record<st
   }
   const plan = response.plan as ReturnType<typeof summarizePlan> | undefined;
   if (!plan || !Array.isArray(plan.channels)) return null;
+  const diff = (response.diff as { before: PlanDiffSide; after: PlanDiffSide } | undefined) ?? null;
   const listed = [...plan.channels]
     .filter(c => c.active && (c.spend ?? 0) > 0)
     .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0));
@@ -125,8 +127,9 @@ export function ToolCard({ name, response }: { name: string; response: Record<st
     <div className="mx-2 rounded-lg border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs text-slate-300">
       <div className="flex items-center gap-2 font-semibold text-indigo-200 mb-1">
         <Sparkles className="h-3.5 w-3.5" />
-        {name === 'update_brief' ? 'Plan rebuilt' : 'Plan adjusted'}
+        {response.changed === false ? 'No changes applied' : name === 'update_brief' ? 'Plan rebuilt' : 'Plan adjusted'}
       </div>
+      {diff && <PlanDiff before={diff.before} after={diff.after} />}
       <div className="grid grid-cols-3 gap-2">
         <div><div className="text-slate-500">Budget</div>{money(plan.totalBudget)}</div>
         <div><div className="text-slate-500">Channels</div>{plan.channels.filter(c => c.active).length}</div>
