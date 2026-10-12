@@ -19,6 +19,7 @@ import { checkReply } from "./_reply-check.js";
 import { collectNumberSources, findUnsourcedNumbers, NUMBER_GUARD_NOTE } from "./_number-guard.js";
 import { detectLang } from "./_language.js";
 import { mentionsRegulation, REGULATORY_DISCLAIMER } from "./_regulatory.js";
+import { stripFieldNames } from "./_reply-clean.js";
 
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 6000;
@@ -34,6 +35,15 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // ---------- Gemini ----------
+const THINKING_LEVELS = ["minimal", "low", "medium", "high"];
+
+/** thinkingConfig for a task from its env var. Default low; "default" sends nothing. */
+function thinkingConfig(name: string): { thinkingConfig?: { thinkingLevel: string } } {
+  const v = (env(name) || "low").trim().toLowerCase();
+  if (v === "default") return {};
+  return { thinkingConfig: { thinkingLevel: THINKING_LEVELS.includes(v) ? v : "low" } };
+}
+
 async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
@@ -46,11 +56,13 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
     if (isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
     attempted++;
     for (let attempt = 0; attempt < 2; attempt++) {
+      const startedAt = Date.now();
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
         method: "POST",
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify(body),
       });
+      console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt });
       if (res.ok) {
         const data = await res.json();
         return { parts: data?.candidates?.[0]?.content?.parts ?? [] };
@@ -186,7 +198,7 @@ HOW TO WORK
    If a tool result contains "note" or "warnings", tell the user plainly (e.g. a share that could not be reached,
    a target CPA that is not achievable, budget held back because channels would saturate).
 5. After a tool result, explain the plan in 3-6 short lines: the top allocations, why, and one trade-off or risk. Mention channels that were skipped only when relevant.
-   Lead with profitability using PLAN STATE.profitability: if losesMoney is true, the first sentence says the plan loses money per month, with monthlyContribution and the break-even cost per customer (breakEvenCpa) versus the current one (blendedCpa), before any ROAS or gross value. Never present ROAS or gross value as a positive result when losesMoney is true. These numbers are engine-computed: quote them, never compute new ones.
+   Lead with profitability using PLAN STATE.profitability: if losesMoney is true, the first sentence says the plan loses money per month, with the monthly contribution and the break-even cost per customer versus the current blended cost per customer, before any ROAS or gross value. Never present ROAS or gross value as a positive result when losesMoney is true. Never write field or key names from PLAN STATE in replies; use plain words. These numbers are engine-computed: quote them, never compute new ones.
 
 RULES
 - Never invent metrics. Quote numbers only from PLAN STATE or tool results. Benchmarks are estimates; say so if the user relies on them.
@@ -229,12 +241,15 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
     if (route.action === "narrow") tools = PLANNER_TOOLS.filter((t) => route.tools?.includes(t.name));
   }
 
+  const planThinking = thinkingConfig("AI_PLANNER_THINKING");
   const { parts } = await callGemini({
     systemInstruction: { parts: [{ text: plannerSystemPrompt(ctx) }] },
     contents: toContents(payload.messages),
     ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
+    ...(planThinking.thinkingConfig ? { generationConfig: planThinking } : {}),
   });
   const result = splitParts(parts);
+  result.text = stripFieldNames(result.text);
 
   // Post-call checks run on final text replies only.
   if (result.text && result.toolCalls.length === 0) {
@@ -265,7 +280,7 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
 async function runJson(payload: { prompt: string }) {
   const { parts } = await callGemini({
     contents: [{ role: "user", parts: [{ text: String(payload.prompt ?? "").slice(0, MAX_PROMPT) }] }],
-    generationConfig: { responseMimeType: "application/json" },
+    generationConfig: { responseMimeType: "application/json", ...thinkingConfig("AI_JSON_THINKING") },
   });
   return splitParts(parts);
 }
