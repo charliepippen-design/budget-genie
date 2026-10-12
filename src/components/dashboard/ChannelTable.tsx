@@ -29,6 +29,7 @@ import {
 // import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL, computeRoasPair } from '@/lib/roas-pair';
 import {
   Search,
   Megaphone,
@@ -189,6 +190,8 @@ export function ChannelTable() {
   // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
   const blendedMetrics = useBlendedMetrics();
+  const onboardingVertical = useMediaPlanStore((s) => s.onboardingVertical);
+  const roasPair = computeRoasPair(blendedMetrics, onboardingVertical, globalMultipliers);
   const categoryTotals = useCategoryTotals();
   const { symbol, format: formatCurrency } = useCurrency();
   const [priceHintChannelId, setPriceHintChannelId] = useState<string | null>(null);
@@ -471,9 +474,19 @@ export function ChannelTable() {
                 </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-widest text-slate-500">Blended ROAS</p>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                  {LIFETIME_ROAS_LABEL}
+                </p>
                 <p className="text-sm font-mono text-cyan-300">
-                  {blendedMetrics.blendedRoas.toFixed(2)}x
+                  {roasPair.lifetime.toFixed(2)}x
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-widest text-slate-500">
+                  {MONTH1_ROAS_LABEL}
+                </p>
+                <p className="text-sm font-mono text-cyan-300">
+                  {roasPair.month1 === null ? 'n/a' : `${roasPair.month1.toFixed(2)}x`}
                 </p>
               </div>
               <div>

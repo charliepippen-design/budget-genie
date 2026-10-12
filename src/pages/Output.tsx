@@ -24,6 +24,8 @@ import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
+import { RoasPair } from '@/components/RoasPair';
+import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { BRAND_NAME } from '@/lib/brand';
 
@@ -57,6 +59,7 @@ const OutputContent = () => {
     projectedFtds,
     blendedCpa,
     blendedRoas,
+    roasPair,
     netPnl,
     netCohort,
     paybackMonths,
@@ -100,6 +103,7 @@ const OutputContent = () => {
     projectedFtds,
     blendedCpa,
     blendedRoas,
+    month1Roas: roasPair.month1,
     paybackMonths,
     topChannel: topChannel?.name ?? 'Unknown',
     weakestChannel: weakestChannel?.name ?? null,
@@ -242,9 +246,7 @@ const OutputContent = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.revenueLabel}</p>
                   <p className="text-2xl font-bold text-foreground mt-1">{$(projectedRevenue)}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {blendedRoas.toFixed(2)}x return on spend
-                  </p>
+                  <RoasPair pair={roasPair} className="text-xs text-muted-foreground mt-0.5" />
                 </div>
               </div>
 
@@ -322,6 +324,7 @@ const OutputContent = () => {
               totalBudget={totalBudget}
               blendedCpa={blendedCpa}
               blendedRoas={blendedRoas}
+              month1Roas={roasPair.month1}
               projectedRevenue={projectedRevenue}
               geos={activeGeos}
               revenueMetric={vc.terms.revenueMetric}
@@ -455,8 +458,9 @@ const OutputContent = () => {
               >
                 {$(netPnl)}
               </p>
+              <RoasPair pair={roasPair} className="text-xs text-muted-foreground mt-1" />
               <p className="text-xs text-muted-foreground mt-1">
-                {blendedRoas.toFixed(2)}x return on spend. Lifetime cohort net: {$(netCohort)}
+                Lifetime cohort net: {$(netCohort)}
               </p>
             </div>
           </div>
@@ -601,6 +605,9 @@ const OutputContent = () => {
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
                     {blendedRoas.toFixed(2)}x
+                    <span className="block text-[10px] font-normal text-muted-foreground">
+                      {LIFETIME_ROAS_LABEL}
+                    </span>
                   </td>
                 </tr>
               </tfoot>

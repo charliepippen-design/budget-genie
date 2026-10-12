@@ -1,8 +1,11 @@
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
+
 export interface StrategySummaryInput {
   channels: { name: string; spend: number }[];
   totalBudget: number;
   blendedCpa: number | null;
   blendedRoas: number;
+  month1Roas?: number | null;
   projectedRevenue: number;
   geos: string[];
   revenueMetric: string;
@@ -22,7 +25,9 @@ export function buildStrategySummary(input: StrategySummaryInput): string {
   parts.push(
     `This plan deploys ${format(totalBudget)} across ${ranked.length} ${
       ranked.length === 1 ? 'channel' : 'channels'
-    }, projecting ${format(projectedRevenue)} in ${input.revenueMetric.toLowerCase()} at a ${blendedRoas.toFixed(2)}x return on spend.`
+    }, projecting ${format(projectedRevenue)} in ${input.revenueMetric.toLowerCase()} at a ${blendedRoas.toFixed(2)}x ${LIFETIME_ROAS_LABEL}${
+      input.month1Roas == null ? '' : ` and ${input.month1Roas.toFixed(2)}x ${MONTH1_ROAS_LABEL}`
+    }.`
   );
 
   if (ranked.length > 0 && totalSpend > 0) {

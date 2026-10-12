@@ -48,6 +48,8 @@ import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
+import { RoasPair } from '@/components/RoasPair';
+import { formatRoasPair } from '@/lib/roas-pair';
 
 const PIE_COLORS = [
   '#6366f1',
@@ -74,6 +76,7 @@ const ReportContent = () => {
     projectedFtds,
     blendedCpa,
     blendedRoas,
+    roasPair,
     netPnl,
     netCohort,
     paybackMonths,
@@ -109,6 +112,7 @@ const ReportContent = () => {
     projectedFtds,
     blendedCpa,
     blendedRoas,
+    month1Roas: roasPair.month1,
     paybackMonths,
     topChannel: topChannel?.name ?? 'Unknown',
     weakestChannel: weakestChannel?.name ?? null,
@@ -172,6 +176,7 @@ const ReportContent = () => {
           blendedCpa,
           projectedRevenue,
           blendedRoas,
+          month1Roas: roasPair.month1,
         },
         { currencySymbol: symbol, formatCurrency: format }
       )
@@ -254,9 +259,7 @@ const ReportContent = () => {
                 <p className="text-sm">{vc.report.revenueLabel}</p>
               </div>
               <p className="text-4xl font-bold text-green-400">{$(projectedRevenue)}</p>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {blendedRoas.toFixed(2)}x return on spend
-              </p>
+              <RoasPair pair={roasPair} className="mt-2 text-xs text-muted-foreground" />
             </div>
 
             <div className="rounded-2xl border border-border bg-card p-5">
@@ -331,7 +334,7 @@ const ReportContent = () => {
             </>
           ) : (
             <div className="rounded-2xl border border-border bg-card p-6 text-foreground/90">
-              Plan is projecting {blendedRoas.toFixed(2)}x return on {$(totalSpend)} deployed.{' '}
+              Plan deploys {$(totalSpend)}: {formatRoasPair(roasPair)}.{' '}
               {topChannel ? `${topChannel.name} is your strongest channel.` : ''}
             </div>
           )}

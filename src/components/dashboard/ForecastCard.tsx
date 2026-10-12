@@ -4,9 +4,14 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { Target, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL, computeRoasPair } from '@/lib/roas-pair';
 
 export const ForecastCard = () => {
-  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = useBlendedMetrics();
+  const blended = useBlendedMetrics();
+  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = blended;
+  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
+  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
+  const roasPair = computeRoasPair(blended, vertical, multipliers);
   const {
     isBudgetDragging,
     budgetDragBaselineRevenue,
@@ -198,7 +203,7 @@ export const ForecastCard = () => {
                 isDark ? 'text-slate-500 dark:text-slate-500' : 'text-slate-600'
               )}
             >
-              Blended ROAS
+              {LIFETIME_ROAS_LABEL}
             </div>
             <div className="flex items-center gap-2">
               <div
@@ -236,6 +241,12 @@ export const ForecastCard = () => {
                   {roasDeltaPct.toFixed(1)}%
                 </span>
               ) : null}
+            </div>
+            <div
+              data-testid="roas-month1"
+              className={cn('mt-1 text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}
+            >
+              {MONTH1_ROAS_LABEL}: {roasPair.month1 === null ? 'n/a' : `${roasPair.month1.toFixed(2)}x`}
             </div>
           </div>
 
