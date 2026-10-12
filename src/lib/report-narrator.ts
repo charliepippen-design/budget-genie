@@ -1,4 +1,4 @@
-import { generateJSON } from '@/lib/ai-client';
+import { generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
 
 export interface ReportNarratorInput {
@@ -79,6 +79,8 @@ export async function generateReportNarrative(
 Return ONLY a JSON object with the fields described above.`));
     return parsed.success ? parsed.data : null;
   } catch (err) {
+    // The free-tier cap is not a failure to hide: the caller shows the upgrade message.
+    if (isFreeTierLimit(err)) throw err;
     console.error('Report narrative generation failed.', err);
     return null;
   }
