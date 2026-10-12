@@ -44,7 +44,8 @@ import {
   buildGroupSpendTotals,
   GROUP_COLORS,
 } from '@/lib/planning-insights';
-import { generateReportNarrative, ReportNarrative } from '@/lib/report-narrator';
+import { useReportNarrative } from '@/hooks/use-report-narrative';
+import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -74,6 +75,7 @@ const ReportContent = () => {
     blendedCpa,
     blendedRoas,
     netPnl,
+    netCohort,
     paybackMonths,
     scenarioEnvelope,
   } = usePlanEconomics();
@@ -100,35 +102,22 @@ const ReportContent = () => {
     [active]
   );
 
-  const [narrative, setNarrative] = useState<ReportNarrative | null>(null);
-  const [narrativeLoading, setNarrativeLoading] = useState(true);
-
-  useEffect(() => {
-    generateReportNarrative({
-      totalBudget,
-      totalSpend,
-      projectedRevenue,
-      projectedFtds,
-      blendedCpa,
-      blendedRoas,
-      paybackMonths,
-      topChannel: topChannel?.name ?? 'Unknown',
-      weakestChannel: weakestChannel?.name ?? null,
-      scenarioBase: scenarioEnvelope[1],
-      alertCount: alerts.length,
-      vertical: vc.vertical,
-      geos: activeGeos,
-      currency: code,
-    })
-      .then((result) => setNarrative(result))
-      .catch((error) => {
-        console.error('Failed to generate report narrative:', error);
-        setNarrative(null);
-      })
-      .finally(() => setNarrativeLoading(false));
-    // Intentionally mount-only.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    totalBudget,
+    totalSpend,
+    projectedRevenue,
+    projectedFtds,
+    blendedCpa,
+    blendedRoas,
+    paybackMonths,
+    topChannel: topChannel?.name ?? 'Unknown',
+    weakestChannel: weakestChannel?.name ?? null,
+    scenarioBase: scenarioEnvelope[1],
+    alertCount: alerts.length,
+    vertical: vc.vertical,
+    geos: activeGeos,
+    currency: code,
+  });
 
   const { theme, cycleTheme } = useTheme();
 
@@ -346,6 +335,9 @@ const ReportContent = () => {
               {topChannel ? `${topChannel.name} is your strongest channel.` : ''}
             </div>
           )}
+          {!narrative && (
+            <NarrativePrompt loading={narrativeLoading} error={narrativeError} onGenerate={generate} />
+          )}
         </section>
 
         <section className="space-y-4">
@@ -374,13 +366,16 @@ const ReportContent = () => {
               <div className="hidden h-full w-px bg-border md:block" />
 
               <div>
-                <p className="text-sm text-muted-foreground">Net Value (cohort value − spend)</p>
+                <p className="text-sm text-muted-foreground">Net Value per month (month 1 value − spend)</p>
                 <p
                   className={`mt-2 text-3xl font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}
                 >
                   {$(netPnl)}
                 </p>
-                <p className="mt-5 text-sm text-muted-foreground">LTV : CAC Ratio</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Lifetime cohort net: {$(netCohort)}
+                </p>
+                <p className="mt-4 text-sm text-muted-foreground">LTV : CAC Ratio</p>
                 <p
                   className={`mt-2 text-xl font-semibold ${
                     scenarioEnvelope[1].ltvToCac > 2

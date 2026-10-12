@@ -12,7 +12,10 @@ export function LossBannerView({ health }: { health: PlanHealth }) {
       className="rounded-lg border border-red-500/60 bg-red-600/15 px-4 py-3 text-sm font-medium text-red-700 dark:text-red-200"
     >
       This plan loses money at these assumptions: about {format(health.monthlyContribution)} per
-      month. Break-even cost per customer: {format(health.breakEvenCpa)} (current {current}).
+      month in month 1. Break-even cost per customer: {format(health.breakEvenCpa)} (current{' '}
+      {current}).
+      {health.cohortNetValue !== undefined &&
+        ` Over the customers' lifetime the cohort nets ${format(health.cohortNetValue)}.`}
     </div>
   );
 }

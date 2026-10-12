@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useUser, useAuth } from '@clerk/clerk-react';
 import { Button } from '@/components/ui/button';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
@@ -19,12 +19,11 @@ export default function Landing() {
   }, [isLoaded, isSignedIn, hasActivePayment, navigate]);
 
   const handleEnter = () => {
-    if (isSignedIn && hasActivePayment) {
+    // Free tier: every signed-in user goes to the app (AI usage is capped server-side).
+    if (isSignedIn) {
       navigate('/app');
-    } else if (isSignedIn) {
-      navigate('/pricing');
     } else {
-      navigate('/auth');
+      navigate('/sign-up');
     }
   };
 
@@ -80,6 +79,14 @@ export default function Landing() {
         >
           Enter Budget Genie →
         </Button>
+        {isLoaded && !isSignedIn && (
+          <p className="mt-4 text-white/80 text-sm">
+            Already have an account?{' '}
+            <Link to="/auth" className="font-semibold underline">
+              Sign in
+            </Link>
+          </p>
+        )}
 
         {/* Footer text */}
         <p className="mt-8 text-white/70 text-sm">
