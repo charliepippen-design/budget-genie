@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -16,13 +16,13 @@ if (!supabaseAnonKey || supabaseAnonKey === 'placeholder-key') {
   );
 }
 
-// Create a single supabase client for interacting with your database
-export const supabase = createClient(
-  supabaseUrl || 'https://placeholder-url.supabase.co',
-  supabaseAnonKey || 'placeholder-key'
-);
-
+// Create ONE supabase client. Two createClient() calls in the same page made two GoTrueClient
+// instances share the same storage key ("Multiple GoTrueClient instances detected" warning and
+// undefined behaviour). typedSupabase is the same instance with the Database types applied.
+// Legacy: the product does not use Supabase auth/data today (see README); kept for use-store-sync/use-auto-save.
 export const typedSupabase = createClient<Database>(
   supabaseUrl || 'https://placeholder-url.supabase.co',
   supabaseAnonKey || 'placeholder-key'
 );
+
+export const supabase = typedSupabase as unknown as SupabaseClient;
