@@ -340,6 +340,31 @@ function createTypeConfigFromLegacy(ch: (typeof BASE_CHANNELS_DATA)[0]): Channel
   };
 }
 
+// Fills the fields a pre-v2 channel may lack, keeping everything the user saved.
+function upgradeLegacyChannel(raw: Partial<ChannelData>): ChannelData {
+  const name = raw.name ?? 'Unnamed Channel';
+  const family = raw.family ?? inferChannelFamily(name);
+  const buyingModel = raw.buyingModel ?? inferBuyingModel(name, family);
+  return {
+    ...raw,
+    id: raw.id ?? crypto.randomUUID(),
+    name,
+    category: raw.category ?? ('Other' as ChannelCategory),
+    allocationPct: raw.allocationPct ?? 0,
+    family,
+    buyingModel,
+    typeConfig: raw.typeConfig ?? {
+      family,
+      buyingModel,
+      price: 5,
+      baselineMetrics: { ctr: 1, conversionRate: 2.5, saturationCeiling: 50000 },
+    },
+    tier: raw.tier ?? (buyingModel === 'RETAINER' || buyingModel === 'FLAT_FEE' ? 'fixed' : 'scalable'),
+    locked: raw.locked ?? false,
+    isActive: raw.isActive ?? true,
+  };
+}
+
 function createInitialChannels(): ChannelData[] {
   const totalBaseSpend = BASE_CHANNELS_DATA.reduce((sum, ch) => sum + ch.baseSpend, 0);
 
@@ -1284,82 +1309,65 @@ export const useMediaPlanStore = create<MediaPlanState>()(
         };
       },
       migrate: (persistedState: unknown, version) => {
-        const safeState = (persistedState ?? {}) as Partial<MediaPlanState> & {
-          channels?: Array<Partial<ChannelData>>;
-        };
-        const withRevenueModelDefaults = (state: Partial<MediaPlanState>) => ({
+        // Steps cascade: each upgrades the state and falls through to the next, so a save from any
+        // older version ends up with every field a v9 state needs. User data is never reset.
+        let state = { ...((persistedState ?? {}) as Partial<MediaPlanState>) };
+
+        if (version < 2) {
+          // v1 used an older channel shape: keep the user's data and fill in what is missing.
+          state = {
+            ...state,
+            totalBudget:
+              typeof state.totalBudget === 'number' && Number.isFinite(state.totalBudget)
+                ? state.totalBudget
+                : 50000,
+            channels:
+              Array.isArray(state.channels) && state.channels.length > 0
+                ? state.channels.map(upgradeLegacyChannel)
+                : createInitialChannels(),
+            presets: Array.isArray(state.presets) ? state.presets : [],
+          };
+        }
+        if (version < 3) {
+          // isActive flag
+          state = {
+            ...state,
+            channels: (state.channels ?? []).map((ch) => ({ ...ch, isActive: ch.isActive ?? true })),
+          };
+        }
+        if (version < 4) {
+          state = {
+            ...state,
+            activeTiers: { ...TIER_DEFAULTS, ...(state.activeTiers ?? {}) },
+            activeGeos: state.activeGeos ?? [],
+          };
+        }
+        if (version < 5) {
+          state = { ...state, subscriptionTier: state.subscriptionTier ?? 'free' };
+        }
+        if (version < 6) {
+          state = { ...state, userStatus: state.userStatus ?? 'demo' };
+        }
+        if (version < 7) {
+          state = {
+            ...state,
+            geoOverrides: state.geoOverrides ?? {},
+            observedLtv: state.observedLtv ?? { m1: null, m3: null, m6: null },
+          };
+        }
+        if (version < 8) {
+          state = { ...state, onboardingVertical: state.onboardingVertical ?? null };
+        }
+
+        // Current version (also applied to v9 saves, as before): revenue model defaults, subvertical.
+        return {
           ...state,
           globalMultipliers: {
             ...DEFAULT_MULTIPLIERS,
             ...(state.globalMultipliers ?? {}),
           },
           onboardingSubvertical: state.onboardingSubvertical ?? null,
-        });
-
-        if (version < 2) {
-          // Hard reset for version 2 (Types totally changed)
-          return withRevenueModelDefaults({
-            totalBudget: 50000,
-            channels: createInitialChannels(),
-            globalMultipliers: { ...DEFAULT_MULTIPLIERS },
-            presets: [],
-          }) as unknown as MediaPlanState;
-        }
-        // Migration to v3 for isActive
-        if (version < 3) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            channels: (safeState.channels ?? []).map((ch) => ({
-              ...ch,
-              isActive: ch.isActive ?? true,
-            })),
-            activeTiers: { ...TIER_DEFAULTS },
-            activeGeos: [],
-          }) as MediaPlanState;
-        }
-        if (version < 4) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            activeTiers: {
-              ...TIER_DEFAULTS,
-              ...(safeState as Partial<MediaPlanState>).activeTiers,
-            },
-            activeGeos: (safeState as Partial<MediaPlanState>).activeGeos ?? [],
-            subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
-            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          }) as MediaPlanState;
-        }
-        if (version < 5) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            subscriptionTier: (safeState as Partial<MediaPlanState>).subscriptionTier ?? 'free',
-            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          }) as MediaPlanState;
-        }
-        if (version < 6) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            userStatus: (safeState as Partial<MediaPlanState>).userStatus ?? 'demo',
-          }) as MediaPlanState;
-        }
-        if (version < 7) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            geoOverrides: (safeState as Partial<MediaPlanState>).geoOverrides ?? {},
-            observedLtv: (safeState as Partial<MediaPlanState>).observedLtv ?? {
-              m1: null,
-              m3: null,
-              m6: null,
-            },
-          }) as MediaPlanState;
-        }
-        if (version < 8) {
-          return withRevenueModelDefaults({
-            ...safeState,
-            onboardingVertical: (safeState as Partial<MediaPlanState>).onboardingVertical ?? null,
-          }) as MediaPlanState;
-        }
-        return withRevenueModelDefaults(safeState) as MediaPlanState;
+        } as MediaPlanState;
       },
     }
   )

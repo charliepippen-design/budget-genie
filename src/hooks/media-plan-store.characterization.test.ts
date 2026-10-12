@@ -127,25 +127,27 @@ describe('merge', () => {
 });
 
 describe('migrate', () => {
-  it('v1 hard-resets to defaults and drops saved data', () => {
+  // Since the migration fix (#25) every step runs in order, so old saves end with all v9 fields.
+  const LATER_FIELDS = {
+    subscriptionTier: 'free',
+    userStatus: 'demo',
+    geoOverrides: {},
+    observedLtv: { m1: null, m3: null, m6: null },
+    onboardingVertical: null,
+  };
+
+  it('v1 keeps the saved budget, presets and channels and runs every later step', () => {
     const out = migrate(fixture({ projectName: 'keep?' }), 1);
-    const initial = useMediaPlanStore.getInitialState();
-    expect(out.totalBudget).toBe(50000);
-    expect(out.presets).toEqual([]);
+    expect(out.totalBudget).toBe(12345);
+    expect(out.presets).toEqual(fixture().presets);
+    expect((out.channels as Array<{ id: string; isActive: boolean }>)[0]).toMatchObject({ id: legacyChannel.id, isActive: true });
+    expect(out.activeTiers).toEqual(TIER_DEFAULTS);
+    expect(out.activeGeos).toEqual([]);
+    expect(out).toMatchObject(LATER_FIELDS);
     expect(out.onboardingSubvertical).toBeNull();
-    expect(out.projectName).toBeUndefined();
-    expect(out.channels).toEqual(initial.channels);
-    expect(out.globalMultipliers).toEqual(initial.globalMultipliers);
-    expect(Object.keys(out).sort()).toEqual([
-      'channels',
-      'globalMultipliers',
-      'onboardingSubvertical',
-      'presets',
-      'totalBudget',
-    ]);
   });
 
-  it('v2 backfills isActive, tiers and geos, then returns early', () => {
+  it('v2 backfills isActive, tiers and geos, then every later step', () => {
     const out = migrate(fixture(), 2);
     expect(out.totalBudget).toBe(12345);
     expect(out.channels).toEqual([{ ...legacyChannel, isActive: true }]);
@@ -153,10 +155,7 @@ describe('migrate', () => {
     expect(out.activeGeos).toEqual([]);
     expect((out.globalMultipliers as GlobalMultipliers).spendMultiplier).toBe(1.5);
     expect(out.onboardingSubvertical).toBeNull();
-    // Early-return quirk: later blocks never run.
-    for (const key of ['subscriptionTier', 'userStatus', 'geoOverrides', 'observedLtv', 'onboardingVertical']) {
-      expect(out[key]).toBeUndefined();
-    }
+    expect(out).toMatchObject(LATER_FIELDS);
   });
 
   it('v2 keeps an existing isActive=false', () => {
@@ -164,16 +163,12 @@ describe('migrate', () => {
     expect(out.channels).toEqual([{ ...legacyChannel, isActive: false }]);
   });
 
-  it('v3 backfills tiers, geos, subscriptionTier, userStatus and returns early', () => {
+  it('v3 backfills tiers, geos, subscriptionTier, userStatus and the later fields', () => {
     const out = migrate(fixture({ activeTiers: { tier1: 10, tier2: 10, tier3: 80 } }), 3);
     expect(out.activeTiers).toEqual({ tier1: 10, tier2: 10, tier3: 80 });
     expect(out.activeGeos).toEqual([]);
-    expect(out.subscriptionTier).toBe('free');
-    expect(out.userStatus).toBe('demo');
     expect(out.channels).toEqual([legacyChannel]);
-    for (const key of ['geoOverrides', 'observedLtv', 'onboardingVertical']) {
-      expect(out[key]).toBeUndefined();
-    }
+    expect(out).toMatchObject(LATER_FIELDS);
   });
 
   it('v3 fills missing tier keys from defaults', () => {
@@ -181,31 +176,25 @@ describe('migrate', () => {
     expect(out.activeTiers).toEqual({ ...TIER_DEFAULTS, tier1: 99 });
   });
 
-  it('v4 backfills subscriptionTier and userStatus only', () => {
+  it('v4 keeps an existing subscriptionTier and backfills the later fields', () => {
     const out = migrate(fixture({ subscriptionTier: 'pro' }), 4);
-    expect(out.subscriptionTier).toBe('pro');
-    expect(out.userStatus).toBe('demo');
+    expect(out).toMatchObject({ ...LATER_FIELDS, subscriptionTier: 'pro' });
     expect(out.activeTiers).toBeUndefined();
-    expect(out.geoOverrides).toBeUndefined();
-    expect(out.observedLtv).toBeUndefined();
-    expect(out.onboardingVertical).toBeUndefined();
   });
 
-  it('v5 backfills userStatus only', () => {
+  it('v5 backfills userStatus and the later fields', () => {
     const out = migrate(fixture(), 5);
     expect(out.userStatus).toBe('demo');
     expect(out.subscriptionTier).toBeUndefined();
-    expect(out.geoOverrides).toBeUndefined();
-    expect(out.observedLtv).toBeUndefined();
-    expect(out.onboardingVertical).toBeUndefined();
+    expect(out).toMatchObject({ geoOverrides: {}, observedLtv: { m1: null, m3: null, m6: null }, onboardingVertical: null });
   });
 
-  it('v6 backfills geoOverrides and observedLtv only', () => {
+  it('v6 backfills geoOverrides, observedLtv and onboardingVertical', () => {
     const out = migrate(fixture(), 6);
     expect(out.geoOverrides).toEqual({});
     expect(out.observedLtv).toEqual({ m1: null, m3: null, m6: null });
+    expect(out.onboardingVertical).toBeNull();
     expect(out.userStatus).toBeUndefined();
-    expect(out.onboardingVertical).toBeUndefined();
   });
 
   it('v7 backfills onboardingVertical only', () => {
@@ -247,11 +236,18 @@ describe('migrate', () => {
     const shape = (v: number) => Object.keys(migrate(fixture(), v)).sort();
     expect(shape(1)).toMatchInlineSnapshot(`
       [
+        "activeGeos",
+        "activeTiers",
         "channels",
+        "geoOverrides",
         "globalMultipliers",
+        "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
+        "subscriptionTier",
         "totalBudget",
+        "userStatus",
       ]
     `);
     expect(shape(2)).toMatchInlineSnapshot(`
@@ -259,10 +255,15 @@ describe('migrate', () => {
         "activeGeos",
         "activeTiers",
         "channels",
+        "geoOverrides",
         "globalMultipliers",
+        "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
+        "subscriptionTier",
         "totalBudget",
+        "userStatus",
       ]
     `);
     expect(shape(3)).toMatchInlineSnapshot(`
@@ -270,8 +271,11 @@ describe('migrate', () => {
         "activeGeos",
         "activeTiers",
         "channels",
+        "geoOverrides",
         "globalMultipliers",
+        "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
         "subscriptionTier",
         "totalBudget",
@@ -281,8 +285,11 @@ describe('migrate', () => {
     expect(shape(4)).toMatchInlineSnapshot(`
       [
         "channels",
+        "geoOverrides",
         "globalMultipliers",
+        "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
         "subscriptionTier",
         "totalBudget",
@@ -292,8 +299,11 @@ describe('migrate', () => {
     expect(shape(5)).toMatchInlineSnapshot(`
       [
         "channels",
+        "geoOverrides",
         "globalMultipliers",
+        "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
         "totalBudget",
         "userStatus",
@@ -306,6 +316,7 @@ describe('migrate', () => {
         "globalMultipliers",
         "observedLtv",
         "onboardingSubvertical",
+        "onboardingVertical",
         "presets",
         "totalBudget",
       ]

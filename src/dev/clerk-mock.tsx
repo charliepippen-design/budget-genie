@@ -28,7 +28,15 @@ const user = mockFreeUser
       reload: async () => undefined,
     };
 
-export const ClerkProvider = ({ children }: { children: ReactNode; publishableKey?: string }) => <>{children}</>;
+type MockProviderProps = {
+  children: ReactNode;
+  publishableKey?: string;
+  routerPush?: (to: string) => unknown;
+  routerReplace?: (to: string) => unknown;
+  signInUrl?: string;
+  signUpUrl?: string;
+};
+export const ClerkProvider = ({ children }: MockProviderProps) => <>{children}</>;
 
 export const useAuth = () => ({
   isLoaded: true,
@@ -46,8 +54,21 @@ export const useClerk = () => ({
   openUserProfile: () => undefined,
 });
 
-export const SignIn = () => <div data-qa="mock-sign-in">Mock sign-in (QA mode)</div>;
-export const SignUp = SignIn;
+type MockAuthProps = {
+  routing?: string;
+  path?: string;
+  signInUrl?: string;
+  signUpUrl?: string;
+  fallbackRedirectUrl?: string;
+};
+export const SignIn = (props: MockAuthProps) => {
+  void props;
+  return <div data-qa="mock-sign-in">Mock sign-in (QA mode)</div>;
+};
+export const SignUp = (props: MockAuthProps) => {
+  void props;
+  return <div data-qa="mock-sign-in">Mock sign-up (QA mode)</div>;
+};
 export const SignedIn = ({ children }: { children: ReactNode }) => <>{children}</>;
 export const SignedOut = () => null;
 export const UserButton = () => <div data-qa="mock-user-button">QA</div>;
