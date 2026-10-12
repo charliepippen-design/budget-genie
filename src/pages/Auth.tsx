@@ -1,8 +1,9 @@
 
-import { SignIn } from '@clerk/clerk-react';
+import { SignIn, SignUp } from '@clerk/clerk-react';
 import { DollarSign, ShieldCheck } from "lucide-react";
+import { AFTER_AUTH_URL, SIGN_IN_PATH, SIGN_UP_PATH } from '@/lib/auth-routes';
 
-export default function Auth() {
+export default function Auth({ mode = 'sign-in' }: { mode?: 'sign-in' | 'sign-up' }) {
     return (
         <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
             <div className="w-full max-w-md bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
@@ -15,13 +16,27 @@ export default function Auth() {
                         MediaPlanner <span className="text-blue-500">Pro</span>
                     </h1>
                     <p className="text-slate-400 text-sm">
-                        Please sign in to access your media plans
+                        {mode === 'sign-up' ? 'Create your account to start planning' : 'Please sign in to access your media plans'}
                     </p>
                 </div>
 
                 {/* Clerk SignIn */}
                 <div className="p-8">
-                    <SignIn />
+                    {mode === 'sign-up' ? (
+                        <SignUp
+                            routing="path"
+                            path={SIGN_UP_PATH}
+                            signInUrl={SIGN_IN_PATH}
+                            fallbackRedirectUrl={AFTER_AUTH_URL}
+                        />
+                    ) : (
+                        <SignIn
+                            routing="path"
+                            path={SIGN_IN_PATH}
+                            signUpUrl={SIGN_UP_PATH}
+                            fallbackRedirectUrl={AFTER_AUTH_URL}
+                        />
+                    )}
                 </div>
 
                 <div className="mt-6 text-center pb-8">

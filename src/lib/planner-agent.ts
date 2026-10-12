@@ -3,6 +3,8 @@ import { DEFAULT_BRIEF, generatePlan, type PlanBrief } from '@/lib/plan-generato
 import { INDUSTRY_PACKS, getIndustryPack, type ChannelTag, type IndustryId, type Objective, type RiskProfile } from '@/lib/industries';
 import type { AIToolCall } from '@/lib/ai-client';
 import { snapshotPlanBeforeApply } from '@/lib/crash-recovery';
+import { computePlanHealth } from '@/lib/plan-health';
+import { isIgamingVertical } from '@/lib/igaming-revenue-model';
 
 // Bridge between the AI conversation and the deterministic engine:
 // builds the context the model sees and applies the model's tool calls to the store.
@@ -16,6 +18,7 @@ const isFixed = (ch: ChannelData) => ch.tier === 'fixed' || ch.buyingModel === '
 export function summarizePlan(state: Store = useMediaPlanStore.getState()) {
   const { channels, blended: b } = computePlanSnapshot(state);
   const budget = state.totalBudget || 1;
+  const health = computePlanHealth(b, state.onboardingVertical, state.globalMultipliers);
   return {
     totalBudget: state.totalBudget,
     markets: state.activeGeos.length ? state.activeGeos : state.activeTiers,
@@ -37,6 +40,15 @@ export function summarizePlan(state: Store = useMediaPlanStore.getState()) {
       costPerConversion: round(b.blendedCpa),
       grossValue: round(b.projectedRevenue),
       roas: round(b.blendedRoas, 2),
+    },
+    // Same engine check as the dashboard LossBanner; the reply must lead with it.
+    profitability: {
+      source: 'engine' as const,
+      losesMoney: health.losesMoney,
+      monthlyContribution: round(health.monthlyContribution) ?? 0,
+      breakEvenCpa: round(health.breakEvenCpa),
+      blendedCpa: round(health.blendedCpa),
+      netValueBasis: isIgamingVertical(state.onboardingVertical) ? ('NGR' as const) : ('revenue' as const),
     },
     warnings: state.planWarnings,
   };

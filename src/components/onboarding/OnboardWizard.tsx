@@ -13,6 +13,14 @@ import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
+import {
+  BUDGET_TIERS,
+  WIZARD_MAX_BUDGET,
+  WIZARD_MIN_BUDGET,
+  defaultBudgetForTier,
+  isValidBudget,
+  parseBudgetInput,
+} from '@/lib/wizard-budget';
 import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 
 type WizardState = WizardDraft;
@@ -63,49 +71,6 @@ const GEO_GROUPS: Array<{ title: string; tier: 'tier1' | 'tier2' | 'tier3' }> = 
   { title: 'Volume Markets (Tier 2)', tier: 'tier2' },
   { title: 'Emerging Markets (Tier 3)', tier: 'tier3' },
 ];
-
-const BUDGET_TIERS = [
-  {
-    key: 'getting-started',
-    title: 'Getting Started',
-    rangeLabel: '$5,000 - $20,000',
-    helper: '/ month',
-    description: 'Test 2-3 channels and identify what works before scaling.',
-    min: 5000,
-    max: 20000,
-    midpoint: 10000,
-  },
-  {
-    key: 'growing',
-    title: 'Growing',
-    rangeLabel: '$20,000 - $75,000',
-    helper: '/ month',
-    description: 'Build a multi-channel presence with enough data to optimise.',
-    min: 20000,
-    max: 75000,
-    midpoint: 40000,
-  },
-  {
-    key: 'scaling',
-    title: 'Scaling',
-    rangeLabel: '$75,000 - $250,000',
-    helper: '/ month',
-    description: 'Compete across all key channels with serious volume.',
-    min: 75000,
-    max: 250000,
-    midpoint: 150000,
-  },
-  {
-    key: 'market-leader',
-    title: 'Market Leader',
-    rangeLabel: '$250,000+',
-    helper: '/ month',
-    description: 'Dominate your vertical with full-funnel coverage.',
-    min: 250000,
-    max: 1000000,
-    midpoint: 400000,
-  },
-] as const;
 
 function toFlagEmoji(code: string): string {
   return code
@@ -165,8 +130,7 @@ export const OnboardWizard = () => {
     [state.subvertical]
   );
 
-  const isBudgetValid =
-    typeof state.budget === 'number' && state.budget >= 5000 && state.budget <= 1000000;
+  const isBudgetValid = isValidBudget(state.budget);
 
   const goToStep = useCallback((step: WizardState['step']) => {
     setState((prev) => ({ ...prev, step }));
@@ -514,7 +478,7 @@ export const OnboardWizard = () => {
                         triggerStepOneContinueAttention();
                       }
                       setSelectedBudgetTierKey(tier.key);
-                      setState((prev) => ({ ...prev, budget: tier.midpoint }));
+                      setState((prev) => ({ ...prev, budget: defaultBudgetForTier(tier) }));
                     }}
                     onKeyDown={(event) => {
                       if (event.key === 'Enter') {
@@ -523,7 +487,7 @@ export const OnboardWizard = () => {
                           triggerStepOneContinueAttention();
                         }
                         setSelectedBudgetTierKey(tier.key);
-                        setState((prev) => ({ ...prev, budget: tier.midpoint }));
+                        setState((prev) => ({ ...prev, budget: defaultBudgetForTier(tier) }));
                       }
                     }}
                   >
@@ -541,20 +505,40 @@ export const OnboardWizard = () => {
 
             <div
               className={`overflow-hidden transition-all duration-300 ${
-                selectedBudgetTier ? 'mt-6 max-h-80 opacity-100' : 'max-h-0 opacity-0'
+                selectedBudgetTier ? 'mt-6 max-h-[32rem] opacity-100' : 'max-h-0 opacity-0'
               }`}
             >
               <div className="rounded-2xl border border-slate-700 bg-slate-900 p-6">
-                <p className="text-sm text-slate-400">Fine-tune your budget</p>
+                <p className="text-sm text-slate-400">Your exact monthly budget</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {selectedBudgetTier
+                    ? `Starting at the bottom of the ${selectedBudgetTier.title} range (${format(defaultBudgetForTier(selectedBudgetTier))}). Change it to the exact amount you plan to spend.`
+                    : ''}
+                </p>
+                <div className="relative mt-4 max-w-xs">
+                  <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                    {symbol}
+                  </span>
+                  <Input
+                    inputMode="numeric"
+                    value={typeof state.budget === 'number' ? String(state.budget) : ''}
+                    onChange={(event) => {
+                      const next = parseBudgetInput(event.target.value);
+                      setState((prev) => ({ ...prev, budget: next }));
+                    }}
+                    className="h-12 border-slate-700 bg-slate-950 pl-10 text-lg text-white"
+                    aria-label="Exact monthly budget"
+                  />
+                </div>
                 <input
                   type="range"
-                  min={selectedBudgetTier?.min ?? 5000}
-                  max={selectedBudgetTier?.max ?? 1000000}
+                  min={selectedBudgetTier?.min ?? WIZARD_MIN_BUDGET}
+                  max={selectedBudgetTier?.max ?? WIZARD_MAX_BUDGET}
                   step={5000}
                   value={
                     typeof state.budget === 'number'
                       ? state.budget
-                      : (selectedBudgetTier?.midpoint ?? 5000)
+                      : (selectedBudgetTier?.min ?? WIZARD_MIN_BUDGET)
                   }
                   onChange={(event) => {
                     const next = Number(event.target.value);
@@ -564,10 +548,13 @@ export const OnboardWizard = () => {
                   aria-label="Fine tune monthly budget"
                 />
                 <p className="mt-4 text-3xl font-bold text-indigo-400">
-                  {typeof state.budget === 'number'
-                    ? format(state.budget)
-                    : format(0)}
+                  {typeof state.budget === 'number' ? format(state.budget) : format(0)}
                 </p>
+                {!isBudgetValid ? (
+                  <p role="alert" className="mt-2 text-xs text-red-400">
+                    {`Enter a monthly budget between ${format(WIZARD_MIN_BUDGET)} and ${format(WIZARD_MAX_BUDGET)}.`}
+                  </p>
+                ) : null}
                 <p className="mt-2 text-xs text-slate-500">
                   You can adjust this at any time from the dashboard.
                 </p>
@@ -579,7 +566,7 @@ export const OnboardWizard = () => {
                 className={`bg-indigo-600 px-7 text-base hover:bg-indigo-500 ${
                   isContinueAttentionActive ? 'animate-pulse' : ''
                 }`}
-                disabled={!selectedBudgetTierKey}
+                disabled={!selectedBudgetTierKey || !isBudgetValid}
                 onClick={continueFromBudget}
               >
                 {showContinueLetsGo ? "Continue → Let's go" : 'Continue →'}
@@ -675,7 +662,7 @@ export const OnboardWizard = () => {
                       <p>Margin: {(preset.margin * 100).toFixed(1)}%</p>
                       <p>Bonus Rate: {(preset.bonusRate * 100).toFixed(1)}%</p>
                       <p>Reg to FTD CVR: {(preset.regToFtdCvr * 100).toFixed(1)}%</p>
-                      <p>Player Value: ${preset.playerValue}</p>
+                      <p>Player Value: {format(preset.playerValue)}</p>
                       <p>Retention Rate: {(preset.retentionRate * 100).toFixed(0)}%</p>
                     </div>
                   </Card>
@@ -800,6 +787,7 @@ export const OnboardWizard = () => {
                                 ? 'border-indigo-500 bg-indigo-600 text-white hover:bg-indigo-500'
                                 : 'text-slate-200 hover:bg-slate-800'
                             }`}
+                            aria-pressed={selected}
                             onClick={() => toggleGeo(geo.code)}
                           >
                             <span className="mr-2">{toFlagEmoji(geo.code)}</span>
@@ -849,6 +837,9 @@ export const OnboardWizard = () => {
             <p className="mt-3 max-w-3xl text-slate-400">
               If you have real data, enter it here. Otherwise skip and we'll use industry averages
               for your selected business type.
+            </p>
+            <p className="mt-2 text-sm text-slate-300" data-testid="wizard-budget-summary">
+              Monthly budget: {typeof state.budget === 'number' ? format(state.budget) : format(0)}
             </p>
 
             <div className="mt-10 grid gap-6 md:grid-cols-2">

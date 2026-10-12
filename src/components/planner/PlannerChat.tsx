@@ -108,7 +108,7 @@ function RichText({ text }: { text: string }) {
   );
 }
 
-function ToolCard({ name, response }: { name: string; response: Record<string, unknown> }) {
+export function ToolCard({ name, response }: { name: string; response: Record<string, unknown> }) {
   const { format } = useCurrency();
   const money = (n: unknown) => (typeof n === 'number' ? format(n) : '—');
   if (!response.ok) {
@@ -116,6 +116,11 @@ function ToolCard({ name, response }: { name: string; response: Record<string, u
   }
   const plan = response.plan as ReturnType<typeof summarizePlan> | undefined;
   if (!plan || !Array.isArray(plan.channels)) return null;
+  const listed = [...plan.channels]
+    .filter(c => c.active && (c.spend ?? 0) > 0)
+    .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0));
+  const totalShare = Math.round(listed.reduce((t, c) => t + (c.sharePct ?? 0), 0) * 10) / 10;
+  const totalSpend = typeof plan.blended?.spend === 'number' ? plan.blended.spend : listed.reduce((t, c) => t + (c.spend ?? 0), 0);
   return (
     <div className="mx-2 rounded-lg border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs text-slate-300">
       <div className="flex items-center gap-2 font-semibold text-indigo-200 mb-1">
@@ -129,16 +134,16 @@ function ToolCard({ name, response }: { name: string; response: Record<string, u
       </div>
       {/* Numbers come straight from the engine, so the chat can never misquote them. */}
       <div className="mt-2 space-y-0.5">
-        {[...plan.channels]
-          .filter(c => c.active && (c.spend ?? 0) > 0)
-          .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0))
-          .slice(0, 5)
-          .map(c => (
-            <div key={c.id} className="flex justify-between gap-2">
-              <span className="truncate">{c.locked ? '🔒 ' : ''}{c.name}</span>
-              <span className="shrink-0 tabular-nums">{c.sharePct}% · {money(c.spend)}</span>
-            </div>
-          ))}
+        {listed.map(c => (
+          <div key={c.id} className="flex justify-between gap-2">
+            <span className="truncate">{c.locked ? '🔒 ' : ''}{c.name}</span>
+            <span className="shrink-0 tabular-nums">{c.sharePct}% · {money(c.spend)}</span>
+          </div>
+        ))}
+        <div className="flex justify-between gap-2 border-t border-indigo-500/30 pt-0.5 font-semibold text-slate-200">
+          <span>Total</span>
+          <span className="shrink-0 tabular-nums">{totalShare}% · {money(totalSpend)}</span>
+        </div>
       </div>
       {typeof response.note === 'string' && <div className="mt-2 text-amber-500">{response.note}</div>}
       {Array.isArray((response as { warnings?: unknown }).warnings) &&
