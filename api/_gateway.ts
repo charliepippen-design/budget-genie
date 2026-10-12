@@ -18,6 +18,7 @@ import { routeMessage } from "./_decision-router.js";
 import { checkReply } from "./_reply-check.js";
 import { collectNumberSources, findUnsourcedNumbers, NUMBER_GUARD_NOTE } from "./_number-guard.js";
 import { detectLang } from "./_language.js";
+import { mentionsRegulation, REGULATORY_DISCLAIMER } from "./_regulatory.js";
 
 const MAX_MESSAGES = 60;
 const MAX_TEXT = 6000;
@@ -191,6 +192,9 @@ RULES
 - Never invent metrics. Quote numbers only from PLAN STATE or tool results. Benchmarks are estimates; say so if the user relies on them.
 - Use only channel keys from CHANNEL CATALOG and ids from PLAN STATE.
 - Flag compliance issues from COMPLIANCE NOTES when they matter.
+- Never state specific regulatory facts (licence requirements, approvals, restrictions, fees, dates, regulator rulings) unless they appear in COMPLIANCE NOTES; otherwise tell the user to check with the regulator.
+- Name regulators only as places to check, never as sources of claims.
+- Never present compliance information as legal advice.
 - Reply in the user's language. Be concise, plain words, no jargon without explanation.
 
 INDUSTRIES: ${JSON.stringify(ctx.industries ?? [])}
@@ -249,6 +253,8 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
       const check = await checkReply(decisions, { userMessage: userText, reply: result.text, industry: brief?.industry });
       if (check.appendNotice) result.text += `\n\n${check.appendNotice}`;
     }
+    const disclaimer = REGULATORY_DISCLAIMER[detectLang(userText)];
+    if (mentionsRegulation(result.text) && !result.text.includes(disclaimer)) result.text += `\n\n${disclaimer}`;
   }
   return result;
 }
