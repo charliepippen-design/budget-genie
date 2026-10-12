@@ -9,6 +9,7 @@ import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
+import { UndoAiChangeButton } from './UndoAiChangeButton';
 
 // Conversational planner: the user describes the business, the AI fills the brief,
 // the engine builds the plan and the dashboard updates live.
@@ -259,6 +260,8 @@ export function PlannerChat() {
           <X className="h-4 w-4" />
         </Button>
       </header>
+
+      <UndoAiChangeButton />
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
         <div className="rounded-2xl rounded-tl-none border border-slate-700 bg-slate-800 p-3 text-slate-200">
