@@ -21,7 +21,6 @@ export default tseslint.config(
       ...reactHooks.configs.recommended.rules,
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
-<<<<<<< HEAD
       "no-restricted-syntax": [
         "error",
         {
@@ -36,16 +35,11 @@ export default tseslint.config(
           message:
             "Do not use an expression-bodied arrow in React.useEffect/useLayoutEffect: its value is used as the cleanup. Chrome 150+ scroll APIs (scrollIntoView, scrollTo) return a Promise, which React then calls and crashes with 'n is not a function'. Use a block body: React.useEffect(() => { ... }, []).",
         },
-      ],
-=======
-      // Money goes through formatMoney (CurrencyContext) so one plan currency shows everywhere.
-      "no-restricted-syntax": [
-        "error",
+        // Money goes through formatMoney (CurrencyContext) so one plan currency shows everywhere.
         {
           selector: "Property[key.name='style'][value.value='currency']",
           message: "Format money with formatMoney() from @/contexts/CurrencyContext, not Intl style: 'currency'.",
->>>>>>> 3e4bb74 (One plan currency: all money via formatMoney, AI told the plan currency, lint rule against ad-hoc currency formatting (N-3))
-    },
+        },
       ],
     },
   },
