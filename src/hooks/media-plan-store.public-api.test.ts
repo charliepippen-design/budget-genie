@@ -88,6 +88,7 @@ describe('use-media-plan-store public API', () => {
       'computePoolAwareSpend',
       'getGeoMarketProfile',
       'getSpendSharePct',
+      'selectMarketSplit',
       'useBlendedMetrics',
       'useCategoryTotals',
       'useChannelsWithMetrics',

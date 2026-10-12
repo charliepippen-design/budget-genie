@@ -566,7 +566,8 @@ export interface MediaPlanState {
   brief: PlanBrief | null;
   planRationale: ChannelRationale[];
   planWarnings: string[];
-  applyGeneratedPlan: (plan: GeneratedPlan) => void;
+  /** `snapshot: false` when the caller already took the pre-apply snapshot for this change. */
+  applyGeneratedPlan: (plan: GeneratedPlan, options?: { snapshot?: boolean }) => void;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
@@ -664,9 +665,9 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       planRationale: [],
       planWarnings: [],
 
-      applyGeneratedPlan: (plan) => {
+      applyGeneratedPlan: (plan, options) => {
         // Keep the previous plan so a crash screen can offer "Undo last AI plan change".
-        snapshotPlanBeforeApply();
+        if (options?.snapshot !== false) snapshotPlanBeforeApply();
         set((state) => ({
           brief: plan.brief,
           totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, plan.totalBudget)),
@@ -674,6 +675,13 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           globalMultipliers: { ...state.globalMultipliers, ...plan.multipliers },
           activeGeos: plan.geo.activeGeos,
           activeTiers: { ...plan.geo.activeTiers },
+          // Overrides belong to the old markets and ghost/drag values to the old budget:
+          // left behind they skew or dim the new headline numbers.
+          geoOverrides: {},
+          isBudgetDragging: false,
+          budgetDragBaselineRevenue: null,
+          budgetDragBaselineRoas: null,
+          ghostProjectedRevenue: null,
           onboardingVertical: industryToVertical(plan.brief.industry),
           planRationale: plan.rationale,
           planWarnings: plan.warnings,
@@ -1506,6 +1514,25 @@ export function useChannelsWithMetrics(): ChannelWithMetrics[] {
 
 export function useBlendedMetrics(): BlendedMetrics {
   return usePlanSnapshot().blended;
+}
+
+export interface MarketSplit {
+  /** Markets the plan targets: the brief's countries, else the selected geo names. */
+  markets: string[];
+  tiers: Record<GeoTierKey, number>;
+}
+
+/**
+ * What the dashboard shows for "where is the money going". Countries outside the
+ * iGaming geo list are folded into tiers (activeGeos stays empty), so the brief
+ * is the source for the market names.
+ */
+export function selectMarketSplit(state: Pick<MediaPlanState, 'brief' | 'activeGeos' | 'activeTiers'>): MarketSplit {
+  const fromBrief = state.brief?.markets ?? [];
+  return {
+    markets: fromBrief.length > 0 ? [...fromBrief] : [...state.activeGeos],
+    tiers: { ...state.activeTiers },
+  };
 }
 
 export function useGeoMarketProfile(): GeoMarketProfile {

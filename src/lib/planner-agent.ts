@@ -2,6 +2,7 @@ import { computePlanSnapshot, useMediaPlanStore, type ChannelData } from '@/hook
 import { DEFAULT_BRIEF, generatePlan, type PlanBrief } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, getIndustryPack, type ChannelTag, type IndustryId, type Objective, type RiskProfile } from '@/lib/industries';
 import type { AIToolCall } from '@/lib/ai-client';
+import { snapshotPlanBeforeApply } from '@/lib/crash-recovery';
 
 // Bridge between the AI conversation and the deterministic engine:
 // builds the context the model sees and applies the model's tool calls to the store.
@@ -156,13 +157,29 @@ function rememberAdjustment(channelId: string, action: string) {
   useMediaPlanStore.setState({ brief: next });
 }
 
+let snapshotTaken = false;
+
+/**
+ * Takes the pre-apply snapshot once per batch of tool calls. The calls of one AI turn
+ * run synchronously, so a single undo reverts the whole turn instead of only its last call.
+ */
+function snapshotOncePerBatch() {
+  if (snapshotTaken) return;
+  snapshotTaken = true;
+  snapshotPlanBeforeApply();
+  queueMicrotask(() => {
+    snapshotTaken = false;
+  });
+}
+
 export function applyPlannerToolCall(call: AIToolCall): Record<string, unknown> {
   const store = useMediaPlanStore.getState();
+  if (call.name === 'update_brief' || call.name === 'adjust_channel') snapshotOncePerBatch();
 
   if (call.name === 'update_brief') {
     const brief = mergeBrief(store.brief ?? DEFAULT_BRIEF, call.args);
     const plan = generatePlan(brief);
-    store.applyGeneratedPlan(plan);
+    store.applyGeneratedPlan(plan, { snapshot: false });
     return {
       ok: true,
       brief,

@@ -22,6 +22,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { toast } from 'sonner';
 import { FTDVelocityEngine } from './FTDVelocityEngine';
 import { GlobalGeoArbitrageTokenMatrix } from './GlobalGeoArbitrageTokenMatrix';
+import { MarketSplitCard } from './MarketSplitCard';
 import {
   exportToCsv,
   exportToExcel,
@@ -351,6 +352,7 @@ export const BudgetGenieAI = () => {
               </div>
 
               {/* MACRO VELOCITY WIDGET */}
+              <MarketSplitCard />
               <GlobalGeoArbitrageTokenMatrix />
 
               <FTDVelocityEngine />
