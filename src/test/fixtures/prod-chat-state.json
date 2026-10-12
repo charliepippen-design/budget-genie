@@ -1,0 +1,107 @@
+{
+  "mediaplan-planner-chat-v1": [
+    { "kind": "user", "text": "How should I split budget across the UK, Germany and Canada?" },
+    { "kind": "user", "text": "What CPA and FTD volume should I expect per market for this plan?" }
+  ],
+  "mediaplan-store-v2": {
+    "state": {
+      "totalBudget": 20000,
+      "channels": [
+        {
+          "id": "igaming-affiliate-cpa",
+          "name": "Affiliates - CPA",
+          "category": "Affiliate",
+          "allocationPct": 29.379874500855674,
+          "family": "affiliate",
+          "buyingModel": "CPA",
+          "typeConfig": {
+            "family": "affiliate",
+            "buyingModel": "CPA",
+            "price": 200,
+            "baselineMetrics": { "ctr": 4, "conversionRate": 2, "aov": 250, "saturationCeiling": 79422 }
+          },
+          "tier": "scalable",
+          "maxSpendLimit": 0,
+          "locked": false,
+          "isActive": true
+        },
+        {
+          "id": "igaming-google-search",
+          "name": "Google Search (Licensed)",
+          "category": "Paid Search",
+          "allocationPct": 21.48528237307473,
+          "family": "paid_media",
+          "buyingModel": "CPC",
+          "typeConfig": {
+            "family": "paid_media",
+            "buyingModel": "CPC",
+            "price": 6,
+            "baselineMetrics": { "ctr": 4, "conversionRate": 2.5, "aov": 280, "saturationCeiling": 39711 }
+          },
+          "tier": "scalable",
+          "maxSpendLimit": 0,
+          "locked": false,
+          "isActive": true
+        },
+        {
+          "id": "igaming-seo-content",
+          "name": "SEO - Content & Links",
+          "category": "SEO/Content",
+          "allocationPct": 12.41,
+          "family": "seo_content",
+          "buyingModel": "RETAINER",
+          "typeConfig": {
+            "family": "seo_content",
+            "buyingModel": "RETAINER",
+            "price": 2482,
+            "baselineMetrics": { "ctr": 1, "conversionRate": 1.44, "aov": 300, "trafficPerUnit": 2500, "saturationCeiling": 9928 }
+          },
+          "tier": "fixed",
+          "maxSpendLimit": 0,
+          "locked": false,
+          "isActive": true
+        }
+      ],
+      "globalMultipliers": {
+        "spendMultiplier": 1,
+        "defaultCpmOverride": null,
+        "ctrBump": 0,
+        "cpaTarget": 110,
+        "roasTarget": 2.5,
+        "playerValue": 250,
+        "retentionRate": 0.55,
+        "regToFtdCvr": 0.2,
+        "turnoverRate": 1,
+        "margin": 0.06,
+        "bonusRate": 0.28
+      },
+      "activeTiers": { "tier1": 40, "tier2": 35, "tier3": 25 },
+      "activeGeos": ["United Kingdom", "Germany", "Canada"],
+      "geoOverrides": {},
+      "observedLtv": { "m1": null, "m3": null, "m6": null },
+      "subscriptionTier": "free",
+      "userStatus": "demo",
+      "hasCompletedOnboarding": true,
+      "onboardingVertical": "igaming",
+      "onboardingSubvertical": "casino",
+      "brief": {
+        "industry": "igaming",
+        "monthlyBudget": 20000,
+        "months": 6,
+        "objectives": { "acquisition": 0.8, "retention": 0, "branding": 0.2 },
+        "markets": ["GB", "DE", "CA"],
+        "riskProfile": "balanced",
+        "includeChannels": [],
+        "excludeChannels": [],
+        "excludeTags": [],
+        "targetCpa": null,
+        "shareOverrides": {},
+        "lockedChannels": [],
+        "notes": []
+      },
+      "planRationale": [],
+      "planWarnings": []
+    },
+    "version": 9
+  }
+}
