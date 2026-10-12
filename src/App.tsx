@@ -3,7 +3,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, useLocation, useNavigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { Suspense, type ReactNode } from 'react';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
@@ -112,6 +112,10 @@ const AppShell = () => {
                   <Route path="/output" element={<RouteBoundary name="route:/output"><ProtectedRoute>
                         <Output />
                       </ProtectedRoute></RouteBoundary>} />
+                  {/* Common guessed URLs go to the app instead of a 404. */}
+                  {['/dashboard', '/planner', '/demo'].map((path) => (
+                    <Route key={path} path={path} element={<Navigate to="/app" replace />} />
+                  ))}
                   <Route path="*" element={<RouteBoundary name="route:404"><NotFound /></RouteBoundary>} />
                 </Routes>
               </Suspense>
