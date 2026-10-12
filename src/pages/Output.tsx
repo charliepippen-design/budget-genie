@@ -63,6 +63,7 @@ const OutputContent = () => {
     netPnl,
     netCohort,
     paybackMonths,
+    paybackLtvPerUser,
     scenarioEnvelope,
   } = usePlanEconomics();
   const isProfit = netPnl >= 0;
@@ -273,8 +274,8 @@ const OutputContent = () => {
                     {paybackMonths ? `${paybackMonths} months` : '12+ months'}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    based on {$(globalMultipliers.playerValue)}{' '}
-                    {vc.terms.customerValue.toLowerCase()}
+                    based on {$(paybackLtvPerUser)} 12-month{' '}
+                    {vc.terms.customerValue.toLowerCase()} per {vc.terms.conversion.toLowerCase()}
                   </p>
                 </div>
               </div>
