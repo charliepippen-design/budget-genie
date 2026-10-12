@@ -6,6 +6,9 @@ import {
   type ReportNarrative,
   type ReportNarratorInput,
 } from '@/lib/report-narrator';
+import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { computePlanHealth } from '@/lib/plan-health';
 
 export interface NarrativeError {
   message: string;
@@ -17,7 +20,23 @@ export interface NarrativeError {
  * Mounting, or re-rendering with a changed plan, never calls the AI: a cached
  * summary is shown only when its input hash matches the current plan.
  */
-export function useReportNarrative(input: ReportNarratorInput) {
+export function useReportNarrative(base: ReportNarratorInput) {
+  const blended = useBlendedMetrics();
+  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
+  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
+  const verticalConfig = useVerticalConfig();
+  const health = computePlanHealth(blended, vertical, multipliers);
+  // Engine profitability and the vertical's value label join the input before hashing.
+  const input: ReportNarratorInput = {
+    ...base,
+    profitability: base.profitability ?? {
+      losesMoney: health.losesMoney,
+      monthlyContribution: health.monthlyContribution,
+      breakEvenCpa: health.breakEvenCpa,
+      blendedCpa: health.blendedCpa,
+    },
+    revenueLabel: base.revenueLabel ?? verticalConfig.report.revenueLabel,
+  };
   const hash = hashNarratorInput(input);
   const [generated, setGenerated] = useState<{ hash: string; narrative: ReportNarrative } | null>(null);
   const [loading, setLoading] = useState(false);
