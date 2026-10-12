@@ -23,6 +23,30 @@ export const CURRENCIES: Record<CurrencyCode, CurrencyInfo> = {
   CNY: { code: 'CNY', symbol: '¥', name: 'Chinese Yuan', locale: 'zh-CN', symbolPosition: 'before', flag: '🇨🇳' },
 };
 
+/** Sign first, then symbol, then magnitude: "-€12.3K", never "€-12.3K". */
+export function formatMoney(value: number, code: CurrencyCode, compact = false): string {
+  const info = CURRENCIES[code];
+  // Safety check just in case
+  if (!info) return `${value}`;
+
+  if (compact && Math.abs(value) >= 1000) {
+    const abs = Math.abs(value);
+    const formatted = abs >= 1000000 ? `${(abs / 1000000).toFixed(1)}M` : `${(abs / 1000).toFixed(1)}K`;
+    return `${value < 0 ? '-' : ''}${info.symbol}${formatted}`;
+  }
+
+  // One number style across the app (en-US grouping), whatever the currency,
+  // so "€40,000" never sits next to "40.000 €" on the same screen.
+  const formatter = new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+    style: 'currency',
+    currency: code,
+  });
+
+  return formatter.format(value);
+}
+
 interface CurrencyContextType {
   code: CurrencyCode;
   symbol: string;
@@ -47,32 +71,7 @@ export const CurrencyProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     localStorage.setItem('app_currency', c);
   };
 
-  const format = (value: number, compact = false) => {
-    const info = CURRENCIES[code];
-    // Safety check just in case
-    if (!info) return `${value}`;
-
-    if (compact && Math.abs(value) >= 1000) {
-      let formatted: string;
-      if (Math.abs(value) >= 1000000) {
-        formatted = `${(value / 1000000).toFixed(1)}M`;
-      } else {
-        formatted = `${(value / 1000).toFixed(1)}K`;
-      }
-      return `${info.symbol}${formatted}`;
-    }
-
-    // One number style across the app (en-US grouping), whatever the currency,
-    // so "€40,000" never sits next to "40.000 €" on the same screen.
-    const formatter = new Intl.NumberFormat('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-      style: 'currency',
-      currency: code,
-    });
-
-    return formatter.format(value);
-  };
+  const format = (value: number, compact = false) => formatMoney(value, code, compact);
 
   const info = CURRENCIES[code] || CURRENCIES['EUR'];
   const symbol = info.symbol;

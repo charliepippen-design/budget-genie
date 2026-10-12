@@ -1,4 +1,7 @@
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import { Component, Fragment, type ErrorInfo, type ReactNode } from 'react';
+import { saveCrashBackup } from '@/lib/crash-recovery';
+import { reportClientError } from '@/lib/error-report';
+import { CrashFallback } from './CrashFallback';
 
 interface Props {
   children: ReactNode;
@@ -6,42 +9,41 @@ interface Props {
 }
 
 interface State {
-  hasError: boolean;
   error: Error | null;
+  componentStack: string;
+  attempt: number;
 }
 
 export class ErrorBoundary extends Component<Props, State> {
-  state: State = { hasError: false, error: null };
+  state: State = { error: null, componentStack: '', attempt: 0 };
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+  static getDerivedStateFromError(error: Error): Partial<State> {
+    return { error: error instanceof Error ? error : new Error(String(error)) };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    // Replace with Sentry or your logger when ready
     console.error('[ErrorBoundary]', error, info.componentStack);
+    saveCrashBackup('app', error);
+    reportClientError({ section: 'app', error, componentStack: info.componentStack });
+    this.setState({ componentStack: info.componentStack ?? '' });
   }
 
-  render() {
-    if (this.state.hasError) {
-      if (this.props.fallback) return this.props.fallback;
+  private retry = () => this.setState((s) => ({ error: null, componentStack: '', attempt: s.attempt + 1 }));
 
+  render() {
+    if (this.state.error) {
+      if (this.props.fallback) return this.props.fallback;
       return (
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background p-8 text-center">
-          <p className="text-lg font-semibold text-foreground">Something went wrong</p>
-          <p className="max-w-md text-sm text-muted-foreground">
-            {this.state.error?.message ?? 'An unexpected error occurred.'}
-          </p>
-          <button
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90"
-            onClick={() => this.setState({ hasError: false, error: null })}
-          >
-            Try again
-          </button>
-        </div>
+        <CrashFallback
+          title="Something went wrong"
+          error={this.state.error}
+          componentStack={this.state.componentStack}
+          className="min-h-screen justify-center bg-background"
+          onRetry={this.retry}
+        />
       );
     }
 
-    return this.props.children;
+    return <Fragment key={this.state.attempt}>{this.props.children}</Fragment>;
   }
 }
