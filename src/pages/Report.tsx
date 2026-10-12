@@ -74,6 +74,7 @@ const ReportContent = () => {
     blendedCpa,
     blendedRoas,
     netPnl,
+    netCohort,
     paybackMonths,
     scenarioEnvelope,
   } = usePlanEconomics();
@@ -374,13 +375,16 @@ const ReportContent = () => {
               <div className="hidden h-full w-px bg-border md:block" />
 
               <div>
-                <p className="text-sm text-muted-foreground">Net Value (cohort value − spend)</p>
+                <p className="text-sm text-muted-foreground">Net Value per month (month 1 value − spend)</p>
                 <p
                   className={`mt-2 text-3xl font-bold ${isProfit ? 'text-green-400' : 'text-red-400'}`}
                 >
                   {$(netPnl)}
                 </p>
-                <p className="mt-5 text-sm text-muted-foreground">LTV : CAC Ratio</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Lifetime cohort net: {$(netCohort)}
+                </p>
+                <p className="mt-4 text-sm text-muted-foreground">LTV : CAC Ratio</p>
                 <p
                   className={`mt-2 text-xl font-semibold ${
                     scenarioEnvelope[1].ltvToCac > 2
