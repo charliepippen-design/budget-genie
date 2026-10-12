@@ -1,5 +1,6 @@
 import { getIndustryPack } from '@/lib/industries';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { AccountMenu } from '@/components/common/AccountMenu';
 import {
   Download,
   FileText,
@@ -404,6 +405,8 @@ export function DashboardHeader({
             >
               <Settings className="h-5 w-5" />
             </a>
+
+            <AccountMenu isDark={isDark} className={cn(controlShellClass, 'w-10 px-0')} />
           </div>
         </div>
       </div>

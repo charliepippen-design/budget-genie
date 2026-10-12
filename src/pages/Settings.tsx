@@ -7,6 +7,7 @@ import {
   Cloud,
   CreditCard,
   Database,
+  LogOut,
   RefreshCw,
   ShieldCheck,
   Sparkles,
@@ -22,6 +23,7 @@ import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-stor
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { useSignOut } from '@/hooks/use-sign-out';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
@@ -62,6 +64,7 @@ export default function Settings() {
   // Identity comes from Clerk (the app's auth); Supabase auth is not used.
   const { user: clerkUser } = useUser();
   const clerk = useClerk();
+  const signOut = useSignOut();
   const email = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
   const [projectCount, setProjectCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -446,6 +449,15 @@ export default function Settings() {
                 className="w-full border-indigo-500/40 text-indigo-200 hover:text-white hover:bg-indigo-600/20 hover:border-indigo-400"
               >
                 Restart Onboarding Wizard
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => void signOut()}
+                disabled={!clerkUser}
+                className="w-full gap-2 border-rose-500/40 text-rose-200 hover:text-white hover:bg-rose-600/20 hover:border-rose-400"
+              >
+                <LogOut className="h-4 w-4" />
+                Sign out
               </Button>
             </CardContent>
           </Card>
