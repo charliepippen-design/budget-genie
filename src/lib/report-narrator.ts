@@ -17,6 +17,15 @@ export interface ReportNarratorInput {
   vertical: string | null;
   geos: string[];
   currency?: string; // ISO code the user plans in
+  /** Engine verdict on whether the plan makes or loses money (from computePlanHealth). */
+  profitability?: {
+    losesMoney: boolean;
+    monthlyContribution: number;
+    breakEvenCpa: number | null;
+    blendedCpa: number | null;
+  };
+  /** Vertical-specific name for projectedRevenue, e.g. 'Projected Player Value (lifetime)'. */
+  revenueLabel?: string;
 }
 
 const NarrativeSchema = z.object({
@@ -32,14 +41,31 @@ function buildPrompt(input: ReportNarratorInput): string {
   const code = (input.currency && input.currency in CURRENCIES ? input.currency : 'EUR') as CurrencyCode;
   const $ = (n: number) => formatMoney(n, code);
 
+  const p = input.profitability;
+  const profitLines = p
+    ? `- Monthly profit or loss (engine): ${
+        p.losesMoney
+          ? `LOSS of ${$(Math.abs(p.monthlyContribution))} per month`
+          : `PROFIT of ${$(p.monthlyContribution)} per month`
+      }
+- Break-even cost per customer (engine): ${
+        p.breakEvenCpa === null ? 'Not calculable' : $(p.breakEvenCpa)
+      } (current ${p.blendedCpa === null ? 'Not calculable' : $(p.blendedCpa)})
+`
+    : '';
+  const lossRules = p?.losesMoney
+    ? `
+THIS PLAN LOSES MONEY. The executiveSummary must open with the monthly loss and the break-even versus current cost per customer. Never describe return on spend or value as positive.`
+    : '';
+
   return `You are a senior marketing strategist writing a report for a client.
 The client may be a CMO with no marketing knowledge OR a campaign manager.
 Write clearly for both.
 
 Plan data:
-- Total monthly budget: ${$(input.totalBudget)}
+${profitLines}- Total monthly budget: ${$(input.totalBudget)}
 - Projected spend deployed: ${$(input.totalSpend)}
-- Projected revenue (Month 1): ${$(input.projectedRevenue)}
+- ${input.revenueLabel ?? 'Projected customer value (not first-month revenue)'}: ${$(input.projectedRevenue)}
 - Projected new customers: ${Math.round(input.projectedFtds).toLocaleString()}
 - Blended cost per customer: ${input.blendedCpa ? $(input.blendedCpa) : 'Not calculable'}
 - Blended ROAS: ${input.blendedRoas.toFixed(2)}x
@@ -55,10 +81,11 @@ Plan data:
 Write the narrative. No jargon - a CMO should understand every word.
 Never use the words: ROAS, CPM, CPC, CPA, FTD, LTV, CAC, programmatic.
 Instead say: return on spend, cost per click, cost per customer, lifetime value, customer acquisition cost.
+Quote figures exactly as given and never compute new ones. Never call projected customer value first-month revenue.${lossRules}
 
 Respond with valid JSON matching this exact shape — no markdown, no explanation around it:
 {
-  "executiveSummary": "2-3 sentences leading with return on investment",
+  "executiveSummary": "2-3 sentences leading with profit or loss",
   "operatorInsight": "2-3 sentences for the campaign manager, specific and actionable",
   "biggestRisk": "Single sentence — the one thing most likely to break this plan",
   "firstCheckIn": "Single sentence — what to look at after week 1"
