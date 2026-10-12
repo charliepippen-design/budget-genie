@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useChannelsWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { computePlanEconomics } from '@/lib/plan-economics';
 import { buildLtvCurve, buildPlanScenarios, DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 
 /**
@@ -10,6 +11,8 @@ export function usePlanEconomics() {
   const channels = useChannelsWithMetrics();
   const playerValue = useMediaPlanStore((s) => s.globalMultipliers.playerValue);
   const observedLtv = useMediaPlanStore((s) => s.observedLtv);
+  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
+  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
 
   return useMemo(() => {
     const active = channels.filter((c) => c.isActive && c.metrics.spend > 0);
@@ -23,19 +26,28 @@ export function usePlanEconomics() {
     const model = { playerValue, blendedRoas, churnRate: DEFAULT_CHURN_RATE, observedLtv };
     const curve = buildLtvCurve(plan, model);
 
+    const economics = computePlanEconomics(
+      { totalSpend, totalConversions: projectedFtds, projectedRevenue },
+      vertical,
+      multipliers
+    );
+
     return {
+      economics,
       active,
       totalSpend,
       projectedRevenue,
       projectedFtds,
       blendedCpa,
       blendedRoas,
+      // Net value per month (month-1 value minus spend): the dashboard loss banner's number.
+      netPnl: economics.netValuePerMonth,
       // Lifetime value of this month's cohort minus this month's spend.
-      netPnl: projectedRevenue - totalSpend,
+      netCohort: economics.netValueCohort,
       // Month in which a customer's 12-month value first covers their acquisition cost.
       paybackMonths: curve.paybackMonth,
       ltvToCac12m: curve.points[11]?.ltvToCac ?? 0,
       scenarioEnvelope: buildPlanScenarios(plan, model),
     };
-  }, [channels, observedLtv, playerValue]);
+  }, [channels, observedLtv, playerValue, vertical, multipliers]);
 }

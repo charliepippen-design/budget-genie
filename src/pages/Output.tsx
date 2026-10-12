@@ -54,6 +54,7 @@ const OutputContent = () => {
     blendedCpa,
     blendedRoas,
     netPnl,
+    netCohort,
     paybackMonths,
     scenarioEnvelope,
   } = usePlanEconomics();
@@ -453,7 +454,7 @@ const OutputContent = () => {
             <div className="w-px bg-border self-stretch mx-8 hidden sm:block" />
             <div className="min-w-[8rem]">
               <p className="text-xs text-muted-foreground uppercase tracking-wider">
-                Net Result (Month 1)
+                Net Value per month (Month 1)
               </p>
               <p
                 className={`text-3xl font-bold mt-1 ${netPnl >= 0 ? 'text-green-500' : 'text-red-500'}`}
@@ -461,7 +462,7 @@ const OutputContent = () => {
                 {$(netPnl)}
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                {blendedRoas.toFixed(2)}x return on spend
+                {blendedRoas.toFixed(2)}x return on spend. Lifetime cohort net: {$(netCohort)}
               </p>
             </div>
           </div>
