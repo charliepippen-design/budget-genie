@@ -91,4 +91,22 @@ describe('AI gateway', () => {
       }
     });
   });
+
+  it('answers a busy model with code AI_BUSY and a Retry-After header', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.stubEnv('ALLOW_ANON', 'true');
+      vi.stubEnv('GEMINI_API_KEY', 'server-key');
+      vi.spyOn(console, 'error').mockImplementation(() => undefined);
+      vi.stubGlobal('fetch', vi.fn(async () => new Response('overloaded', { status: 503 })));
+      const pending = handleAIRequest(post({ task: 'json', prompt: 'x' }));
+      await vi.runAllTimersAsync();
+      const res = await pending;
+      expect(res.status).toBe(503);
+      expect(res.headers.get('Retry-After')).toBe('60');
+      expect(await res.json()).toMatchObject({ code: 'AI_BUSY', retryAfterSeconds: 60 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

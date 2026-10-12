@@ -1,4 +1,4 @@
-import { generateJSON, isFreeTierLimit } from '@/lib/ai-client';
+import { aiErrorKind, generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
 import { CURRENCIES, formatMoney, type CurrencyCode } from '@/contexts/CurrencyContext';
 
@@ -109,6 +109,8 @@ Return ONLY a JSON object with the fields described above.`));
   } catch (err) {
     // The free-tier cap is not a failure to hide: the caller shows the upgrade message.
     if (isFreeTierLimit(err)) throw err;
+    // Busy / rate-limited / unavailable are typed so the caller can say what happened and when to retry.
+    if (aiErrorKind(err) !== 'generic') throw err;
     console.error('Report narrative generation failed.', err);
     return null;
   }

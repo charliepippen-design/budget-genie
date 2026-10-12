@@ -25,15 +25,62 @@ export interface AIResponse {
 
 type AITask = 'planner' | 'json';
 
+export type AIErrorKind = 'busy' | 'rate_limited' | 'unavailable' | 'free_tier_limit' | 'generic';
+
 /** Error from the gateway; `code` is FREE_TIER_LIMIT or USAGE_UNAVAILABLE for free-tier cap responses. */
 export class AIError extends Error {
-  constructor(message: string, readonly code?: string, readonly status?: number) {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly status?: number,
+    readonly retryAfterSeconds?: number
+  ) {
     super(message);
     this.name = 'AIError';
+  }
+
+  get kind(): AIErrorKind {
+    if (this.code === 'FREE_TIER_LIMIT') return 'free_tier_limit';
+    if (this.code === 'AI_BUSY') return 'busy';
+    if (this.code === 'AI_RATE_LIMITED' || this.status === 429) return 'rate_limited';
+    if (this.status === 503) return 'unavailable';
+    return 'generic';
   }
 }
 
 export const isFreeTierLimit = (err: unknown): boolean => err instanceof AIError && err.code === 'FREE_TIER_LIMIT';
+
+export const aiErrorKind = (err: unknown): AIErrorKind => (err instanceof AIError ? err.kind : 'generic');
+
+/** Seconds from a Retry-After header (numeric form) or the body, clamped to 1..3600; undefined when absent. */
+export function parseRetryAfter(header: string | null | undefined, bodyValue?: unknown): number | undefined {
+  const raw = header != null && header.trim() !== '' ? Number(header) : typeof bodyValue === 'number' ? bodyValue : NaN;
+  return Number.isFinite(raw) && raw > 0 ? Math.min(3600, Math.ceil(raw)) : undefined;
+}
+
+/** Plain-language message for a failed AI call, specific to the kind of failure. */
+export function aiErrorMessage(err: unknown, fallback = 'Something went wrong.'): string {
+  const own = err instanceof Error && err.message ? err.message : fallback;
+  if (!(err instanceof AIError)) return own;
+  const wait = err.retryAfterSeconds;
+  const secs = wait === 1 ? '1 second' : `${wait} seconds`;
+  switch (err.kind) {
+    case 'busy':
+      return wait ? `The AI is busy, try again in ${secs}.` : 'The AI is busy, try again in a moment.';
+    case 'rate_limited':
+      return wait ? `Too many AI requests right now, try again in ${secs}.` : own;
+    case 'unavailable':
+      return 'The AI is unavailable right now. Your plan and sliders still work.';
+    default:
+      return own;
+  }
+}
+
+/** Language of the app UI as the gateway understands it: Italian browsers get Italian fixed texts. */
+export function getUiLang(): 'it' | 'en' {
+  const lang = typeof navigator !== 'undefined' ? navigator.language : '';
+  return /^it\b/i.test(lang ?? '') ? 'it' : 'en';
+}
 
 /** One turn = one user chat message or one one-shot generation. All requests of a turn share the id. */
 export function newTurnId(): string {
@@ -102,7 +149,14 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
   }
 
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new AIError(data?.error || `AI request failed (${res.status})`, data?.code, res.status);
+  if (!res.ok) {
+    throw new AIError(
+      data?.error || `AI request failed (${res.status})`,
+      data?.code,
+      res.status,
+      parseRetryAfter(res.headers?.get?.('Retry-After'), data?.retryAfterSeconds)
+    );
+  }
   return normalizeAIResponse(data);
 }
 

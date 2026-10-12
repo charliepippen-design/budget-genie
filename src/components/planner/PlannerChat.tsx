@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
+import { useAI, aiErrorKind, aiErrorMessage, getUiLang, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan, type PlanDiffSide } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
@@ -19,7 +19,7 @@ type ChatItem =
   | { kind: 'user'; text: string }
   | { kind: 'assistant'; text: string; raw?: AIPart[] }
   | { kind: 'tool'; id?: string; name: string; response: Record<string, unknown> }
-  | { kind: 'error'; text: string; upgrade?: boolean };
+  | { kind: 'error'; text: string; upgrade?: boolean; retry?: boolean };
 
 const STORAGE_KEY = 'mediaplan-planner-chat-v1';
 const MAX_TOOL_ROUNDS = 4;
@@ -165,6 +165,7 @@ export function PlannerChat() {
   const [busy, setBusy] = useState(false);
   const hasBrief = useMediaPlanStore(s => !!s.brief);
   const callAI = useAI();
+  const uiLang = getUiLang();
   const endRef = useRef<HTMLDivElement>(null);
 
   // Phones: the panel is full-screen, so start hidden and let the user open it.
@@ -181,19 +182,31 @@ export function PlannerChat() {
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [items, busy]);
 
-  const send = async (text: string) => {
+  const send = (text: string) => {
     const trimmed = text.trim();
     if (!trimmed || busy) return;
     setInput('');
+    return run([...items, { kind: 'user', text: trimmed }]);
+  };
 
-    let convo: ChatItem[] = [...items, { kind: 'user', text: trimmed }];
+  // Resends the conversation as it was before the failure (the last user message, or its tool results).
+  const retry = () => {
+    if (busy) return;
+    const base = [...items];
+    while (base.length && base[base.length - 1].kind === 'error') base.pop();
+    if (!base.length) return;
+    return run(base);
+  };
+
+  const run = async (start: ChatItem[]) => {
+    let convo = start;
     setItems(convo);
     setBusy(true);
 
     const turnId = newTurnId(); // every model round trip of this chat message counts as one turn
     try {
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-        const res = await callAI('planner', { turnId, messages: toAgentMessages(convo), context: buildPlannerContext() });
+        const res = await callAI('planner', { turnId, messages: toAgentMessages(convo), context: buildPlannerContext(), uiLang });
         convo = [...convo, { kind: 'assistant', text: typeof res.text === 'string' ? res.text : '', raw: res.raw }];
         if (res.toolCalls.length === 0) break;
 
@@ -209,8 +222,9 @@ export function PlannerChat() {
         ...convo,
         {
           kind: 'error',
-          text: err instanceof Error ? err.message : 'Something went wrong.',
+          text: aiErrorMessage(err),
           upgrade: isFreeTierLimit(err),
+          retry: aiErrorKind(err) !== 'free_tier_limit' && !/sign in/i.test(aiErrorMessage(err)),
         },
       ]);
     } finally {
@@ -306,6 +320,16 @@ export function PlannerChat() {
               {/sign in/i.test(it.text) && (
                 <a href="/auth" className="ml-2 font-semibold text-indigo-300 underline">Sign in</a>
               )}
+              {it.retry && i === items.length - 1 && (
+                <button
+                  type="button"
+                  onClick={retry}
+                  disabled={busy}
+                  className="ml-2 font-semibold text-indigo-300 underline disabled:opacity-50"
+                >
+                  Retry
+                </button>
+              )}
             </div>
           );
         })}
@@ -345,7 +369,7 @@ export function PlannerChat() {
       </form>
       <div className="space-y-1 px-3 pb-3 text-[11px] leading-snug text-slate-500">
         <p>{AI_DISCLOSURE_SHORT}</p>
-        <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
+        {uiLang === 'it' && <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>}
       </div>
     </aside>
   );

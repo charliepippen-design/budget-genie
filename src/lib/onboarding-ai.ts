@@ -139,19 +139,25 @@ export function generateWizardPlan(answers: WizardAnswers): GeneratedPlan | null
   });
 }
 
+/** `error`: the AI call failed; `invalid`: it answered with something that is not a usable plan. */
+export type OnboardingAIResult = { ok: true; plan: RefinedPlan } | { ok: false; reason: 'error' | 'invalid' };
+
+export const ONBOARDING_AI_UNAVAILABLE_NOTICE =
+  'AI suggestions are unavailable right now; your plan uses the standard template.';
+
 export async function generateOnboardingPlan(
   answers: WizardAnswers,
   currency: CurrencyCode = 'EUR'
-): Promise<RefinedPlan | null> {
+): Promise<OnboardingAIResult> {
   const prompt = buildPrompt(answers, currency);
   try {
     // JSON must match the schema exactly; anything else is treated as no answer.
     const parsed = RefinedPlanSchema.safeParse(await generateJSON(`${prompt}
 
 Return ONLY a JSON object with the fields described above.`));
-    return parsed.success ? parsed.data : null;
+    return parsed.success ? { ok: true, plan: parsed.data } : { ok: false, reason: 'invalid' };
   } catch (err) {
     console.error('Onboarding plan generation failed.', err);
-    return null;
+    return { ok: false, reason: 'error' };
   }
 }

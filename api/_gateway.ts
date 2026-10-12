@@ -17,7 +17,7 @@ import { getDecisionModel } from "./_decisions.js";
 import { routeMessage } from "./_decision-router.js";
 import { checkReply } from "./_reply-check.js";
 import { collectNumberSources, findUnsourcedNumbers, NUMBER_GUARD_NOTE } from "./_number-guard.js";
-import { detectLang } from "./_language.js";
+import { resolveLang } from "./_language.js";
 import { mentionsRegulation, REGULATORY_DISCLAIMER } from "./_regulatory.js";
 import { stripFieldNames } from "./_reply-clean.js";
 
@@ -35,6 +35,9 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // ---------- Gemini ----------
+// Matches the "try again in a minute" wording of the busy message.
+const BUSY_RETRY_SECONDS = 60;
+
 async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
@@ -80,14 +83,15 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   if (quotaExhausted) {
     throw new GatewayError(
       "The AI usage limit has been reached for now. Your plan and sliders still work; try the chat again later.",
-      429
+      429,
+      "AI_RATE_LIMITED"
     );
   }
-  throw new GatewayError("The AI model is busy or unavailable right now. Please try again in a minute.", 503);
+  throw new GatewayError("The AI model is busy or unavailable right now. Please try again in a minute.", 503, "AI_BUSY", BUSY_RETRY_SECONDS);
 }
 
 class GatewayError extends Error {
-  constructor(message: string, readonly status: number) {
+  constructor(message: string, readonly status: number, readonly code?: string, readonly retryAfterSeconds?: number) {
     super(message);
   }
 }
@@ -218,7 +222,8 @@ FUNNEL LABELS: ${JSON.stringify(ctx.funnel ?? {})}
 PLAN STATE: ${JSON.stringify(ctx.plan ?? null)}`;
 }
 
-async function runPlanner(payload: { messages: AgentMessage[]; context: Record<string, unknown> }) {
+async function runPlanner(payload: { messages: AgentMessage[]; context: Record<string, unknown>; uiLang?: unknown }) {
+  const uiLang = payload.uiLang === "it" || payload.uiLang === "en" ? payload.uiLang : undefined;
   const ctx = payload.context ?? {};
   const decisions = getDecisionModel();
   const lastUser = [...payload.messages].reverse().find((m) => m.role === "user");
@@ -235,6 +240,7 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
       briefExists: !!ctx.brief,
       channelNames: catalog.map((c) => c?.name).filter((n): n is string => typeof n === "string"),
       availableTools: PLANNER_TOOLS.map((t) => t.name),
+      uiLang,
     });
     if (route.action === "canned" && route.cannedText) {
       return { text: route.cannedText, toolCalls: [], raw: [{ text: route.cannedText }] };
@@ -259,17 +265,17 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
       try {
         const { unsourced } = findUnsourcedNumbers(result.text, collectNumberSources(ctx, payload.messages));
         if (guardMode === "log") console.info("ai_number_guard", { count: unsourced.length });
-        else if (unsourced.length) result.text += `\n\n${NUMBER_GUARD_NOTE[detectLang(userText)]}`;
+        else if (unsourced.length) result.text += `\n\n${NUMBER_GUARD_NOTE[resolveLang(userText, uiLang)]}`;
       } catch {
         // the guard must never break a reply
       }
     }
     if (decisions) {
       const brief = ctx.brief as { industry?: string } | null | undefined;
-      const check = await checkReply(decisions, { userMessage: userText, reply: result.text, industry: brief?.industry });
+      const check = await checkReply(decisions, { userMessage: userText, reply: result.text, industry: brief?.industry, uiLang });
       if (check.appendNotice) result.text += `\n\n${check.appendNotice}`;
     }
-    const disclaimer = REGULATORY_DISCLAIMER[detectLang(userText)];
+    const disclaimer = REGULATORY_DISCLAIMER[resolveLang(userText, uiLang)];
     if (mentionsRegulation(result.text) && !result.text.includes(disclaimer)) result.text += `\n\n${disclaimer}`;
   }
   return result;
@@ -307,13 +313,17 @@ export async function handleAIRequest(req: Request): Promise<Response> {
 
     const result =
       body.task === "planner"
-        ? await runPlanner({ messages, context: body.context })
+        ? await runPlanner({ messages, context: body.context, uiLang: body.uiLang })
         : await runJson({ prompt: body.prompt });
     await admit.commit();
     return json(result);
   } catch (err) {
     console.error("ai-gateway error:", err);
-    if (err instanceof GatewayError) return json({ error: err.message }, err.status);
+    if (err instanceof GatewayError) {
+      const res = json({ error: err.message, code: err.code, retryAfterSeconds: err.retryAfterSeconds }, err.status);
+      if (err.retryAfterSeconds) res.headers.set("Retry-After", String(err.retryAfterSeconds));
+      return res;
+    }
     return json({ error: "AI request failed. Please try again." }, 500);
   }
 }
