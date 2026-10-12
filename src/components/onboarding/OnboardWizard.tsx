@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles, Users, TrendingUp, FlaskConical, Shield, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { buildPlanReadyToast } from '@/lib/plan-ready-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -11,6 +12,7 @@ import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/li
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import { WizardAnswers, generateOnboardingPlan, generateWizardPlan } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
+import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 
 type WizardState = WizardDraft;
@@ -380,19 +382,8 @@ export const OnboardWizard = () => {
       goToStep('done');
       window.requestAnimationFrame(() => navigate('/app', { replace: true }));
 
-      if (refinedPlan) {
-        toast('Your plan is ready', {
-          description: refinedPlan.rationale,
-          duration: 6000,
-        });
-      } else {
-        toast('Your plan is ready', {
-          description: generatedPlan
-            ? `We've built your plan from your goal and markets using ${preset.label} benchmarks.`
-            : `We've built your plan using ${preset.label} industry defaults.`,
-          duration: 6000,
-        });
-      }
+      const planReadyToast = buildPlanReadyToast();
+      toast(planReadyToast.title, planReadyToast.options);
     },
     [
       hasExistingPlan,
@@ -939,6 +930,10 @@ export const OnboardWizard = () => {
                   Build my plan -&gt;
                 </Button>
               </div>
+            </div>
+            <div className="mt-4 space-y-1 text-xs text-slate-500">
+              <p>{AI_DISCLOSURE_SHORT}</p>
+              <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
             </div>
           </section>
         )}

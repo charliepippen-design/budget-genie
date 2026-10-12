@@ -5,7 +5,7 @@ import {
   type GlobalMultipliers,
 } from '@/hooks/use-media-plan-store';
 import { DEFAULT_IGAMING_REVENUE_INPUTS } from '@/lib/igaming-revenue-model';
-import { marketsToGeoSelection, TIER1_REFERENCE, type GeoTierKey } from '@/lib/geo-market-data';
+import { MARKET_ADVERTISING_NOTES, marketsToGeoSelection, TIER1_REFERENCE, type GeoTierKey } from '@/lib/geo-market-data';
 import {
   getIndustryPack,
   type ChannelTag,
@@ -173,6 +173,12 @@ export function generatePlan(input: Partial<PlanBrief>): GeneratedPlan {
 
   const skipped: GeneratedPlan['skipped'] = [];
   const warnings: string[] = [];
+  if (brief.industry === 'igaming') {
+    for (const m of brief.markets) {
+      const note = MARKET_ADVERTISING_NOTES[m.toUpperCase()];
+      if (note) warnings.push(note);
+    }
+  }
 
   // 1. Score every template
   const scored = pack.channels.flatMap(t => {

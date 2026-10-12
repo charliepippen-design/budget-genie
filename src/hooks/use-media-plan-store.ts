@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useMemo } from 'react';
+import { snapshotPlanBeforeApply } from '@/lib/crash-recovery';
 import { ChannelCategory } from '@/lib/mediaplan-data';
 import {
   ChannelFamily,
@@ -240,7 +241,9 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       planRationale: [],
       planWarnings: [],
 
-      applyGeneratedPlan: (plan) =>
+      applyGeneratedPlan: (plan) => {
+        // Keep the previous plan so a crash screen can offer "Undo last AI plan change".
+        snapshotPlanBeforeApply();
         set((state) => ({
           brief: plan.brief,
           totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, plan.totalBudget)),
@@ -251,7 +254,8 @@ export const useMediaPlanStore = create<MediaPlanState>()(
           onboardingVertical: industryToVertical(plan.brief.industry),
           planRationale: plan.rationale,
           planWarnings: plan.warnings,
-        })),
+        }));
+      },
 
       // Budget
       setTotalBudget: (value) =>

@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Bot, Loader2, MessageSquare, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart } from '@/lib/ai-client';
+import { useAI, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
@@ -27,7 +28,8 @@ const WELCOME =
 function loadChat(): ChatItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as ChatItem[]) : [];
+    const parsed: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? (parsed.filter((it) => it && typeof it === 'object') as ChatItem[]) : [];
   } catch {
     return [];
   }
@@ -58,6 +60,16 @@ function toAgentMessages(items: ChatItem[]): AgentMessage[] {
     }
   }
   return out;
+}
+
+/** A failing tool call must not take down the dashboard: report it to the model and the user instead. */
+function applyToolSafely(call: AIToolCall): Record<string, unknown> {
+  try {
+    return applyPlannerToolCall(call);
+  } catch (err) {
+    console.error('[PlannerChat] tool call failed', call.name, err);
+    return { ok: false, error: err instanceof Error ? err.message : 'The plan update failed.' };
+  }
 }
 
 // Minimal markdown for model replies: **bold**, *italic*, `code`.
@@ -102,7 +114,7 @@ function ToolCard({ name, response }: { name: string; response: Record<string, u
     return <div className="text-[11px] text-amber-400 px-3">⚠ {String(response.error ?? 'Action failed')}</div>;
   }
   const plan = response.plan as ReturnType<typeof summarizePlan> | undefined;
-  if (!plan) return null;
+  if (!plan || !Array.isArray(plan.channels)) return null;
   return (
     <div className="mx-2 rounded-lg border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs text-slate-300">
       <div className="flex items-center gap-2 font-semibold text-indigo-200 mb-1">
@@ -167,12 +179,12 @@ export function PlannerChat() {
     try {
       for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
         const res = await callAI('planner', { turnId, messages: toAgentMessages(convo), context: buildPlannerContext() });
-        convo = [...convo, { kind: 'assistant', text: res.text, raw: res.raw }];
+        convo = [...convo, { kind: 'assistant', text: typeof res.text === 'string' ? res.text : '', raw: res.raw }];
         if (res.toolCalls.length === 0) break;
 
         // Engine applies each tool call; results go back to the model so it can explain them.
         for (const call of res.toolCalls) {
-          convo = [...convo, { kind: 'tool', id: call.id, name: call.name, response: applyPlannerToolCall(call) }];
+          convo = [...convo, { kind: 'tool', id: call.id, name: call.name, response: applyToolSafely(call) }];
         }
         setItems(convo);
       }
@@ -314,6 +326,10 @@ export function PlannerChat() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
+      <div className="space-y-1 px-3 pb-3 text-[11px] leading-snug text-slate-500">
+        <p>{AI_DISCLOSURE_SHORT}</p>
+        <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
+      </div>
     </aside>
   );
 }

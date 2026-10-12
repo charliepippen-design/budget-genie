@@ -94,7 +94,7 @@ Prioritize LTV:CPA arbitrage over vanity spend metrics.
 Speak like a CFO, not a copywriter. Use iGaming terminology naturally:
 FTDs, NGR, player value, geo-arbitrage, affiliate CPA, ROAS.
 Be concise — 2-4 sentences max. Never execute tools without user confirmation.
-You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for quick responses.`,
       greeting: 'Oracle online. Show me the numbers.',
       quickActions: [
         {
@@ -162,7 +162,7 @@ You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for re
 Focus on ROAS, cost per order, AOV, and repeat purchase rate.
 Speak in eCommerce terms: conversion rate, cart abandonment, AOV, ROAS, CAC.
 Be concise — 2-4 sentences max. Never execute tools without user confirmation.
-You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for quick responses.`,
       greeting: 'Ready to grow your store. What do you want to optimise?',
       quickActions: [
         {
@@ -229,7 +229,7 @@ You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for re
 Focus on CAC payback, MRR impact, trial-to-paid conversion, and churn.
 Speak in SaaS terms: MRR, ARR, CAC, LTV, churn rate, trial conversion.
 Be concise — 2-4 sentences max. Never execute tools without user confirmation.
-You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for quick responses.`,
       greeting: 'SaaS growth mode. What metric are we moving today?',
       quickActions: [
         {
@@ -296,7 +296,7 @@ You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for re
 Focus on cost per lead, lead quality, pipeline value, and close rates.
 Speak in lead gen terms: CPL, MQL, SQL, pipeline, conversion rate, close rate.
 Be concise — 2-4 sentences max. Never execute tools without user confirmation.
-You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
+You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for quick responses.`,
       greeting: 'Pipeline ready. What are we optimising today?',
       quickActions: [
         {
@@ -362,7 +362,7 @@ You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for re
       persona: `You are a senior digital marketing analyst.
 Focus on ROAS, cost per conversion, and budget efficiency.
     Be concise — 2-4 sentences max. Never execute tools without user confirmation.
-    You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for real-time responses.`,
+    You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for quick responses.`,
       greeting: 'Ready to optimise your marketing plan. What do you need?',
       quickActions: [
         {

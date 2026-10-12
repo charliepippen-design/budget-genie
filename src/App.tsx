@@ -3,8 +3,10 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Suspense, lazy } from 'react';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { Suspense, type ReactNode } from 'react';
+import { lazyWithReload } from '@/lib/lazy-with-reload';
+import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ClerkProvider } from '@clerk/clerk-react';
@@ -17,16 +19,26 @@ import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
 import { SubscriptionAccessSync } from '@/components/common/SubscriptionAccessSync';
 
-const Landing = lazy(() => import('./pages/Landing'));
-const Index = lazy(() => import('./pages/Index'));
-const Pricing = lazy(() => import('./pages/Pricing'));
-const NotFound = lazy(() => import('./pages/NotFound'));
-const Auth = lazy(() => import('./pages/Auth'));
-const Settings = lazy(() => import('./pages/Settings'));
-const Onboard = lazy(() => import('./pages/Onboard'));
-const Report = lazy(() => import('./pages/Report'));
-const Output = lazy(() => import('./pages/Output'));
-const Legal = lazy(() => import('./pages/Legal'));
+const Landing = lazyWithReload(() => import('./pages/Landing'), 'Landing');
+const Index = lazyWithReload(() => import('./pages/Index'), 'Index');
+const Pricing = lazyWithReload(() => import('./pages/Pricing'), 'Pricing');
+const NotFound = lazyWithReload(() => import('./pages/NotFound'), 'NotFound');
+const Auth = lazyWithReload(() => import('./pages/Auth'), 'Auth');
+const Settings = lazyWithReload(() => import('./pages/Settings'), 'Settings');
+const Onboard = lazyWithReload(() => import('./pages/Onboard'), 'Onboard');
+const Report = lazyWithReload(() => import('./pages/Report'), 'Report');
+const Output = lazyWithReload(() => import('./pages/Output'), 'Output');
+const Legal = lazyWithReload(() => import('./pages/Legal'), 'Legal');
+
+// Each route gets its own boundary, reset on navigation, so one broken page never blanks the app.
+const RouteBoundary = ({ name, children }: { name: string; children: ReactNode }) => {
+  const location = useLocation();
+  return (
+    <SectionErrorBoundary name={name} resetKeys={[location.pathname]}>
+      {children}
+    </SectionErrorBoundary>
+  );
+};
 
 const queryClient = new QueryClient();
 
@@ -62,53 +74,28 @@ const AppShell = () => {
             <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
-                  <Route path="/" element={<Landing />} />
-                  <Route path="/auth" element={<Auth />} />
-                  <Route path="/pricing" element={<Pricing />} />
-                  <Route path="/terms" element={<Legal doc="terms" />} />
-                  <Route path="/refund-policy" element={<Legal doc="refund" />} />
-                  <Route path="/privacy" element={<Legal doc="privacy" />} />
-                  <Route
-                    path="/app"
-                    element={
-                      <ProtectedRoute>
+                  <Route path="/" element={<RouteBoundary name="route:/"><Landing /></RouteBoundary>} />
+                  <Route path="/auth" element={<RouteBoundary name="route:/auth"><Auth /></RouteBoundary>} />
+                  <Route path="/pricing" element={<RouteBoundary name="route:/pricing"><Pricing /></RouteBoundary>} />
+                  <Route path="/terms" element={<RouteBoundary name="route:/terms"><Legal doc="terms" /></RouteBoundary>} />
+                  <Route path="/refund-policy" element={<RouteBoundary name="route:/refund-policy"><Legal doc="refund" /></RouteBoundary>} />
+                  <Route path="/privacy" element={<RouteBoundary name="route:/privacy"><Legal doc="privacy" /></RouteBoundary>} />
+                  <Route path="/app" element={<RouteBoundary name="route:/app"><ProtectedRoute>
                         <Index />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <ProtectedRoute>
+                      </ProtectedRoute></RouteBoundary>} />
+                  <Route path="/settings" element={<RouteBoundary name="route:/settings"><ProtectedRoute>
                         <Settings />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/onboard"
-                    element={
-                      <ProtectedRoute>
+                      </ProtectedRoute></RouteBoundary>} />
+                  <Route path="/onboard" element={<RouteBoundary name="route:/onboard"><ProtectedRoute>
                         <Onboard />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/report"
-                    element={
-                      <ProtectedRoute>
+                      </ProtectedRoute></RouteBoundary>} />
+                  <Route path="/report" element={<RouteBoundary name="route:/report"><ProtectedRoute>
                         <Report />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route
-                    path="/output"
-                    element={
-                      <ProtectedRoute>
+                      </ProtectedRoute></RouteBoundary>} />
+                  <Route path="/output" element={<RouteBoundary name="route:/output"><ProtectedRoute>
                         <Output />
-                      </ProtectedRoute>
-                    }
-                  />
-                  <Route path="*" element={<NotFound />} />
+                      </ProtectedRoute></RouteBoundary>} />
+                  <Route path="*" element={<RouteBoundary name="route:404"><NotFound /></RouteBoundary>} />
                 </Routes>
               </Suspense>
             </CurrencyProvider>

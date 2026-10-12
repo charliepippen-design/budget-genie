@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, BadgeDollarSign, Bitcoin, CreditCard, Sparkles } from 'lucide-react';
+import { Bitcoin, CreditCard, Sparkles } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { SubscriptionTier } from '@/hooks/use-media-plan-store';
 import { cn } from '@/lib/utils';
+import { PAID_PLANS } from '@/lib/plans';
 import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
 
 interface UpgradeGatewayModalProps {
@@ -25,11 +26,6 @@ interface UpgradeGatewayModalProps {
   onCopyNowPaymentsLink?: (tier: SubscriptionTier) => Promise<void> | void;
   isProcessing?: boolean;
 }
-
-const ROI_BY_TIER: Record<Exclude<SubscriptionTier, 'free'>, { lift: string; payback: string }> = {
-  pro: { lift: '+18% forecast precision', payback: 'Typical payback in 14 days' },
-  enterprise: { lift: '+31% operating leverage', payback: 'Typical payback in 7 days' },
-};
 
 const NOWPAYMENTS_CHECKOUT_URL = 'https://nowpayments.io/payment/?iid=4321051348&source=button';
 const NOWPAYMENTS_BUTTON_SRC = 'https://nowpayments.io/images/embeds/payment-button-white.svg';
@@ -47,7 +43,7 @@ export function UpgradeGatewayModal({
   isProcessing = false,
 }: UpgradeGatewayModalProps) {
   const billableTier = selectedTier === 'free' ? 'pro' : selectedTier;
-  const roi = ROI_BY_TIER[billableTier];
+  const plan = PAID_PLANS.find((p) => p.tier === billableTier) ?? PAID_PLANS[0];
   const isStripeAvailable = enableStripe && typeof onPayWithStripe === 'function';
   // With crypto hidden the card rail is the only option; without Stripe either, checkout is unavailable.
   const initialMethod = (): 'card' | 'crypto' =>
@@ -76,37 +72,20 @@ export function UpgradeGatewayModal({
                   Upgrade Gateway
                 </Badge>
                 <Badge variant="outline" className="border-slate-600 text-slate-300">
-                  {billableTier === 'pro' ? 'Pro Acquisition' : 'Enterprise Operator'}
+                  {plan.name}
                 </Badge>
               </div>
               <DialogTitle className="text-2xl font-black tracking-tight text-white">
-                Unlock monetization-grade modeling
+                Upgrade to {plan.name}
               </DialogTitle>
               <DialogDescription className="max-w-2xl text-slate-300">
-                Move from static planning to signal-driven growth loops. Your sandbox, geo matrix,
-                and export stack become full-fidelity the moment checkout succeeds.
+                {plan.tagline}. {plan.priceLabel}/month, billed monthly.
               </DialogDescription>
             </DialogHeader>
           </div>
 
           <div className="grid grid-cols-1 gap-6 px-7 py-6 md:grid-cols-[1.15fr_0.85fr]">
             <div className="space-y-4">
-              <div className="rounded-2xl border border-cyan-500/30 bg-cyan-500/10 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                  Expected ROI Delta
-                </p>
-                <div className="mt-3 flex flex-wrap items-center gap-3">
-                  <div className="rounded-xl border border-cyan-400/30 bg-slate-950/60 px-3 py-2">
-                    <p className="text-xs text-slate-400">Performance Lift</p>
-                    <p className="text-lg font-bold text-cyan-200">{roi.lift}</p>
-                  </div>
-                  <div className="rounded-xl border border-emerald-400/30 bg-slate-950/60 px-3 py-2">
-                    <p className="text-xs text-slate-400">Recovery Window</p>
-                    <p className="text-lg font-bold text-emerald-200">{roi.payback}</p>
-                  </div>
-                </div>
-              </div>
-
               <div className="rounded-2xl border border-slate-700 bg-slate-950/50 p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
                   Checkout Rail
@@ -233,27 +212,15 @@ export function UpgradeGatewayModal({
 
             <div className="rounded-2xl border border-slate-700 bg-slate-950/55 p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-300">
-                What You Unlock Instantly
+                What is included
               </p>
               <ul className="mt-3 space-y-2 text-sm text-slate-300">
-                <li className="flex items-start gap-2">
-                  <Sparkles className="mt-0.5 h-4 w-4 text-cyan-300" />
-                  Advanced LTV Forecast Lab with sandbox scenario controls
-                </li>
-                <li className="flex items-start gap-2">
-                  <BadgeDollarSign className="mt-0.5 h-4 w-4 text-emerald-300" />
-                  Geo-Arbitrage matrix for country-level CPA/LTV overrides
-                </li>
-                <li
-                  className={cn(
-                    'flex items-start gap-2',
-                    billableTier === 'enterprise' ? 'text-violet-200' : 'text-slate-500'
-                  )}
-                >
-                  <ArrowUpRight className="mt-0.5 h-4 w-4 text-violet-300" />
-                  Server-side CDP exports
-                  {billableTier !== 'enterprise' ? ' (Enterprise required)' : ''}
-                </li>
+                {plan.features.map((feature) => (
+                  <li key={feature} className="flex items-start gap-2">
+                    <Sparkles className="mt-0.5 h-4 w-4 text-cyan-300" />
+                    {feature}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>

@@ -8,6 +8,33 @@ export interface GeoCountryProfile {
   baselineLtv: number;
 }
 
+/**
+ * Planning notes on gambling advertising rules per market, shown with plan warnings.
+ * Summaries only, current as of the date checked. Not legal advice.
+ *
+ * BR, checked 2026-10-11 against official sources:
+ * - Lei 14.790/2023 (regulated fixed-odds betting; licensed operators from Jan 2025):
+ *   https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2023/lei/l14790.htm
+ * - Portaria SPA/MF 1.231/2024 (responsible gambling and advertising rules), amended by
+ *   Portaria SPA/MF 1.964/2026 (mandatory warning phrases):
+ *   https://www.gov.br/fazenda/pt-br/composicao/orgaos/secretaria-de-premios-e-apostas/apostas-de-quota-fixa/legislacao/apostas
+ * - Medida Provisoria 1.394, 25 Sep 2026 (in force on publication): Art. 1 prohibits exploitation, offer,
+ *   intermediation and advertising of fixed-odds betting; Art. 4 extinguishes federal authorisations 30 days
+ *   after publication (25 Oct 2026); Art. 2 §1 extinguishes state and district concessions/authorisations in
+ *   the same Art. 4 period; sites and apps offline from 6 Oct 2026 (Fazenda timetable).
+ * - Constituição Federal Art. 62 §3 and §7: a provisional measure loses effect if not converted into law
+ *   within 60 days, extendable once by 60 days:
+ *   https://www.planalto.gov.br/ccivil_03/constituicao/constituicao.htm
+ *   Ministry of Finance summary:
+ *   https://www.gov.br/fazenda/pt-br/composicao/orgaos/secretaria-de-premios-e-apostas/medida-provisoria-ndeg-1-394-2026-entenda-as-novas-regras-para-as-apostas-de-quota-fixa
+ *   Text: https://www.planalto.gov.br/ccivil_03/_ato2023-2026/2026/Mpv/mpv1394.htm
+ * - Press (not official) reports challenges before the STF (ADI 8024, ADI 8027); no decision found as of 2026-10-11.
+ * - Other lottery types authorised by law are not covered by the MP (Art. 1, para 2).
+ */
+export const MARKET_ADVERTISING_NOTES: Record<string, string> = {
+  BR: 'Brazil: since 25 Sep 2026, Medida Provisória 1.394/2026 (Art. 1) prohibits the offer and advertising of fixed-odds betting (sports betting and online casino games) nationwide. Federal, state and district authorisations end 30 days after publication, on 25 Oct 2026 (MP 1.394/2026, Art. 2 §1 and Art. 4), and betting sites and apps had to go offline from 6 Oct 2026. Under Constituição Federal Art. 62 §3, a provisional measure loses effect if Congress does not convert it into law within 60 days, extendable once by 60 days. Other lotteries authorised by law are not affected (Art. 1 §2). Sources: planalto.gov.br (MP 1.394/2026, Constituição Federal); Ministério da Fazenda, Secretaria de Prêmios e Apostas (gov.br/fazenda). Check the current status before planning spend.',
+};
+
 export const TIER_LABELS: Record<GeoTierKey, string> = {
   tier1: 'Tier 1: Premium',
   tier2: 'Tier 2: Volume',

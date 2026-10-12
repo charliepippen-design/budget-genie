@@ -54,7 +54,7 @@ export default function Landing() {
         <div className="mb-12 space-y-4">
           <p className="text-lg text-white/90 leading-relaxed">
             Transform your media planning with intelligent insights, automated optimization, and
-            real-time analytics.
+            instant scenario modeling.
           </p>
           <div className="flex gap-4 justify-center text-white/80 text-sm md:text-base">
             <div className="flex items-center gap-2">
@@ -63,7 +63,7 @@ export default function Landing() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">📊</span>
-              <span>Real-time Analytics</span>
+              <span>Instant Scenario Modeling</span>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-2xl">🚀</span>

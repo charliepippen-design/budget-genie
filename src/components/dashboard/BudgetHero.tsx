@@ -7,6 +7,7 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { MIN_BUDGET_CAP, useBlendedMetrics } from '@/hooks/use-media-plan-store';
 import { ForecastCard } from './ForecastCard';
+import { LossBanner } from './LossBanner';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
 
 export const BudgetHero = () => {
@@ -238,7 +239,12 @@ export const BudgetHero = () => {
 
         {/* RIGHT COLUMN: FORECAST ENGINE */}
         <div className="h-full">
-          <ForecastCard />
+          <div className="flex h-full flex-col gap-3">
+            <LossBanner />
+            <div className="min-h-0 flex-1">
+              <ForecastCard />
+            </div>
+          </div>
         </div>
       </div>
     </div>
