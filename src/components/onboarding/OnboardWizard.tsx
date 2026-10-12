@@ -85,7 +85,7 @@ function parsePositive(value: string): number | undefined {
 }
 
 export const OnboardWizard = () => {
-  const { format, symbol } = useCurrency();
+  const { format, symbol, code } = useCurrency();
   const navigate = useNavigate();
   const setTotalBudget = useMediaPlanStore((state) => state.setTotalBudget);
   const setOnboardingVertical = useMediaPlanStore((state) => state.setOnboardingVertical);
@@ -233,7 +233,7 @@ export const OnboardWizard = () => {
       const startedAt = Date.now();
       let refinedPlan: Awaited<ReturnType<typeof generateOnboardingPlan>> = null;
       try {
-        refinedPlan = await generateOnboardingPlan(answers);
+        refinedPlan = await generateOnboardingPlan(answers, code);
       } catch {
         // AI generation failed — continue with preset defaults
       }
@@ -350,6 +350,7 @@ export const OnboardWizard = () => {
       toast(planReadyToast.title, planReadyToast.options);
     },
     [
+      code,
       hasExistingPlan,
       applyGeneratedPlan,
       clearActiveGeos,

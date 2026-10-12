@@ -6,7 +6,7 @@ vi.mock('@/lib/ai-client', () => ({
   generateJSON: (...args: unknown[]) => mockGenerateJSON(...args),
 }));
 
-import { generateOnboardingPlan, generateWizardPlan, type WizardAnswers } from '@/lib/onboarding-ai';
+import { buildPrompt, generateOnboardingPlan, generateWizardPlan, type WizardAnswers } from '@/lib/onboarding-ai';
 import { getOnboardingMarkets } from '@/lib/geo-market-data';
 
 const answers: WizardAnswers = {
@@ -49,6 +49,26 @@ describe('generateOnboardingPlan', () => {
   it('returns null when the gateway fails', async () => {
     mockGenerateJSON.mockRejectedValueOnce(new Error('Sign in to use the AI planner.'));
     expect(await generateOnboardingPlan(answers)).toBeNull();
+  });
+});
+
+describe('buildPrompt currency', () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it('states the plan currency code and never a dollar sign', () => {
+    const prompt = buildPrompt({ ...answers, benchmarks: { cpa: 70, ltv: 210 } }, 'GBP');
+    expect(prompt).toContain('Budget: 50,000 GBP/month');
+    expect(prompt).toContain('Known CPA: 70 GBP');
+    expect(prompt).toContain('Known LTV per conversion: 210 GBP');
+    expect(prompt).not.toContain('$');
+  });
+
+  it('passes the currency code through generateOnboardingPlan', async () => {
+    mockGenerateJSON.mockResolvedValueOnce(validPlan);
+    await generateOnboardingPlan(answers, 'CHF');
+    expect(mockGenerateJSON.mock.calls[0][0] as string).toContain('Budget: 50,000 CHF/month');
   });
 });
 

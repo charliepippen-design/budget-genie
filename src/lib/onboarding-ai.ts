@@ -1,5 +1,6 @@
 import { generateJSON } from '@/lib/ai-client';
 import { z } from 'zod';
+import type { CurrencyCode } from '@/contexts/CurrencyContext';
 import { getOnboardingMarkets, normalizeMarketCode, TOP_IGAMING_GEOS } from './geo-market-data';
 import type { IndustryId } from './industries';
 import { generatePlan, type GeneratedPlan, type PlanBrief } from './plan-generator';
@@ -34,7 +35,9 @@ const RefinedPlanSchema = z.object({
 
 export type RefinedPlan = z.infer<typeof RefinedPlanSchema>;
 
-function buildPrompt(answers: WizardAnswers): string {
+/** Money in the prompt is an amount plus the plan currency code, never a bare symbol. */
+export function buildPrompt(answers: WizardAnswers, currency: CurrencyCode = 'EUR'): string {
+  const amt = (n: number) => `${n.toLocaleString('en-US')} ${currency}`;
   const preset = VERTICAL_PRESETS[answers.vertical];
   const marketNames = new Map(getOnboardingMarkets(answers.vertical).map((m) => [m.code, m.name]));
   const validGeos = answers.geos
@@ -48,13 +51,13 @@ function buildPrompt(answers: WizardAnswers): string {
 
   const geoUniverse =
     answers.vertical === 'igaming'
-      ? TOP_IGAMING_GEOS.map((geo) => `- ${geo.name} (${geo.tier}): CPA $${geo.baselineCpa}, LTV $${geo.baselineLtv}`).join('\n')
+      ? TOP_IGAMING_GEOS.map((geo) => `- ${geo.name} (${geo.tier}): CPA ${amt(geo.baselineCpa)}, LTV ${amt(geo.baselineLtv)}`).join('\n')
       : getOnboardingMarkets(answers.vertical).map((m) => `- ${m.name} (${m.tier})`).join('\n');
 
   const benchmarkContext =
     [
-      answers.benchmarks.cpa ? `Known CPA: $${answers.benchmarks.cpa}` : null,
-      answers.benchmarks.ltv ? `Known LTV per conversion: $${answers.benchmarks.ltv}` : null,
+      answers.benchmarks.cpa ? `Known CPA: ${amt(answers.benchmarks.cpa)}` : null,
+      answers.benchmarks.ltv ? `Known LTV per conversion: ${amt(answers.benchmarks.ltv)}` : null,
     ]
       .filter(Boolean)
       .join('. ') || 'No benchmarks provided - use vertical defaults.';
@@ -68,7 +71,8 @@ function buildPrompt(answers: WizardAnswers): string {
 
   return `You are a senior performance marketing strategist. A client has provided these details:
 
-Budget: $${answers.budget.toLocaleString()}/month
+Budget: ${amt(answers.budget)}/month
+Currency: every money amount is in ${currency}; never assume dollars.
 Vertical: ${preset.label} (${preset.description})
 Goal: ${goalDescriptions[answers.goal]}
 ${geoContext}
@@ -80,7 +84,7 @@ ${geoUniverse}
 The starting channel mix from the vertical preset is:
 ${preset.channels.map((channel) => `- ${channel.name}: ${channel.allocationPct}%`).join('\n')}
 
-Vertical defaults: CPA target $${preset.defaultCpaTarget}, ROAS target ${preset.defaultRoasTarget}x, LTV $${preset.defaultPlayerValue}.
+Vertical defaults: CPA target ${amt(preset.defaultCpaTarget)}, ROAS target ${preset.defaultRoasTarget}x, LTV ${amt(preset.defaultPlayerValue)}.
 
 Your job:
 1. Adjust the channel allocations to best serve the client's stated goal and geo context.
@@ -135,8 +139,11 @@ export function generateWizardPlan(answers: WizardAnswers): GeneratedPlan | null
   });
 }
 
-export async function generateOnboardingPlan(answers: WizardAnswers): Promise<RefinedPlan | null> {
-  const prompt = buildPrompt(answers);
+export async function generateOnboardingPlan(
+  answers: WizardAnswers,
+  currency: CurrencyCode = 'EUR'
+): Promise<RefinedPlan | null> {
+  const prompt = buildPrompt(answers, currency);
   try {
     // JSON must match the schema exactly; anything else is treated as no answer.
     const parsed = RefinedPlanSchema.safeParse(await generateJSON(`${prompt}

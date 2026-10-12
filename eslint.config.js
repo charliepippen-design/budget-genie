@@ -35,7 +35,16 @@ export default tseslint.config(
           message:
             "Do not use an expression-bodied arrow in React.useEffect/useLayoutEffect: its value is used as the cleanup. Chrome 150+ scroll APIs (scrollIntoView, scrollTo) return a Promise, which React then calls and crashes with 'n is not a function'. Use a block body: React.useEffect(() => { ... }, []).",
         },
+        // Money goes through formatMoney (CurrencyContext) so one plan currency shows everywhere.
+        {
+          selector: "Property[key.name='style'][value.value='currency']",
+          message: "Format money with formatMoney() from @/contexts/CurrencyContext, not Intl style: 'currency'.",
+        },
       ],
     },
+  },
+  {
+    files: ["src/contexts/CurrencyContext.tsx"],
+    rules: { "no-restricted-syntax": "off" },
   },
 );

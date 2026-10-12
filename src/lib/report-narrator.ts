@@ -1,5 +1,6 @@
 import { generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
+import { CURRENCIES, formatMoney, type CurrencyCode } from '@/contexts/CurrencyContext';
 
 export interface ReportNarratorInput {
   totalBudget: number;
@@ -40,12 +41,8 @@ const NarrativeSchema = z.object({
 export type ReportNarrative = z.infer<typeof NarrativeSchema>;
 
 function buildPrompt(input: ReportNarratorInput): string {
-  const $ = (n: number) =>
-    new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: input.currency ?? 'EUR',
-      maximumFractionDigits: 0,
-    }).format(n);
+  const code = (input.currency && input.currency in CURRENCIES ? input.currency : 'EUR') as CurrencyCode;
+  const $ = (n: number) => formatMoney(n, code);
 
   const p = input.profitability;
   const profitLines = p
