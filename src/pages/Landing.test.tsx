@@ -32,11 +32,15 @@ describe('Landing', () => {
       );
     });
     const h1 = container.querySelector('h1');
-    expect(h1?.textContent).toBe('Plan your media budget across channels in minutes');
+    expect(h1?.textContent).toBe('Plan and forecast iGaming acquisition budgets by market');
     // Responsive H1: small base size so it does not clip at 375px.
     expect(h1?.className).toMatch(/\btext-3xl\b/);
     expect(container.querySelectorAll('ul[aria-label="Benefits"] li')).toHaveLength(3);
     expect(container.textContent).toContain('Start free, no card required');
+    const titles = [...container.querySelectorAll('ul[aria-label="Benefits"] li p:first-child')].map((e) => e.textContent);
+    expect(titles).toEqual(['Markets with CPA and LTV benchmarks', 'P&L and payback', 'AI media planner']);
+    expect(container.querySelector('[data-testid="landing-preview"]')?.textContent).toContain('United Kingdom');
+    expect(container.querySelector('a[href="/pricing"]')?.textContent).toBe('See pricing');
     // Brand heading stays available for the e2e heading selector.
     expect(container.querySelector('h2')?.textContent).toBe('MediaPlanner Pro');
   });

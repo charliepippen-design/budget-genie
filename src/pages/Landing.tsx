@@ -5,38 +5,74 @@ import { Button } from '@/components/ui/button';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { LegalLinks } from '@/pages/Legal';
 import { BrandLogo } from '@/components/common/BrandLogo';
-import { BRAND_NAME, BRAND_TAGLINE } from '@/lib/brand';
+import { BRAND_NAME } from '@/lib/brand';
 import { FREE_PLAN } from '@/lib/plans';
+import { formatMoney } from '@/contexts/CurrencyContext';
 
 const BENEFITS = [
-  { title: 'Allocate by channel', body: 'Split one budget across channels and markets.' },
-  { title: 'Compare scenarios', body: 'Change inputs and see the plan update instantly.' },
-  { title: 'Export the plan', body: 'Share results as PDF, Excel or CSV on Pro.' },
+  {
+    title: 'Markets with CPA and LTV benchmarks',
+    body: 'Split an iGaming budget by market and tier, with CPA and player value for each.',
+  },
+  {
+    title: 'P&L and payback',
+    body: 'See month-1 and lifetime profit, break-even CPA and payback before you spend.',
+  },
+  {
+    title: 'AI media planner',
+    body: 'Ask the planner to rebuild the plan or rebalance channels on Pro.',
+  },
 ];
 
-const MOCK_ROWS = [
-  { name: 'Search', pct: 35 },
-  { name: 'Social', pct: 30 },
-  { name: 'Video', pct: 20 },
-  { name: 'Display', pct: 15 },
+// Fixed demo plan, rendered read-only (illustrative numbers, not live data).
+const DEMO_BUDGET = 50000;
+const DEMO_MARKETS = [
+  { name: 'United Kingdom', share: 40, cpa: 180, ltv: 310 },
+  { name: 'Canada', share: 35, cpa: 150, ltv: 270 },
+  { name: 'Germany', share: 25, cpa: 130, ltv: 210 },
 ];
 
-/** Lightweight illustration of the planner (not live data). */
 function DashboardPreview() {
+  const money = (v: number) => formatMoney(v, 'EUR');
+  const rows = DEMO_MARKETS.map((m) => {
+    const customers = Math.round((DEMO_BUDGET * m.share) / 100 / m.cpa);
+    return { ...m, customers, value: customers * m.ltv };
+  });
+  const customers = rows.reduce((a, r) => a + r.customers, 0);
+  const value = rows.reduce((a, r) => a + r.value, 0);
   return (
-    <figure className="mt-10 mx-auto max-w-md rounded-2xl bg-slate-900/90 border border-white/20 p-4 text-left shadow-2xl">
+    <figure
+      data-testid="landing-preview"
+      className="mt-10 mx-auto max-w-lg rounded-2xl bg-slate-900/90 border border-white/20 p-4 text-left shadow-2xl"
+    >
       <figcaption className="text-xs uppercase tracking-wider text-slate-300 mb-3">
-        Example plan (illustration)
+        Example plan (illustration, not live data)
       </figcaption>
-      <ul className="space-y-3">
-        {MOCK_ROWS.map((r) => (
+      <div className="grid grid-cols-3 gap-2 text-center">
+        {[
+          ['Budget', money(DEMO_BUDGET)],
+          ['New players', String(customers)],
+          ['Lifetime value', money(value)],
+        ].map(([label, val]) => (
+          <div key={label} className="rounded-lg bg-slate-800 p-2">
+            <div className="text-[11px] text-slate-300">{label}</div>
+            <div className="text-sm sm:text-base font-semibold text-white">{val}</div>
+          </div>
+        ))}
+      </div>
+      <ul className="mt-4 space-y-3">
+        {rows.map((r) => (
           <li key={r.name}>
-            <div className="flex justify-between text-sm text-slate-100">
-              <span>{r.name}</span>
-              <span>{r.pct}%</span>
+            <div className="flex flex-wrap justify-between gap-x-2 text-sm text-slate-100">
+              <span>
+                {r.name} {r.share}%
+              </span>
+              <span className="text-slate-300">
+                CPA {money(r.cpa)} / LTV {money(r.ltv)}
+              </span>
             </div>
             <div className="mt-1 h-2 rounded-full bg-slate-700" aria-hidden="true">
-              <div className="h-2 rounded-full bg-blue-400" style={{ width: `${r.pct}%` }} />
+              <div className="h-2 rounded-full bg-blue-400" style={{ width: `${r.share}%` }} />
             </div>
           </li>
         ))}
@@ -79,10 +115,11 @@ export default function Landing() {
         <BrandLogo size="md" as="h2" className="justify-center mb-6" />
 
         <h1 className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight text-white drop-shadow-lg break-words">
-          Plan your media budget across channels in minutes
+          Plan and forecast iGaming acquisition budgets by market
         </h1>
         <p className="mt-4 text-base sm:text-lg md:text-xl text-blue-50 leading-relaxed">
-          {BRAND_TAGLINE}. Split a budget across channels, compare scenarios and export the plan.
+          Split a budget across markets and channels, check CPA, LTV, P&amp;L and payback, and compare scenarios before
+          you spend.
         </p>
 
         {/* Benefits */}
@@ -117,9 +154,9 @@ export default function Landing() {
         <DashboardPreview />
 
         <p className="mt-8 text-white/80 text-sm">
-          The {FREE_PLAN.name} plan includes the planner and scenarios.{' '}
+          The {FREE_PLAN.name} plan includes the planner and scenarios. Pro adds the AI planner and exports.{' '}
           <Link to="/pricing" className="underline font-semibold">
-            See plans
+            See pricing
           </Link>
         </p>
         <LegalLinks className="mt-6 text-white/80" />
