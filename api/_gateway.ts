@@ -35,15 +35,6 @@ const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 // ---------- Gemini ----------
-const THINKING_LEVELS = ["minimal", "low", "medium", "high"];
-
-/** thinkingConfig for a task from its env var. Default low; "default" sends nothing. */
-function thinkingConfig(name: string): { thinkingConfig?: { thinkingLevel: string } } {
-  const v = (env(name) || "low").trim().toLowerCase();
-  if (v === "default") return {};
-  return { thinkingConfig: { thinkingLevel: THINKING_LEVELS.includes(v) ? v : "low" } };
-}
-
 async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
   const key = env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
@@ -128,6 +119,16 @@ function splitParts(parts: Part[]) {
       return { id: fc.id, name: fc.name, args: fc.args ?? {} };
     });
   return { text, toolCalls, raw: parts };
+}
+
+// Gemini 3 thinking level per task (latency). Env: AI_PLANNER_THINKING, AI_JSON_THINKING.
+const THINKING_LEVELS = ["minimal", "low", "medium", "high"];
+
+/** thinkingConfig for a task from its env var. Default low; "default" sends nothing. */
+function thinkingConfig(name: string): { thinkingConfig?: { thinkingLevel: string } } {
+  const v = (env(name) || "low").trim().toLowerCase();
+  if (v === "default") return {};
+  return { thinkingConfig: { thinkingLevel: THINKING_LEVELS.includes(v) ? v : "low" } };
 }
 
 // ---------- Task: planner ----------
