@@ -9,6 +9,7 @@ export interface StrategySummaryInput {
   geos: string[];
   revenueMetric: string;
   format: (n: number) => string;
+  /** Engine plan health (same as LossBanner). When it loses money the summary opens with the loss. */
   health?: PlanHealth;
 }
 
@@ -21,27 +22,23 @@ export function buildStrategySummary(input: StrategySummaryInput): string {
   const ranked = channels.filter((c) => c.spend > 0).sort((a, b) => b.spend - a.spend);
   const totalSpend = ranked.reduce((s, c) => s + c.spend, 0);
 
-  const { health } = input;
   const parts: string[] = [];
-  const channelWord = ranked.length === 1 ? 'channel' : 'channels';
-  const metric = input.revenueMetric.toLowerCase();
-  if (health && health.losesMoney && health.breakEvenCpa !== null) {
+  const { health } = input;
+  const losing = !!health && health.losesMoney && health.breakEvenCpa !== null;
+  if (losing && health && health.breakEvenCpa !== null) {
     const current = health.blendedCpa === null ? 'n/a' : format(health.blendedCpa);
     parts.push(
       `At these assumptions this plan loses about ${format(Math.abs(health.monthlyContribution))} per month. Break-even cost per customer is ${format(health.breakEvenCpa)} (current ${current}).`
     );
-    parts.push(
-      `It deploys ${format(totalBudget)} across ${ranked.length} ${channelWord}; projected ${metric} is ${format(projectedRevenue)} at ${blendedRoas.toFixed(2)}x return on spend, which does not cover the cost.`
-    );
-  } else {
-    parts.push(
-      `This plan deploys ${format(totalBudget)} across ${ranked.length} ${channelWord}, projecting ${format(projectedRevenue)} in ${metric} at a ${blendedRoas.toFixed(2)}x return on spend.`
-    );
-    if (health && health.monthlyContribution > 0) {
-      parts.push(
-        `At these assumptions the plan earns about ${format(health.monthlyContribution)} per month.`
-      );
-    }
+  }
+  parts.push(
+    `This plan deploys ${format(totalBudget)} across ${ranked.length} ${
+      ranked.length === 1 ? 'channel' : 'channels'
+    }, projecting ${format(projectedRevenue)} in ${input.revenueMetric.toLowerCase()} at a ${blendedRoas.toFixed(2)}x return on spend.`
+  );
+  if (losing) parts.push('At these assumptions that projected value does not cover the media cost.');
+  else if (health && health.monthlyContribution > 0) {
+    parts.push(`At these assumptions the plan earns about ${format(health.monthlyContribution)} per month.`);
   }
 
   if (ranked.length > 0 && totalSpend > 0) {

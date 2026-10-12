@@ -30,8 +30,8 @@ describe('buildStrategySummary', () => {
       true
     );
     expect(text).toContain('Break-even cost per customer is €11 (current €178).');
-    expect(text).toContain('which does not cover the cost');
-    expect(text).not.toContain('projecting €28,704');
+    expect(text).toContain('that projected value does not cover the media cost');
+    expect(text.indexOf('loses about')).toBeLessThan(text.indexOf('projecting €28,704'));
   });
 
   it('seed d2-007: summary of this plan for my boss leads with the loss', () => {
