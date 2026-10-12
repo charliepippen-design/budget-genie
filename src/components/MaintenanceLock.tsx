@@ -1,5 +1,6 @@
 import { Shield, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { BRAND_NAME } from '@/lib/brand';
 
 export const MaintenanceLock = () => {
     return (
@@ -14,7 +15,7 @@ export const MaintenanceLock = () => {
 
                 <div className="space-y-2">
                     <h1 className="text-4xl font-bold tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-b from-white to-white/60">
-                        Media Planner Pro
+                        {BRAND_NAME}
                     </h1>
                     <h2 className="text-lg font-medium text-slate-400">
                         Coming Soon - Private Beta

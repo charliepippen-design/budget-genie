@@ -47,7 +47,7 @@ export function EfficiencyAlertBanner() {
               className="font-semibold underline underline-offset-2"
               onClick={() => setIsGenieOpen(true)}
             >
-              Review in Genie →
+              Review with the assistant →
             </button>
           </p>
           <Button

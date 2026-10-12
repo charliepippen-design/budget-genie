@@ -8,6 +8,7 @@ import { Suspense, type ReactNode } from 'react';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { SIGN_IN_PATH, SIGN_UP_PATH } from '@/lib/auth-routes';
+import { BRAND_NAME } from '@/lib/brand';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
 import { ThemeProvider } from '@/contexts/ThemeContext';
 import { ClerkProvider } from '@clerk/clerk-react';
@@ -133,7 +134,7 @@ const AppShell = () => {
         <div className="max-w-xl text-center rounded-3xl border border-white/10 bg-slate-900/90 p-10 shadow-2xl">
           <h1 className="text-3xl font-bold mb-4">Site configuration is missing</h1>
           <p className="text-slate-300 mb-6 leading-7">
-            Budget Genie requires Clerk configuration to run. Please add the environment variable{' '}
+            {BRAND_NAME} requires Clerk configuration to run. Please add the environment variable{' '}
             <code className="bg-slate-800 px-2 py-1 rounded">VITE_CLERK_PUBLISHABLE_KEY</code> to
             your Vercel project and redeploy.
           </p>

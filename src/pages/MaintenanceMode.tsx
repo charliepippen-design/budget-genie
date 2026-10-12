@@ -1,5 +1,6 @@
 
 import { AlertTriangle, Hammer } from "lucide-react";
+import { BRAND_NAME } from '@/lib/brand';
 
 export default function MaintenanceMode() {
     // Allow bypassing for devs via invisible clickable area or just url query
@@ -14,7 +15,7 @@ export default function MaintenanceMode() {
             <h1 className="text-4xl font-bold text-white mb-4 tracking-tight">System Maintenance</h1>
 
             <p className="text-slate-400 max-w-md mx-auto mb-8 text-lg">
-                MediaPlanner Pro is currently undergoing scheduled upgrades to improve cloud synchronization and performance.
+                {BRAND_NAME} is currently undergoing scheduled upgrades to improve cloud synchronization and performance.
             </p>
 
             <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 max-w-sm w-full flex items-start gap-3">

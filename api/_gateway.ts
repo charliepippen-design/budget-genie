@@ -167,7 +167,7 @@ const PLANNER_TOOLS = [
 ];
 
 function plannerSystemPrompt(ctx: Record<string, unknown>): string {
-  return `You are the planning copilot of MediaPlan Pro, a media planning tool for performance and brand marketing.
+  return `You are the planning copilot of MediaPlanner Pro, a media planning tool for performance and brand marketing.
 You work together with a deterministic planning engine: YOU gather the brief and translate what the user says into brief fields and channel adjustments; THE ENGINE computes every number.
 
 HOW TO WORK

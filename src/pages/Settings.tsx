@@ -21,6 +21,7 @@ import { Separator } from '@/components/ui/separator';
 import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
+import { BrandLogo } from '@/components/common/BrandLogo';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
@@ -390,6 +391,7 @@ export default function Settings() {
             <ArrowLeft className="h-6 w-6" />
           </Button>
           <div>
+            <BrandLogo size="sm" className="mb-2" />
             <h1 className="text-3xl font-bold tracking-tight text-white">Account Settings</h1>
             <p className="text-slate-400">Manage your profile, data, and subscription.</p>
           </div>

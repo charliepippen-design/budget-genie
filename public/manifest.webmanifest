@@ -1,6 +1,6 @@
 {
-  "name": "Budget Genie - iGaming Media Planner",
-  "short_name": "BudgetGenie",
+  "name": "MediaPlanner Pro - iGaming Media Planner",
+  "short_name": "MediaPlanner Pro",
   "description": "Offline-ready iGaming media budget planning dashboard.",
   "start_url": "/",
   "display": "standalone",

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Construction } from 'lucide-react';
+import { BRAND_NAME } from '@/lib/brand';
 
 const UnderConstruction: React.FC = () => {
     return (
@@ -11,7 +12,7 @@ const UnderConstruction: React.FC = () => {
                 System Upgrade in Progress
             </h1>
             <p className="text-lg text-slate-400 max-w-md">
-                We're deploying some magic updates to the Budget Genie. <br />
+                We're deploying updates to {BRAND_NAME}. <br />
                 Please check back soon.
             </p>
         </div>
