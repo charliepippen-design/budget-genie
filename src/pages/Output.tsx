@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { StrategicSummary } from '@/components/StrategicSummary';
 import { getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
@@ -285,13 +286,7 @@ const OutputContent = () => {
             Strategic Approach
           </h2>
 
-          {narrativeLoading ? (
-            <div className="space-y-3">
-              <div className="bg-muted animate-pulse rounded h-4 w-full" />
-              <div className="bg-muted animate-pulse rounded h-4 w-4/5" />
-              <div className="bg-muted animate-pulse rounded h-4 w-3/5" />
-            </div>
-          ) : narrative ? (
+          {narrative ? (
             <>
               <div className="flex items-center gap-1.5 text-xs text-primary mb-4">
                 <Sparkles className="w-3 h-3" />
@@ -322,13 +317,16 @@ const OutputContent = () => {
               </div>
             </>
           ) : (
-            <div className="border-l-4 border-primary pl-6 py-2">
-              <p className="text-xl leading-relaxed text-foreground font-light">
-                This plan deploys {$(totalBudget)} across {active.length} channels, projecting{' '}
-                {$(projectedRevenue)} in {vc.terms.revenueMetric.toLowerCase()} at a{' '}
-                {blendedRoas.toFixed(2)}x return on spend.
-              </p>
-            </div>
+            <StrategicSummary
+              channels={active.map((c) => ({ name: c.name, spend: c.metrics.spend }))}
+              totalBudget={totalBudget}
+              blendedCpa={blendedCpa}
+              blendedRoas={blendedRoas}
+              projectedRevenue={projectedRevenue}
+              geos={activeGeos}
+              revenueMetric={vc.terms.revenueMetric}
+              format={$}
+            />
           )}
           {!narrative && (
             <div className="mt-6">
