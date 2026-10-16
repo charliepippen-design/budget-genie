@@ -8,7 +8,7 @@ describe('ltv-model', () => {
   it('payback is the first month where cumulative value covers CPA', () => {
     const { points, paybackMonth } = buildLtvCurve(plan, model);
     expect(points).toHaveLength(12);
-    const expected = points.find((p) => p.ltvToCac >= 1)?.month ?? null;
+    const expected = points.find((p) => (p.ltvToCac ?? 0) >= 1)?.month ?? null;
     expect(paybackMonth).toBe(expected);
     for (let i = 1; i < 12; i++) expect(points[i].cumulativeLtvPerUser).toBeGreaterThanOrEqual(points[i - 1].cumulativeLtvPerUser);
   });
@@ -24,5 +24,14 @@ describe('ltv-model', () => {
     const [bear, base, bull] = buildPlanScenarios(plan, model);
     expect(bear.projectedCohortValue).toBeLessThan(base.projectedCohortValue);
     expect(base.projectedCohortValue).toBeLessThan(bull.projectedCohortValue);
+  });
+
+  // N-14: a plan with no CPA (no conversions) has no LTV:CAC, not 0.00x, and no payback month.
+  it('LTV:CAC is null when the plan has no CPA', () => {
+    const noCpa = { totalSpend: 0, totalConversions: 0, blendedCpa: null, blendedRoas: 0 };
+    const { points, paybackMonth } = buildLtvCurve(noCpa, model);
+    expect(points.every((p) => p.ltvToCac === null)).toBe(true);
+    expect(paybackMonth).toBeNull();
+    expect(buildPlanScenarios(noCpa, model).every((s) => s.ltvToCac === null)).toBe(true);
   });
 });

@@ -34,8 +34,8 @@ export interface SandboxScenarioComparison {
   scenario: 'Bear' | 'Base' | 'Bull';
   baselineProjectedCohortValue: number;
   adjustedProjectedCohortValue: number;
-  baselineLtvToCac: number;
-  adjustedLtvToCac: number;
+  baselineLtvToCac: number | null;
+  adjustedLtvToCac: number | null;
   baselineRoiPct: number;
   adjustedRoiPct: number;
 }

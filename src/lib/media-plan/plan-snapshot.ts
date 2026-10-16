@@ -1,6 +1,6 @@
 import { CATEGORY_INFO } from '@/lib/mediaplan-data';
 import { DEFAULT_IGAMING_REVENUE_INPUTS } from '@/lib/igaming-revenue-model';
-import type { MediaPlanState } from '@/hooks/use-media-plan-store';
+import type { MediaPlanData } from './state';
 import { calculateChannelMetricsWithGeo, getGeoMarketProfile } from './channel-metrics';
 import type {
   ChannelData,
@@ -69,18 +69,26 @@ export const DEFAULT_MULTIPLIERS_FALLBACK: GlobalMultipliers = {
 };
 
 export type PlanInputs = Pick<
-  MediaPlanState,
+  MediaPlanData,
   'totalBudget' | 'channels' | 'globalMultipliers' | 'activeTiers' | 'activeGeos' | 'geoOverrides'
 >;
+
+export interface PlanSnapshot {
+  channels: ChannelWithMetrics[];
+  blended: BlendedMetrics;
+  /** Sum of active fixed-fee prices (spent in full whatever the budget). */
+  fixedSpend: number;
+  /** True when fixed fees alone exceed the budget: the plan spends more than the user set. */
+  overBudget: boolean;
+  /** How far fixed fees exceed the budget (0 when within budget). */
+  overBudgetBy: number;
+}
 
 /**
  * Pure plan computation: per-channel metrics and blended totals.
  * The dashboard hooks and the AI planner both read numbers from here.
  */
-export function computePlanSnapshot(input: PlanInputs): {
-  channels: ChannelWithMetrics[];
-  blended: BlendedMetrics;
-} {
+export function computePlanSnapshot(input: PlanInputs): PlanSnapshot {
   const mults = input.globalMultipliers || DEFAULT_MULTIPLIERS_FALLBACK;
   const { cpaTarget, roasTarget } = mults;
   const geoProfile = getGeoMarketProfile(input.activeTiers, input.activeGeos, input.geoOverrides);
@@ -131,7 +139,14 @@ export function computePlanSnapshot(input: PlanInputs): {
 
   blended.blendedCpa = blended.totalConversions > 0 ? blended.totalSpend / blended.totalConversions : null;
   blended.blendedRoas = blended.totalSpend > 0 ? blended.projectedRevenue / blended.totalSpend : 0;
-  return { channels, blended };
+  const overBudgetBy = Math.max(0, totalFixedSpend - (input.totalBudget || 0));
+  return {
+    channels,
+    blended,
+    fixedSpend: totalFixedSpend,
+    overBudget: overBudgetBy > 0,
+    overBudgetBy,
+  };
 }
 
 /**
@@ -144,7 +159,7 @@ export function getSpendSharePct(channel: ChannelWithMetrics, blended: BlendedMe
 }
 
 export function computeCategoryTotals(
-  snapshot: ReturnType<typeof computePlanSnapshot>
+  snapshot: Pick<PlanSnapshot, 'channels' | 'blended'>
 ): Record<string, { spend: number; percentage: number }> {
   const totals: Record<string, { spend: number; percentage: number }> = {};
 

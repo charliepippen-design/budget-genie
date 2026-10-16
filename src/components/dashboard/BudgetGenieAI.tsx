@@ -7,6 +7,7 @@ import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
 import { SettingsConsole } from './SettingsConsole';
 import { DashboardHeader } from './DashboardHeader';
 import { EfficiencyAlertBanner } from './EfficiencyAlertBanner';
+import { OverBudgetBanner } from './OverBudgetBanner';
 import { BudgetHero } from './BudgetHero';
 import { ChannelTable } from './ChannelTable';
 import { ProjectManager } from './ProjectManager';
@@ -246,7 +247,8 @@ export const BudgetGenieAI = () => {
             onLaunchMasterWizard={() => setIsBudgetWizardOpen(true)}
           />
 
-          <div className="max-w-[1600px] mx-auto w-full px-6 pt-3">
+          <div className="max-w-[1600px] mx-auto w-full px-6 pt-3 space-y-3">
+            <OverBudgetBanner />
             <EfficiencyAlertBanner />
           </div>
 

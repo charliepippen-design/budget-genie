@@ -1,6 +1,7 @@
 import { aiErrorKind, generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
 import { CURRENCIES, formatMoney, type CurrencyCode } from '@/contexts/CurrencyContext';
+import { formatLtvToCac } from '@/lib/planning-insights';
 
 export interface ReportNarratorInput {
   totalBudget: number;
@@ -15,7 +16,7 @@ export interface ReportNarratorInput {
   paybackMonths: number | null;
   topChannel: string;
   weakestChannel: string | null;
-  scenarioBase: { ltvToCac: number; projectedCohortValue: number };
+  scenarioBase: { ltvToCac: number | null; projectedCohortValue: number };
   alertCount: number;
   vertical: string | null;
   geos: string[];
@@ -76,7 +77,7 @@ ${profitLines}- Total monthly budget: ${$(input.totalBudget)}
 - Estimated payback period: ${input.paybackMonths ? input.paybackMonths + ' months' : 'Not calculable'}
 - Top performing channel: ${input.topChannel}
 - Weakest channel: ${input.weakestChannel ?? 'None identified'}
-- LTV to CAC ratio (Base scenario): ${input.scenarioBase.ltvToCac.toFixed(2)}x
+- LTV to CAC ratio (Base scenario): ${formatLtvToCac(input.scenarioBase.ltvToCac)}
 - Projected cohort value (lifetime): ${$(input.scenarioBase.projectedCohortValue)}
 - Active efficiency alerts: ${input.alertCount}
 - Vertical: ${input.vertical ?? 'Not specified'}

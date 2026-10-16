@@ -2,45 +2,38 @@ import { useEffect } from 'react';
 import { useMediaPlanStore } from './use-media-plan-store';
 import { useMultiMonthStore } from './use-multi-month-store';
 import { supabase } from '@/lib/supabase';
+import { SYNC_CHANNEL_NAME, createSyncController, createTabId } from '@/lib/store-sync';
+import type { MediaPlanState } from '@/lib/media-plan/state';
+
+type SyncPayload = Pick<
+  MediaPlanState,
+  'totalBudget' | 'channels' | 'globalMultipliers' | 'presets' | 'projectName'
+>;
 
 export function useStoreSync() {
   useEffect(() => {
-    // 1. BroadcastChannel for modern browsers
-    const channel = new BroadcastChannel('media_planner_sync');
+    // BroadcastChannel keeps open tabs in step. (localStorage itself is shared by persist.)
+    const channel = new BroadcastChannel(SYNC_CHANNEL_NAME);
+
+    const sync = createSyncController<SyncPayload>({
+      tabId: createTabId(),
+      post: (message) => channel.postMessage(message),
+      apply: (payload) => useMediaPlanStore.setState(payload),
+    });
 
     channel.onmessage = (event) => {
-      if (event.data && event.data.type === 'STATE_UPDATE') {
-        useMediaPlanStore.setState(event.data.payload);
-      }
+      sync.onMessage(event.data);
     };
 
-    // 2. Storage event fallback for older browsers/persistence sync
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === 'media-plan-storage' && e.newValue) {
-        try {
-          const parsed = JSON.parse(e.newValue);
-          if (parsed.state) {
-            useMediaPlanStore.setState(parsed.state);
-          }
-        } catch (err) {
-          console.error('Failed to sync from storage', err);
-        }
-      }
-    };
-
-    window.addEventListener('storage', handleStorage);
-
-    // Subscribe to changes to broadcast them
+    // Broadcast local changes. Only DATA, not ACTIONS (functions cannot be cloned).
     const unsubscribe = useMediaPlanStore.subscribe((state) => {
-      // FILTER: Only broadcast DATA, not ACTIONS (functions cannot be cloned)
-      const serializableState = {
+      sync.onLocalChange({
         totalBudget: state.totalBudget,
         channels: state.channels,
         globalMultipliers: state.globalMultipliers,
         presets: state.presets,
         projectName: state.projectName,
-      };
-      channel.postMessage({ type: 'STATE_UPDATE', payload: serializableState });
+      });
     });
 
     let supabaseChannel: ReturnType<typeof supabase.channel> | null = null;
@@ -67,21 +60,20 @@ export function useStoreSync() {
             const statePayload = next?.payload;
             if (!statePayload) return;
 
-            if (statePayload.mediaPlanState) {
-              useMediaPlanStore.setState(
-                statePayload.mediaPlanState as Partial<
-                  ReturnType<typeof useMediaPlanStore.getState>
-                >
-              );
-            }
+            // Every tab receives the realtime event itself, so it is not re-broadcast.
+            sync.applyRemote(() => {
+              if (statePayload.mediaPlanState) {
+                useMediaPlanStore.setState(
+                  statePayload.mediaPlanState as Partial<ReturnType<typeof useMediaPlanStore.getState>>
+                );
+              }
 
-            if (statePayload.multiMonthState) {
-              useMultiMonthStore.setState(
-                statePayload.multiMonthState as Partial<
-                  ReturnType<typeof useMultiMonthStore.getState>
-                >
-              );
-            }
+              if (statePayload.multiMonthState) {
+                useMultiMonthStore.setState(
+                  statePayload.multiMonthState as Partial<ReturnType<typeof useMultiMonthStore.getState>>
+                );
+              }
+            });
           }
         )
         .subscribe();
@@ -91,7 +83,6 @@ export function useStoreSync() {
 
     return () => {
       channel.close();
-      window.removeEventListener('storage', handleStorage);
       unsubscribe();
       supabaseChannel?.unsubscribe();
     };

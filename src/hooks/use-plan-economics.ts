@@ -51,7 +51,7 @@ export function usePlanEconomics() {
       paybackMonths: curve.paybackMonth,
       // 12-month cumulative value per customer from the same curve payback is read from.
       paybackLtvPerUser: curve.points[11]?.cumulativeLtvPerUser ?? 0,
-      ltvToCac12m: curve.points[11]?.ltvToCac ?? 0,
+      ltvToCac12m: curve.points[11]?.ltvToCac ?? null,
       scenarioEnvelope: buildPlanScenarios(plan, model),
     };
   }, [channels, observedLtv, playerValue, vertical, multipliers]);

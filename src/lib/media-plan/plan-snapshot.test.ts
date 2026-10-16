@@ -162,3 +162,40 @@ describe('getSpendSharePct and computeCategoryTotals', () => {
     expect(Object.values(totals).every((t) => t.spend === 0 && t.percentage === 0)).toBe(true);
   });
 });
+
+// N-7: fixed fees above the budget used to overspend silently (variable pool clamped to 0).
+describe('computePlanSnapshot over-budget flag (N-7)', () => {
+  const geo = { activeTiers: { tier1: 100, tier2: 0, tier3: 0 }, activeGeos: [], geoOverrides: {} };
+  const fixed = (price: number) =>
+    channel({ id: 'fixed', buyingModel: 'FLAT_FEE', tier: 'fixed', isActive: true }, price);
+  const variable = channel({ id: 'var', buyingModel: 'CPM', tier: 'scalable', isActive: true, allocationPct: 100 });
+  const input = (totalBudget: number, fixedPrice: number): PlanInputs => ({
+    totalBudget,
+    channels: [fixed(fixedPrice), variable],
+    globalMultipliers: DEFAULT_MULTIPLIERS,
+    ...geo,
+  });
+
+  it('flags a plan whose fixed fees exceed the budget, with the overrun', () => {
+    const snap = computePlanSnapshot(input(10000, 15000));
+    expect(snap.overBudget).toBe(true);
+    expect(snap.overBudgetBy).toBe(5000);
+    expect(snap.fixedSpend).toBe(15000);
+    expect(snap.blended.totalSpend).toBeGreaterThan(10000);
+  });
+
+  it('does not flag a plan within budget (including exactly at budget)', () => {
+    expect(computePlanSnapshot(input(10000, 4000)).overBudget).toBe(false);
+    const exact = computePlanSnapshot(input(10000, 10000));
+    expect(exact.overBudget).toBe(false);
+    expect(exact.overBudgetBy).toBe(0);
+  });
+
+  it('ignores inactive fixed channels', () => {
+    const snap = computePlanSnapshot({
+      ...input(10000, 50000),
+      channels: [{ ...fixed(50000), isActive: false }, variable],
+    });
+    expect(snap.overBudget).toBe(false);
+  });
+});

@@ -76,9 +76,23 @@ export const IGAMING_SUBVERTICAL_PRESETS: Record<IgamingSubvertical, IgamingSubv
   },
 };
 
+/** Fractions (retention, CVR, margin, bonus) live in [0, 1]: 0.55 means 55%. */
 function clampRate(value: number, fallback: number) {
   if (!Number.isFinite(value)) return fallback;
+  return Math.min(1, Math.max(0, value));
+}
+
+/** Turnover is a multiple of player value, so only the lower bound applies. */
+function clampMultiple(value: number, fallback: number) {
+  if (!Number.isFinite(value)) return fallback;
   return Math.max(0, value);
+}
+
+/** Parses a fractional rate typed into a settings field, clamped to [0, 1]. */
+export function parseRateInput(raw: string): number {
+  const value = parseFloat(raw);
+  if (!Number.isFinite(value)) return 0;
+  return Math.min(1, Math.max(0, value));
 }
 
 export function isIgamingVertical(vertical: Vertical | null | undefined): vertical is 'igaming' {
@@ -101,7 +115,7 @@ export function normalizeIgamingRevenueInputs(
       partial?.regToFtdCvr ?? DEFAULT_IGAMING_REVENUE_INPUTS.regToFtdCvr,
       DEFAULT_IGAMING_REVENUE_INPUTS.regToFtdCvr
     ),
-    turnoverRate: clampRate(
+    turnoverRate: clampMultiple(
       partial?.turnoverRate ?? DEFAULT_IGAMING_REVENUE_INPUTS.turnoverRate,
       DEFAULT_IGAMING_REVENUE_INPUTS.turnoverRate
     ),

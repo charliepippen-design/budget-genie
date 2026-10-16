@@ -16,6 +16,7 @@ export interface WizardDraft {
 }
 
 export const ONBOARDING_DRAFT_KEY = 'onboarding-wizard-draft-v1';
+export const ONBOARDING_DRAFT_VERSION = 1;
 
 export const INITIAL_DRAFT: WizardDraft = {
   step: 1,
@@ -66,6 +67,19 @@ export function sanitizeDraft(raw: unknown): WizardDraft {
   };
 }
 
+/** What is written to storage. */
+function partializeDraft(s: OnboardingDraftState) {
+  // A finished wizard leaves nothing behind; a reload mid-generation resumes at the last step.
+  if (s.draft.step === 'done') {
+    return { draft: { ...INITIAL_DRAFT }, selectedBudgetTierKey: null };
+  }
+  return {
+    draft: { ...s.draft, step: s.draft.step === 'generating' ? 6 : s.draft.step },
+    selectedBudgetTierKey: s.selectedBudgetTierKey,
+  };
+}
+type PersistedDraft = ReturnType<typeof partializeDraft>;
+
 export const useOnboardingDraftStore = create<OnboardingDraftState>()(
   persist(
     (set) => ({
@@ -77,17 +91,11 @@ export const useOnboardingDraftStore = create<OnboardingDraftState>()(
     }),
     {
       name: ONBOARDING_DRAFT_KEY,
-      version: 1,
-      partialize: (s) => {
-        // A finished wizard leaves nothing behind; a reload mid-generation resumes at the last step.
-        if (s.draft.step === 'done') {
-          return { draft: { ...INITIAL_DRAFT }, selectedBudgetTierKey: null };
-        }
-        return {
-          draft: { ...s.draft, step: s.draft.step === 'generating' ? 6 : s.draft.step },
-          selectedBudgetTierKey: s.selectedBudgetTierKey,
-        };
-      },
+      version: ONBOARDING_DRAFT_VERSION,
+      // Without a migrate function zustand discards a save whose version differs. The shape has
+      // not changed, so pass it through: merge() sanitises whatever comes back.
+      migrate: (persisted) => (persisted ?? {}) as PersistedDraft,
+      partialize: partializeDraft,
       merge: (persisted, current) => {
         const saved = (persisted ?? {}) as Partial<OnboardingDraftState>;
         const draft = sanitizeDraft(saved.draft);

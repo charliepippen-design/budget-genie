@@ -4,6 +4,8 @@ import {
   calculateIgamingRevenueMonth,
   calculateIgamingRevenueSeries,
   DEFAULT_IGAMING_REVENUE_INPUTS,
+  normalizeIgamingRevenueInputs,
+  parseRateInput,
 } from '@/lib/igaming-revenue-model';
 
 describe('igaming revenue model', () => {
@@ -43,5 +45,33 @@ describe('igaming revenue model', () => {
     expect(series[0].activePlayers).toBe(100);
     expect(series[1].activePlayers).toBeCloseTo(95);
     expect(series[1].ngr).toBeCloseTo(641.25);
+  });
+});
+
+// N-8: rates typed as percentages (55 instead of 0.55) must not blow up the waterfall.
+describe('rate inputs are fractions in [0, 1] (N-8)', () => {
+  it('normalizeIgamingRevenueInputs clamps fractional rates to 1 and keeps turnover as a multiple', () => {
+    const out = normalizeIgamingRevenueInputs(
+      { retentionRate: 55, regToFtdCvr: 20, margin: 6, bonusRate: 25, turnoverRate: 3 },
+      150
+    );
+    expect(out.retentionRate).toBe(1);
+    expect(out.regToFtdCvr).toBe(1);
+    expect(out.margin).toBe(1);
+    expect(out.bonusRate).toBe(1);
+    expect(out.turnoverRate).toBe(3);
+  });
+
+  it('keeps valid fractions and clamps negatives to 0', () => {
+    const out = normalizeIgamingRevenueInputs({ retentionRate: 0.55, margin: -0.2 }, 150);
+    expect(out.retentionRate).toBe(0.55);
+    expect(out.margin).toBe(0);
+  });
+
+  it('parseRateInput clamps what the user types', () => {
+    expect(parseRateInput('55')).toBe(1);
+    expect(parseRateInput('0.55')).toBe(0.55);
+    expect(parseRateInput('-3')).toBe(0);
+    expect(parseRateInput('')).toBe(0);
   });
 });

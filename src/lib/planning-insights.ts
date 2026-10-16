@@ -12,7 +12,13 @@ export interface ScenarioEnvelopePoint {
   scenario: 'Bear' | 'Base' | 'Bull';
   projectedLtvPerUser: number;
   projectedCohortValue: number;
-  ltvToCac: number;
+  /** null when there is no acquisition cost to divide by (shown as "n/a", never 0.00x). */
+  ltvToCac: number | null;
+}
+
+/** "2.35x", or "n/a" when the ratio cannot be computed (no CPA). */
+export function formatLtvToCac(ratio: number | null | undefined, digits = 2): string {
+  return typeof ratio === 'number' && Number.isFinite(ratio) ? `${ratio.toFixed(digits)}x` : 'n/a';
 }
 
 export interface EfficiencyAlert {
@@ -183,7 +189,7 @@ export function buildScenarioEnvelope(input: {
       scenario,
       projectedLtvPerUser,
       projectedCohortValue,
-      ltvToCac: stressedCpa > 0 ? projectedLtvPerUser / stressedCpa : 0,
+      ltvToCac: stressedCpa > 0 ? projectedLtvPerUser / stressedCpa : null,
     };
   });
 }
