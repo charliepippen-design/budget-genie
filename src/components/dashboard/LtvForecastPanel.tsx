@@ -35,6 +35,7 @@ import { Input } from '@/components/ui/input';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
 import {
   buildScenarioEnvelope,
+  formatLtvToCac,
   getChannelGroup,
   GROUP_LABELS,
   type ChannelGroup,
@@ -1194,11 +1195,11 @@ export function LtvForecastPanel() {
                 <div
                   className={cn(
                     'text-2xl font-bold',
-                    terminalPoint.ltvToCac >= 3
+                    (terminalPoint.ltvToCac ?? 0) >= 3
                       ? isDark
                         ? 'text-emerald-400 dark:text-emerald-400'
                         : 'text-emerald-600'
-                      : terminalPoint.ltvToCac >= 1
+                      : (terminalPoint.ltvToCac ?? 0) >= 1
                         ? isDark
                           ? 'text-amber-300 dark:text-amber-300'
                           : 'text-amber-600'
@@ -1207,7 +1208,7 @@ export function LtvForecastPanel() {
                           : 'text-rose-600'
                   )}
                 >
-                  {terminalPoint.ltvToCac.toFixed(2)}x
+                  {formatLtvToCac(terminalPoint.ltvToCac)}
                 </div>
               </div>
 
@@ -1512,7 +1513,7 @@ export function LtvForecastPanel() {
                                 isDark ? 'text-slate-400 dark:text-slate-400' : 'text-slate-600'
                               )}
                             >
-                              {scenario.ltvToCac.toFixed(2)}x LTV:CAC
+                              {formatLtvToCac(scenario.ltvToCac)} LTV:CAC
                             </div>
                           </div>
                         </div>
@@ -1541,7 +1542,7 @@ export function LtvForecastPanel() {
                     isDark ? 'text-cyan-300' : 'text-cyan-700'
                   )}
                 >
-                  {terminalPoint.ltvToCac.toFixed(2)}x
+                  {formatLtvToCac(terminalPoint.ltvToCac)}
                 </span>
                 <span className={cn('font-medium', isDark ? 'text-slate-300' : 'text-slate-700')}>
                   Payback Window

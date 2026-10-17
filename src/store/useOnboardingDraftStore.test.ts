@@ -54,3 +54,37 @@ describe('onboarding wizard draft', () => {
     expect(sanitizeDraft({ step: 3, budget: 20000, vertical: 'saas', subvertical: 'casino' }).subvertical).toBeNull();
   });
 });
+
+// SA-11: without a migrate function zustand silently drops a save whose version differs.
+describe('onboarding draft migration (SA-11)', () => {
+  beforeEach(() => {
+    localStorage.clear();
+    useOnboardingDraftStore.getState().reset();
+  });
+
+  it('has a version and a migrate function', () => {
+    const options = useOnboardingDraftStore.persist.getOptions();
+    expect(options.version).toBe(1);
+    expect(typeof options.migrate).toBe('function');
+  });
+
+  it('a save from an older version is restored, not dropped', async () => {
+    localStorage.setItem(
+      ONBOARDING_DRAFT_KEY,
+      JSON.stringify({
+        state: { draft: { ...INITIAL_DRAFT, budget: 25000, vertical: 'saas', step: 3 }, selectedBudgetTierKey: 'starter' },
+        version: 0,
+      })
+    );
+    await useOnboardingDraftStore.persist.rehydrate();
+    const { draft, selectedBudgetTierKey } = useOnboardingDraftStore.getState();
+    expect(draft).toMatchObject({ budget: 25000, vertical: 'saas', step: 3 });
+    expect(selectedBudgetTierKey).toBe('starter');
+  });
+
+  it('a malformed older save still falls back to a fresh start', async () => {
+    localStorage.setItem(ONBOARDING_DRAFT_KEY, JSON.stringify({ state: { draft: 'nope' }, version: 0 }));
+    await useOnboardingDraftStore.persist.rehydrate();
+    expect(useOnboardingDraftStore.getState().draft).toEqual(INITIAL_DRAFT);
+  });
+});

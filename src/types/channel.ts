@@ -292,7 +292,8 @@ export function inferChannelFamily(name: string): ChannelFamily {
     return 'affiliate';
   if (lower.includes('influencer') || lower.includes('twitch') || lower.includes('tiktok'))
     return 'influencer';
-  if (lower.includes('pr') || lower.includes('brand')) return 'pr_brand';
+  // Word-bounded: a bare 'pr' substring matched "Programmatic", "Premium", "Promo"...
+  if (/\bpr\b/.test(lower) || lower.includes('brand')) return 'pr_brand';
   if (lower.includes('email') || lower.includes('crm')) return 'email_crm';
 
   return 'paid_media';

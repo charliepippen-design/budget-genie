@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildScenarioEnvelope,
+  formatLtvToCac,
   buildBudgetUtilization,
   buildGroupSpendTotals,
   getChannelGroup,
@@ -137,7 +138,8 @@ describe('buildScenarioEnvelope', () => {
     });
   });
 
-  it('ltvToCac is 0 (not Infinity) when CPA is 0', () => {
+  // N-14: with no CPA the ratio is unknown, not 0.00x (and never Infinity).
+  it('ltvToCac is null (shown as n/a) when CPA is 0', () => {
     const result = buildScenarioEnvelope({
       baseLtvPerUser: 300,
       conversions: 100,
@@ -145,9 +147,16 @@ describe('buildScenarioEnvelope', () => {
       assumptions: BASE_ASSUMPTIONS,
     });
     result.forEach(({ ltvToCac }) => {
-      expect(ltvToCac).toBe(0);
-      expect(isFinite(ltvToCac)).toBe(true);
+      expect(ltvToCac).toBeNull();
+      expect(formatLtvToCac(ltvToCac)).toBe('n/a');
     });
+  });
+
+  it('formatLtvToCac renders a ratio or n/a', () => {
+    expect(formatLtvToCac(2.345)).toBe('2.35x');
+    expect(formatLtvToCac(0)).toBe('0.00x');
+    expect(formatLtvToCac(null)).toBe('n/a');
+    expect(formatLtvToCac(undefined)).toBe('n/a');
   });
 
   it('cpaMultiplier stresses the denominator: higher CPA → lower ltvToCac', () => {
@@ -164,7 +173,7 @@ describe('buildScenarioEnvelope', () => {
       assumptions: { ...BASE_ASSUMPTIONS, cpaMultiplier: 1.5 },
     });
     // Same LTV but higher stressed CPA → worse ratio
-    expect(stressed[1].ltvToCac).toBeLessThan(baseline[1].ltvToCac);
+    expect(stressed[1].ltvToCac!).toBeLessThan(baseline[1].ltvToCac!);
   });
 
   it('roasMultiplier lifts base LTV', () => {
