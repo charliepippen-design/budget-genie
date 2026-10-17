@@ -175,14 +175,24 @@ const fieldSchemas: Partial<Record<keyof MediaPlanData, z.ZodType>> = {
   planWarnings: z.array(z.string()),
 };
 
-/** Channels as stored; legacy entries are upgraded, and anything unusable means defaults. */
+/**
+ * Channels as stored, checked one by one: valid entries are kept unchanged, legacy entries are
+ * upgraded, and entries that are still unusable are dropped. A non-array value, or one where no
+ * channel survives, returns undefined so the default channels are used instead of an empty plan.
+ */
 function validChannels(raw: unknown): ChannelData[] | undefined {
   if (!Array.isArray(raw) || raw.length === 0) return undefined;
-  const checked = z.array(channelSchema).safeParse(raw);
-  if (checked.success) return raw as ChannelData[];
-  if (!raw.every((ch) => ch && typeof ch === 'object' && !Array.isArray(ch))) return undefined;
-  const repaired = raw.map((ch) => upgradeLegacyChannel(ch as Partial<ChannelData>));
-  return z.array(channelSchema).safeParse(repaired).success ? repaired : undefined;
+  const kept: ChannelData[] = [];
+  for (const ch of raw) {
+    if (channelSchema.safeParse(ch).success) {
+      kept.push(ch as ChannelData);
+      continue;
+    }
+    if (!ch || typeof ch !== 'object' || Array.isArray(ch)) continue;
+    const repaired = upgradeLegacyChannel(ch as Partial<ChannelData>);
+    if (channelSchema.safeParse(repaired).success) kept.push(repaired);
+  }
+  return kept.length > 0 ? kept : undefined;
 }
 
 /** Valid persisted fields only, keyed as in MediaPlanData. Never throws. */

@@ -96,6 +96,19 @@ describe('merge validates stored state (SA-6)', () => {
     expect(merged.globalMultipliers.margin).toBe(current().globalMultipliers.margin);
   });
 
+  it('drops only the invalid channels and keeps the valid ones unchanged', () => {
+    const second = { ...savedChannel, id: 'c2', name: 'Social', allocationPct: 40 };
+    const broken = { ...savedChannel, id: 'c3', typeConfig: { ...savedChannel.typeConfig, price: null } };
+    const merged = merge({ channels: [savedChannel, broken, second] }, current());
+    expect(merged.channels).toEqual([savedChannel, second]);
+  });
+
+  it('falls back to default channels when every stored channel is invalid', () => {
+    const broken = { ...savedChannel, allocationPct: 'all' };
+    const merged = merge({ channels: [broken] }, current());
+    expect(merged.channels).toEqual(current().channels);
+  });
+
   it('never lets stored data replace an action', () => {
     const merged = merge({ setTotalBudget: 'nope', totalBudget: 5000 }, current());
     expect(typeof merged.setTotalBudget).toBe('function');
