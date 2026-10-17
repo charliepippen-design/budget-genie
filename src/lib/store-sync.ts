@@ -1,6 +1,6 @@
 /**
  * Cross-tab sync protocol. Each tab has an id and a Lamport-style revision counter:
- * - local changes bump the revision and are broadcast once;
+ * - local changes bump the revision (never below Date.now()) and are broadcast once;
  * - a tab ignores its own messages and anything not newer than what it has already seen
  *   (ties between tabs are broken by tab id so every tab converges on the same state);
  * - applying a remote change never triggers a re-broadcast (no echo loops).
@@ -61,7 +61,8 @@ export function createSyncController<P>(options: {
     tabId,
     onLocalChange: (payload) => {
       if (applyingRemote) return;
-      revision += 1;
+      // Wall-clock floor: a tab opened later must not start below a long-lived tab's counter.
+      revision = Math.max(revision + 1, Date.now());
       lastWriter = tabId;
       post({ type: 'STATE_UPDATE', tabId, revision, payload });
     },

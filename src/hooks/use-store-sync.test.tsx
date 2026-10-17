@@ -83,10 +83,10 @@ describe('useStoreSync (RT-7)', () => {
     expect(useMediaPlanStore.getState().totalBudget).toBe(61000);
 
     act(() =>
-      channel.deliver({ type: 'STATE_UPDATE', tabId: 'other-tab', revision: 10, payload: { totalBudget: 80000 } })
+      channel.deliver({ type: 'STATE_UPDATE', tabId: 'other-tab', revision: own.revision + 10, payload: { totalBudget: 80000 } })
     );
     act(() =>
-      channel.deliver({ type: 'STATE_UPDATE', tabId: 'other-tab', revision: 9, payload: { totalBudget: 5000 } })
+      channel.deliver({ type: 'STATE_UPDATE', tabId: 'other-tab', revision: own.revision + 9, payload: { totalBudget: 5000 } })
     );
     expect(useMediaPlanStore.getState().totalBudget).toBe(80000);
   });
