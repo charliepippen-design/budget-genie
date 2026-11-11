@@ -64,8 +64,8 @@ export function PlanKpiBar() {
   ];
 
   const tileClass = cn(
-    'min-w-0 rounded-xl border px-3 py-2',
-    isDark ? 'border-slate-800 bg-slate-900/70' : 'border-slate-200 bg-white'
+    'min-w-0 rounded-xl px-3.5 py-2.5',
+    isDark ? 'bg-slate-900' : 'bg-white'
   );
   const labelClass = cn(
     'truncate text-[10px] font-semibold uppercase leading-4 tracking-wide',
@@ -81,8 +81,8 @@ export function PlanKpiBar() {
       <label
         className={cn(
           tileClass,
-          'cursor-text transition-colors focus-within:border-indigo-500',
-          isDark ? 'hover:border-slate-600' : 'hover:border-slate-400'
+          'cursor-text ring-1 ring-transparent transition-shadow focus-within:ring-slate-500',
+          isDark ? 'hover:ring-slate-700' : 'hover:ring-slate-300'
         )}
       >
         <span className={cn(labelClass, 'flex items-center gap-1.5')}>

@@ -26,20 +26,8 @@ import { formatLtvToCac } from '@/lib/planning-insights';
 import { cn } from '@/lib/utils';
 import { LossBanner } from './LossBanner';
 
-const CHANNEL_COLORS = [
-  '#b998df',
-  '#22d3ee',
-  '#34d399',
-  '#fbbf24',
-  '#f472b6',
-  '#a78bfa',
-  '#fb923c',
-  '#38bdf8',
-  '#4ade80',
-  '#f87171',
-  '#e879f9',
-  '#facc15',
-];
+// One neutral ramp: channels are told apart by position and label, colour is kept for results.
+const CHANNEL_COLORS = ['#ffffff', '#cfcfcf', '#a6a6a6', '#808080', '#5e5e5e', '#444444'];
 const BUDGET_STEPS = [-20, -10, 10, 20, 50];
 
 const compact = (value: number) =>
@@ -64,8 +52,8 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
 
   const colorOf = (index: number) => CHANNEL_COLORS[index % CHANNEL_COLORS.length];
   const cardClass = cn(
-    'rounded-2xl border p-4 md:p-5',
-    isDark ? 'border-slate-800 bg-slate-900/70' : 'border-slate-200 bg-white'
+    'rounded-2xl p-4 md:p-5',
+    isDark ? 'bg-slate-900' : 'bg-white'
   );
   const mutedClass = isDark ? 'text-slate-400' : 'text-slate-500';
   const headClass = cn('text-[10px] font-semibold uppercase tracking-wide leading-4', mutedClass);
@@ -123,7 +111,7 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
           {/* Share of spend, one segment per channel */}
           <div
             className={cn(
-              'mb-4 flex h-3 w-full overflow-hidden rounded-full',
+              'mb-4 flex h-2 w-full gap-0.5 overflow-hidden rounded-full',
               isDark ? 'bg-slate-800' : 'bg-slate-200'
             )}
             role="img"

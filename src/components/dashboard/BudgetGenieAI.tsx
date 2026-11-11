@@ -105,6 +105,11 @@ export const BudgetGenieAI = () => {
       // storage unavailable: the tab just isn't remembered
     }
   }, []);
+  const railButtonClass = cn(
+    'flex h-10 min-h-0 w-10 items-center justify-center rounded-xl transition-colors',
+    isDark ? 'text-slate-500 hover:bg-slate-900 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-900'
+  );
+  const railActiveClass = isDark ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-sm';
   const loadingClass = cn('p-4 text-sm', isDark ? 'text-slate-400' : 'text-slate-600');
   const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
@@ -175,7 +180,7 @@ export const BudgetGenieAI = () => {
       <div
         className={cn(
           'flex h-screen overflow-hidden font-inter selection:bg-indigo-500/30 transition-colors duration-300',
-          isDark ? 'bg-[#141414] text-white' : 'bg-slate-100 text-slate-900'
+          isDark ? 'bg-[#0b0b0b] text-white' : 'bg-slate-200 text-slate-900'
         )}
       >
         {/* WIZARD MODAL */}
@@ -198,6 +203,41 @@ export const BudgetGenieAI = () => {
           />
         )}
 
+        {/* ICON RAIL: the workspace areas, then assumptions and account settings */}
+        <nav
+          aria-label="Workspace"
+          className="hidden w-[60px] shrink-0 flex-col items-center gap-1 py-3 md:flex"
+        >
+          <div role="tablist" aria-orientation="vertical" className="flex flex-col items-center gap-1">
+            {WORKSPACE_TABS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                type="button"
+                role="tab"
+                aria-selected={tab === id}
+                aria-label={label}
+                title={label}
+                onClick={() => selectTab(id)}
+                className={cn(railButtonClass, tab === id && railActiveClass)}
+              >
+                <Icon className="h-[18px] w-[18px]" />
+              </button>
+            ))}
+          </div>
+          <div className="mt-auto flex flex-col items-center gap-1">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen((open) => !open)}
+              aria-pressed={isSidebarOpen}
+              aria-label="Assumptions"
+              title="Assumptions: targets, multipliers and the channel list"
+              className={cn(railButtonClass, isSidebarOpen && railActiveClass)}
+            >
+              <Settings2 className="h-[18px] w-[18px]" />
+            </button>
+          </div>
+        </nav>
+
         {/* LEFT SIDEBAR (SETTINGS) */}
         <div
           className={cn(
@@ -215,8 +255,8 @@ export const BudgetGenieAI = () => {
         <div
           id="dashboard-main-capture"
           className={cn(
-            'relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden transition-colors duration-300',
-            isDark ? 'bg-[#141414]' : 'bg-slate-50'
+            'relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden transition-colors duration-300 md:my-2 md:rounded-2xl',
+            isDark ? 'bg-slate-950' : 'bg-slate-50'
           )}
         >
           <DashboardHeader
@@ -234,24 +274,7 @@ export const BudgetGenieAI = () => {
           </div>
 
           <Tabs value={tab} onValueChange={selectTab} className="flex min-h-0 flex-1 flex-col">
-            <div className="flex items-center gap-2 px-4 pt-3">
-              <button
-                type="button"
-                onClick={() => setIsSidebarOpen((open) => !open)}
-                aria-pressed={isSidebarOpen}
-                title="Targets, multipliers and the channel list"
-                className={cn(
-                  'hidden h-10 min-h-0 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors lg:flex',
-                  isSidebarOpen
-                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
-                    : isDark
-                      ? 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
-                )}
-              >
-                <Settings2 className="h-4 w-4" />
-                Assumptions
-              </button>
+            <div className="flex items-center gap-2 px-4 pt-3 md:hidden">
               <TabsList
                 className={cn(
                   'h-10 min-w-0 flex-1 justify-start gap-1 overflow-x-auto rounded-full border p-1',
