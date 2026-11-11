@@ -15,7 +15,6 @@ import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
 import { SettingsConsole } from './SettingsConsole';
 import { DashboardHeader } from './DashboardHeader';
-import { EfficiencyAlertBanner } from './EfficiencyAlertBanner';
 import { OverBudgetBanner } from './OverBudgetBanner';
 import { PlanCanvas } from './PlanCanvas';
 import { PlanKpiBar } from './PlanKpiBar';
@@ -232,7 +231,6 @@ export const BudgetGenieAI = () => {
 
           <div className="space-y-2 px-4 pt-2 empty:hidden">
             <OverBudgetBanner />
-            <EfficiencyAlertBanner />
           </div>
 
           <Tabs value={tab} onValueChange={selectTab} className="flex min-h-0 flex-1 flex-col">

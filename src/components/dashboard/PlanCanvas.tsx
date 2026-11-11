@@ -50,7 +50,7 @@ const compact = (value: number) =>
  * 12-month projection on the other. Every figure comes from the engine result.
  */
 export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
-  const { channels, channelInsights, totals, customerValue, scenarios } = usePlanResult();
+  const { channels, channelInsights, totals, customerValue, scenarios, alerts } = usePlanResult();
   const totalBudget = useMediaPlanStore((s) => s.totalBudget);
   const roasTarget = useMediaPlanStore((s) => s.globalMultipliers.roasTarget);
   const setChannelAllocation = useMediaPlanStore((s) => s.setChannelAllocation);
@@ -94,6 +94,22 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
               <SlidersHorizontal className="h-4 w-4 text-indigo-400" aria-hidden />
               <h2 className="text-base font-semibold leading-6">Channel mix</h2>
               <span className={cn('text-xs', mutedClass)}>drag to rebalance; the rest adjusts</span>
+              {alerts.belowBreakEven.length > 0 ? (
+                <span
+                  className="rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-semibold text-rose-400"
+                  title={`${format(alerts.wastedSpend)} goes to channels returning less than they cost`}
+                >
+                  {alerts.belowBreakEven.length} below 1x
+                </span>
+              ) : null}
+              {alerts.nearSaturation.length > 0 ? (
+                <span
+                  className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-400"
+                  title="Spending above 90% of the level where returns flatten"
+                >
+                  {alerts.nearSaturation.length} near saturation
+                </span>
+              ) : null}
             </div>
             <button
               type="button"
