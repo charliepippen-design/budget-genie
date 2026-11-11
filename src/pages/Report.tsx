@@ -38,11 +38,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
-import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import {
   getEfficiencyAlerts,
   buildRoasTrendData,
-  buildGroupSpendTotals,
   GROUP_COLORS,
   formatLtvToCac,
 } from '@/lib/planning-insights';
@@ -67,7 +66,7 @@ const PIE_COLORS = [
 const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
-  const channels = useChannelsWithMetrics();
+  const { alerts: alertsResult, channelInsights, groups } = usePlanResult();
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -98,19 +97,22 @@ const ReportContent = () => {
     [active]
   );
 
-  const weakestChannel = useMemo(() => active.find((c) => c.metrics.roas < 1) ?? null, [active]);
+  const weakestChannel = useMemo(
+    () => active.find((c) => c.id === alertsResult.weakestChannelId) ?? null,
+    [active, alertsResult.weakestChannelId]
+  );
 
   const roasTrend = useMemo(
     () => buildRoasTrendData(active, { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 }, 6),
     [active]
   );
 
-  const groupSpend = useMemo(() => buildGroupSpendTotals(active), [active]);
+  const groupSpend = groups.spend;
 
   const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
 
   const pieData = useMemo(
-    () => active.map((c) => ({ name: c.name, value: c.metrics.spend })),
+    () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
     [active]
   );
 
@@ -493,7 +495,7 @@ const ReportContent = () => {
             </div>
 
             {sortedActiveBySpend.map((c) => {
-              const pct = totalSpend > 0 ? (c.metrics.spend / totalSpend) * 100 : 0;
+              const pct = channelInsights[c.id]?.spendSharePct ?? 0;
               const returnClass =
                 c.metrics.roas >= roasTarget
                   ? 'text-green-400'
@@ -523,7 +525,7 @@ const ReportContent = () => {
           <div className="rounded-2xl border border-border bg-card p-4">
             <div className="flex h-5 overflow-hidden rounded-full border border-border bg-muted">
               {sortedActiveBySpend.map((c, i) => {
-                const width = totalSpend > 0 ? (c.metrics.spend / totalSpend) * 100 : 0;
+                const width = channelInsights[c.id]?.spendSharePct ?? 0;
                 return (
                   <div
                     key={c.id}
@@ -575,7 +577,7 @@ const ReportContent = () => {
             <div className="rounded-2xl border border-border bg-card p-4">
               <div className="space-y-3">
                 {sortedPieLegend.map((row, i) => {
-                  const pct = totalSpend > 0 ? (row.value / totalSpend) * 100 : 0;
+                  const pct = channelInsights[row.id]?.spendSharePct ?? 0;
                   return (
                     <div key={row.name} className="flex items-center justify-between gap-4">
                       <div className="flex items-center gap-3">
