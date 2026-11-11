@@ -371,9 +371,13 @@ export function PlannerChat() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-      <div className="space-y-1 px-3 pb-3 text-[11px] leading-snug text-slate-500">
-        <p>{AI_DISCLOSURE_SHORT}</p>
-        {uiLang === 'it' && <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>}
+      <div className="space-y-1 px-3 pb-3 text-slate-500">
+        <p className="text-[11px] leading-snug">{AI_DISCLOSURE_SHORT}</p>
+        {uiLang === 'it' && (
+          <p lang="it" className="text-[11px] leading-snug">
+            {AI_DISCLOSURE_SHORT_IT}
+          </p>
+        )}
       </div>
     </aside>
   );

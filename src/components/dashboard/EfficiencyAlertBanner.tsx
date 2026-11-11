@@ -30,12 +30,12 @@ export function EfficiencyAlertBanner() {
   return (
     <div className="space-y-2">
       {!dismissRoas && roasUnderperformers.length > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
-          <p>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 px-4 py-1.5 text-sm text-amber-100">
+          <p className="text-sm leading-snug">
             {`⚠ ${roasUnderperformers.length} channel${roasUnderperformers.length > 1 ? 's' : ''} below 1x ROAS — ${money} potentially mis-allocated.`}{' '}
             <button
               type="button"
-              className="font-semibold underline underline-offset-2"
+              className="min-h-0 text-sm font-semibold underline underline-offset-2"
               onClick={() => setIsGenieOpen(true)}
             >
               Review with the assistant →
@@ -45,7 +45,7 @@ export function EfficiencyAlertBanner() {
             variant="ghost"
             size="sm"
             onClick={() => setDismissRoas(true)}
-            className="h-7 px-2 text-amber-100 hover:bg-amber-500/20"
+            className="h-7 min-h-0 px-2 text-sm text-amber-100 hover:bg-amber-500/20"
           >
             Dismiss
           </Button>
@@ -53,8 +53,8 @@ export function EfficiencyAlertBanner() {
       ) : null}
 
       {!dismissSaturation && saturationChannels.length > 0 ? (
-        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 px-4 py-3 text-sm text-amber-100">
-          <p>
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/40 bg-amber-500/15 px-4 py-1.5 text-sm text-amber-100">
+          <p className="text-sm leading-snug">
             {`⚠ ${saturationChannels[0].name} is approaching its saturation ceiling.`}
             {globalMultipliers.roasTarget
               ? ` (ROAS target ${globalMultipliers.roasTarget.toFixed(2)}x)`
@@ -64,7 +64,7 @@ export function EfficiencyAlertBanner() {
             variant="ghost"
             size="sm"
             onClick={() => setDismissSaturation(true)}
-            className="h-7 px-2 text-amber-100 hover:bg-amber-500/20"
+            className="h-7 min-h-0 px-2 text-sm text-amber-100 hover:bg-amber-500/20"
           >
             Dismiss
           </Button>

@@ -1,5 +1,6 @@
 import { PlannerChat } from '../planner/PlannerChat';
 import { useState, useCallback, Suspense } from 'react';
+import { CalendarRange, FlaskConical, GitCompare, Globe2, LayoutDashboard, Table2 } from 'lucide-react';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
@@ -8,13 +9,11 @@ import { DashboardHeader } from './DashboardHeader';
 import { EfficiencyAlertBanner } from './EfficiencyAlertBanner';
 import { OverBudgetBanner } from './OverBudgetBanner';
 import { BudgetHero } from './BudgetHero';
+import { PlanKpiBar } from './PlanKpiBar';
 import { ChannelTable } from './ChannelTable';
-import { ProjectManager } from './ProjectManager';
 import { MonthConfigPanel } from '../multi-month/MonthConfigPanel';
-import { WizardLauncherCard } from './WizardLauncherCard';
 import { ProgressionPatternSelector } from '../multi-month/ProgressionPatternSelector';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { ChartSectionSkeleton, ScenarioListSkeleton } from '@/components/common/AppSkeletons';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -51,6 +50,27 @@ const StrategicInsightsPanel = lazyWithReload(() =>
 const LtvForecastPanel = lazyWithReload(() =>
   import('./LtvForecastPanel').then((m) => ({ default: m.LtvForecastPanel })), 'LtvForecastPanel');
 
+// The workspace areas. Each groups the widgets a planner uses together, instead of one long page.
+const WORKSPACE_TABS = [
+  { id: 'overview', label: 'Overview', icon: LayoutDashboard },
+  { id: 'channels', label: 'Channels', icon: Table2 },
+  { id: 'timeline', label: 'Timeline', icon: CalendarRange },
+  { id: 'scenarios', label: 'Scenarios', icon: GitCompare },
+  { id: 'markets', label: 'Markets', icon: Globe2 },
+  { id: 'what-if', label: 'What-if', icon: FlaskConical },
+] as const;
+type WorkspaceTab = (typeof WORKSPACE_TABS)[number]['id'];
+const WORKSPACE_TAB_KEY = 'mediaplan-workspace-tab';
+
+function readSavedTab(): WorkspaceTab {
+  try {
+    const saved = localStorage.getItem(WORKSPACE_TAB_KEY);
+    return WORKSPACE_TABS.find((t) => t.id === saved)?.id ?? 'overview';
+  } catch {
+    return 'overview';
+  }
+}
+
 export const BudgetGenieAI = () => {
   // 1. VIEW MODEL (The Brain)
   // Connects to store, handles math, provides stable data
@@ -69,7 +89,16 @@ export const BudgetGenieAI = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= 1024
   );
-  const [preset, setPreset] = useState<BudgetPresetKey>('custom');
+  const [tab, setTab] = useState<WorkspaceTab>(readSavedTab);
+  const selectTab = useCallback((value: string) => {
+    setTab(value as WorkspaceTab);
+    try {
+      localStorage.setItem(WORKSPACE_TAB_KEY, value);
+    } catch {
+      // storage unavailable: the tab just isn't remembered
+    }
+  }, []);
+  const loadingClass = cn('p-4 text-sm', isDark ? 'text-slate-400' : 'text-slate-600');
   const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
 
@@ -180,13 +209,11 @@ export const BudgetGenieAI = () => {
         <div
           id="dashboard-main-capture"
           className={cn(
-            'relative z-10 flex flex-1 flex-col overflow-y-auto transition-colors duration-300',
+            'relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden transition-colors duration-300',
             isDark ? 'bg-[#020617]' : 'bg-slate-50'
           )}
         >
           <DashboardHeader
-            budgetPreset={preset}
-            onPresetChange={setPreset}
             onExport={handleExport}
             exportingLabel={exporting}
             onImport={() => setIsImportOpen(true)}
@@ -194,173 +221,54 @@ export const BudgetGenieAI = () => {
             onLaunchMasterWizard={() => setIsBudgetWizardOpen(true)}
           />
 
-          <div className="max-w-[1600px] mx-auto w-full px-6 pt-3 space-y-3">
+          <PlanKpiBar />
+
+          <div className="space-y-2 px-4 pt-2 empty:hidden">
             <OverBudgetBanner />
             <EfficiencyAlertBanner />
           </div>
 
-          <main className={cn('flex-1 overflow-y-auto', isDark ? 'bg-[#020617]' : 'bg-slate-50')}>
-            {/* BUDGET HERO (Big Number) */}
-            <div id="hero-charts-anchor">
-              <BudgetHero />
+          <Tabs value={tab} onValueChange={selectTab} className="flex min-h-0 flex-1 flex-col">
+            <div className="px-4 pt-3">
+              <TabsList
+                className={cn(
+                  'h-auto w-full justify-start gap-1 overflow-x-auto border p-1',
+                  isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                )}
+              >
+                {WORKSPACE_TABS.map(({ id, label, icon: Icon }) => (
+                  <TabsTrigger
+                    key={id}
+                    value={id}
+                    className={cn(
+                      'gap-2 px-4 py-2 transition-all data-[state=active]:bg-indigo-600 data-[state=active]:text-white',
+                      !isDark && 'text-slate-700'
+                    )}
+                  >
+                    <Icon className="h-4 w-4" />
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
             </div>
 
-            <div className="max-w-[1600px] mx-auto space-y-6 pb-20 p-6">
-              {/* MONTHLY CONFIG (Seasonality) */}
-              <div className="mb-6">
-                <MonthConfigPanel />
-              </div>
-
-              <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_384px] gap-6 mb-6">
-                {/* CENTER COLUMN (Charts & Wizard) */}
-                <div className="min-w-0 space-y-6">
-                  {/* PROJECT MANAGER (Top Bar) */}
-                  <Suspense
-                    fallback={
-                      <div
-                        className={cn(
-                          'rounded-xl border p-3 text-xs',
-                          isDark
-                            ? 'border-slate-800 text-slate-400'
-                            : 'border-slate-200 text-slate-600 bg-white'
-                        )}
-                      >
-                        Loading vault...
-                      </div>
-                    }
-                  >
-                    <ProjectManager isDark={isDark} />
-                  </Suspense>
-
-                  {/* CHARTS (The Visuals) */}
-                  {/* Data passed from ViewModel ensuring consistency */}
+            <main className="min-h-0 flex-1 overflow-y-auto !p-0">
+              <div className="mx-auto max-w-[1600px] space-y-6 p-4 pb-20">
+                <TabsContent value="overview" className="mt-0 space-y-6">
+                  <div id="hero-charts-anchor">
+                    <BudgetHero />
+                  </div>
                   <div id="primary-charts-anchor">
                     <Suspense fallback={<ChartSectionSkeleton />}>
                       <ChartSection channels={vm.channels} categoryTotals={vm.categoryTotals} />
                     </Suspense>
                   </div>
-
-                  <Suspense
-                    fallback={
-                      <div
-                        className={cn(
-                          'rounded-xl border p-4 text-xs',
-                          isDark
-                            ? 'border-slate-800 text-slate-400'
-                            : 'border-slate-200 text-slate-600 bg-white'
-                        )}
-                      >
-                        Modeling LTV scenarios...
-                      </div>
-                    }
-                  >
-                    <LtvForecastPanel />
+                  <Suspense fallback={<p className={loadingClass}>Loading insights...</p>}>
+                    <StrategicInsightsPanel />
                   </Suspense>
+                </TabsContent>
 
-                  {/* WIZARD LAUNCHER */}
-                  <WizardLauncherCard
-                    variant="banner"
-                    onLaunch={() => setIsBudgetWizardOpen(true)}
-                  />
-
-                  {/* PROGRESSION PATTERN (Moved) */}
-                  <ProgressionPatternSelector />
-                </div>
-
-                {/* RIGHT SIDEBAR (Scenarios) */}
-                <div className="shrink-0 w-full xl:w-96 min-w-0">
-                  <div className="w-full xl:sticky xl:top-4 space-y-6">
-                    <Suspense fallback={<ScenarioListSkeleton />}>
-                      <ScenarioSidebar
-                        totalBudget={vm.totalBudget}
-                        channelAllocations={vm.currentAllocations}
-                        onLoadScenario={vm.handleLoadScenario}
-                        onReset={vm.resetAll}
-                        onNormalize={vm.normalizeAllocations}
-                      />
-                    </Suspense>
-
-                    <Suspense
-                      fallback={
-                        <div
-                          className={cn(
-                            'rounded-xl border p-4 text-xs',
-                            isDark
-                              ? 'border-slate-800 text-slate-400'
-                              : 'border-slate-200 text-slate-600 bg-white'
-                          )}
-                        >
-                          Loading insights...
-                        </div>
-                      }
-                    >
-                      <StrategicInsightsPanel />
-                    </Suspense>
-                  </div>
-                </div>
-              </div>
-
-              {/* MACRO VELOCITY WIDGET */}
-              <MarketSplitCard />
-              <GlobalGeoArbitrageTokenMatrix />
-
-              <FTDVelocityEngine />
-
-              {/* DATA GRID (Tabs) */}
-              <Tabs defaultValue="single" className="w-full mt-6">
-                <TabsList
-                  className={cn(
-                    'mb-4 h-10 p-1 border',
-                    isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
-                  )}
-                >
-                  <TabsTrigger
-                    value="single"
-                    className={cn(
-                      'transition-all',
-                      isDark
-                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                    )}
-                  >
-                    Global View
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="multi"
-                    className={cn(
-                      'transition-all',
-                      isDark
-                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                    )}
-                  >
-                    Multi-Month Detailed View
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="multi-charts"
-                    className={cn(
-                      'transition-all',
-                      isDark
-                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                    )}
-                  >
-                    Multi-Month Charts
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="scenarios"
-                    className={cn(
-                      'transition-all',
-                      isDark
-                        ? 'data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                        : 'text-slate-700 data-[state=active]:bg-indigo-600 data-[state=active]:text-white'
-                    )}
-                  >
-                    Scenario Comparison
-                  </TabsTrigger>
-                </TabsList>
-
-                <TabsContent value="single" className="mt-0">
+                <TabsContent value="channels" className="mt-0">
                   <div
                     className={cn(
                       'rounded-xl border shadow-sm overflow-hidden',
@@ -371,34 +279,66 @@ export const BudgetGenieAI = () => {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="multi" className="mt-0">
-                  <Suspense
-                    fallback={
-                      <div
-                        className={cn('p-4 text-sm', isDark ? 'text-slate-400' : 'text-slate-600')}
-                      >
-                        Loading table...
-                      </div>
-                    }
-                  >
-                    <PLTable />
-                  </Suspense>
-                </TabsContent>
-
-                <TabsContent value="multi-charts" className="mt-0">
-                  <Suspense fallback={<ChartSectionSkeleton />}>
-                    <MultiMonthCharts />
-                  </Suspense>
+                <TabsContent value="timeline" className="mt-0 space-y-6">
+                  <MonthConfigPanel />
+                  <ProgressionPatternSelector />
+                  <Tabs defaultValue="multi" className="w-full">
+                    <TabsList
+                      className={cn(
+                        'mb-4 h-10 p-1 border',
+                        isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
+                      )}
+                    >
+                      <TabsTrigger value="multi">Multi-Month Detailed View</TabsTrigger>
+                      <TabsTrigger value="multi-charts">Multi-Month Charts</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="multi" className="mt-0">
+                      <Suspense fallback={<p className={loadingClass}>Loading table...</p>}>
+                        <PLTable />
+                      </Suspense>
+                    </TabsContent>
+                    <TabsContent value="multi-charts" className="mt-0">
+                      <Suspense fallback={<ChartSectionSkeleton />}>
+                        <MultiMonthCharts />
+                      </Suspense>
+                    </TabsContent>
+                  </Tabs>
                 </TabsContent>
 
                 <TabsContent value="scenarios" className="mt-0">
-                  <Suspense fallback={<ChartSectionSkeleton />}>
-                    <ScenarioComparison />
+                  <div className="grid grid-cols-1 gap-6 xl:grid-cols-[384px_minmax(0,1fr)]">
+                    <Suspense fallback={<ScenarioListSkeleton />}>
+                      <ScenarioSidebar
+                        totalBudget={vm.totalBudget}
+                        channelAllocations={vm.currentAllocations}
+                        onLoadScenario={vm.handleLoadScenario}
+                        onReset={vm.resetAll}
+                        onNormalize={vm.normalizeAllocations}
+                      />
+                    </Suspense>
+                    <div className="min-w-0">
+                      <h2 className="mb-3 text-lg font-semibold">Scenario Comparison</h2>
+                      <Suspense fallback={<ChartSectionSkeleton />}>
+                        <ScenarioComparison />
+                      </Suspense>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                <TabsContent value="markets" className="mt-0 space-y-6">
+                  <MarketSplitCard />
+                  <GlobalGeoArbitrageTokenMatrix />
+                  <FTDVelocityEngine />
+                </TabsContent>
+
+                <TabsContent value="what-if" className="mt-0">
+                  <Suspense fallback={<p className={loadingClass}>Modeling LTV scenarios...</p>}>
+                    <LtvForecastPanel />
                   </Suspense>
                 </TabsContent>
-              </Tabs>
-            </div>
-          </main>
+              </div>
+            </main>
+          </Tabs>
         </div>
 
         <SectionErrorBoundary name="planner-chat">
