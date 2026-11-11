@@ -72,6 +72,13 @@ export interface EngineTotals extends BlendedMetrics {
   fixedTierSpend: number;
   /** Sum of every channel's `spendSharePct`: 100 when anything is spent, else 0. */
   spendShareTotalPct: number;
+  /** Active fixed fees as a % of the budget (above 100 when they exceed it). */
+  fixedBudgetSharePct: number;
+  /**
+   * Total row of a list of `budgetSharePct` shown to one decimal: the sum of the rounded shares of
+   * active channels with spend, itself rounded to one decimal, so the total matches its rows.
+   */
+  budgetShareTotalPct: number;
 }
 
 /** Per-channel figures shown next to a channel, keyed by channel id in `EngineResult.channelInsights`. */
@@ -84,6 +91,8 @@ export interface EngineChannelInsight {
   nearSaturation: boolean;
   /** Spend as a % of the saturation ceiling, rounded and capped at 100; null without a ceiling. */
   saturationPct: number | null;
+  /** Spend as a % of the budget (not of total spend, see `spendSharePct`); the AI planner's share. */
+  budgetSharePct: number;
 }
 
 /** Spend and return grouped by channel family (organic, paid, affiliate, influencer). */
@@ -93,6 +102,8 @@ export interface EngineChannelGroups {
   utilization: BudgetUtilizationPoint[];
   /** Spend-weighted return per group over 6 months, eroded by churn: `{ month: 'M1', Organic: 1.2, ... }`. */
   returnTrend: Array<Record<string, number | string>>;
+  /** `returnTrend` as the report page draws it: same model with a slightly higher churn. */
+  reportReturnTrend: Array<Record<string, number | string>>;
 }
 
 /** Value of one customer over time and when it pays back its acquisition cost. */
@@ -118,6 +129,11 @@ export interface EngineAlerts {
   weakestChannelId: string | null;
   /** Ids of channels with `nearSaturation`, in input order. */
   nearSaturation: string[];
+  /**
+   * The `efficiency` checks run over active, spending channels only, so "above-average spend" is
+   * measured against those channels. This is the list /report and /output show.
+   */
+  efficiencyActive: EfficiencyAlert[];
 }
 
 export interface EngineResult {
@@ -141,6 +157,8 @@ export interface EngineResult {
    * this month's conversions and spend; null when the industry has no such model (today: all but iGaming).
    */
   revenueModelMonth: IgamingRevenueMonthValues | null;
+  /** The active, spending channel with the highest return (first in input order on a tie); null when none. */
+  strongestChannelId: string | null;
 }
 
 // ========== ENGINE ==========
