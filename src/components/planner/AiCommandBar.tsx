@@ -80,7 +80,7 @@ export function AiCommandBar({ className }: { className?: string }) {
           disabled={!text.trim()}
           aria-label="Send to the AI planner"
           title="Send to the AI planner"
-          className="flex h-9 min-h-0 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-500"
+          className="flex h-9 min-h-0 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-600 text-white transition-colors hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-indigo-600"
         >
           <ArrowUp className="h-4 w-4" />
         </button>
@@ -89,7 +89,7 @@ export function AiCommandBar({ className }: { className?: string }) {
       {suggestions.length > 0 && (
         <ul aria-label="Suggestions for this plan" className="mt-2 flex flex-wrap gap-1.5">
           {suggestions.map((s) => (
-            <li key={s.id}>
+            <li key={s.id} className="min-w-0 max-w-[24rem]">
               <button
                 type="button"
                 data-suggestion={s.id}
