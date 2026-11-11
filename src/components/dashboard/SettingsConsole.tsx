@@ -480,7 +480,7 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
                 isDark ? 'bg-slate-800' : 'bg-slate-100'
               )}
             >
-              {channel.buyingModel}
+              {BUYING_MODEL_INFO[channel.buyingModel]?.name ?? channel.buyingModel}
             </span>
             <span className={cn('truncate', isDark ? 'text-slate-400' : 'text-slate-600')}>
               {channel.allocationPct.toFixed(1)}% Alloc

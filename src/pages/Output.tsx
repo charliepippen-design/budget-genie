@@ -24,6 +24,7 @@ import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { BUYING_MODEL_INFO, FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
@@ -581,11 +582,11 @@ const OutputContent = () => {
                     <tr key={c.id} className="bg-card border-b border-border">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.family}</p>
+                        <p className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="bg-muted text-muted-foreground text-xs rounded px-2 py-0.5">
-                          {c.buyingModel}
+                          {BUYING_MODEL_INFO[c.buyingModel]?.name ?? c.buyingModel}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-foreground">

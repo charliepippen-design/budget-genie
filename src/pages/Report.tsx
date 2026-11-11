@@ -48,6 +48,7 @@ import {
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { formatRoasPair } from '@/lib/roas-pair';
@@ -510,7 +511,7 @@ const ReportContent = () => {
                 >
                   <div>
                     <p className="font-medium text-foreground">{c.name}</p>
-                    <span className="text-xs text-muted-foreground">{c.family}</span>
+                    <span className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</span>
                   </div>
                   <div>{$(c.metrics.spend)}</div>
                   <div>{pct.toFixed(1)}%</div>
