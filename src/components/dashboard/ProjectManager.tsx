@@ -14,6 +14,7 @@ import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useMultiMonthStore } from '@/hooks/use-multi-month-store';
 import { toast } from 'sonner';
 import { ScenarioListSkeleton } from '@/components/common/AppSkeletons';
+import { discardPreApplyBackup } from '@/lib/crash-recovery';
 import { cn } from '@/lib/utils';
 import type { MediaPlanState } from '@/hooks/use-media-plan-store';
 import type { MultiMonthState } from '@/hooks/use-multi-month-store';
@@ -104,6 +105,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
       return;
     }
     try {
+      discardPreApplyBackup();
       useMediaPlanStore.setState(prepared.mediaPlanState as Partial<MediaPlanState>);
       useMultiMonthStore.setState(prepared.multiMonthState as Partial<MultiMonthState>);
 

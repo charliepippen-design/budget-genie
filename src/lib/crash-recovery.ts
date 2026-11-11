@@ -81,6 +81,18 @@ export function hasPreApplyBackup(currentFingerprint?: string): boolean {
   }
 }
 
+/**
+ * Drops the AI undo snapshot. Call it whenever the plan is replaced without the AI (wizard,
+ * project or preset load, reset): undo would otherwise bring back a plan from before that. Never throws.
+ */
+export function discardPreApplyBackup() {
+  try {
+    localStorage.removeItem(PRE_APPLY_BACKUP_KEY);
+  } catch {
+    // storage unavailable
+  }
+}
+
 /** Restores the plan saved before the last AI plan change. Returns false if there is nothing to restore. */
 export function restorePreApplyBackup(): boolean {
   try {

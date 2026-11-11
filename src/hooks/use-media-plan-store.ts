@@ -22,6 +22,7 @@ import { computeCategoryTotals, type PlanSnapshot } from '@/lib/media-plan/plan-
 import { getEngine, subscribeEngine } from '@/engine/registry';
 import { selectEngineInput } from '@/engine/input';
 import type { EngineResult } from '@/engine/contract';
+import { discardPreApplyBackup } from '@/lib/crash-recovery';
 import type { MediaPlanData, MediaPlanState } from '@/lib/media-plan/state';
 import {
   MEDIA_PLAN_STORE_KEY,
@@ -143,9 +144,10 @@ export const useMediaPlanStore = create<MediaPlanState>()(
     (set, get) => ({
       ...initialData(),
 
-      applyGeneratedPlan: (plan) => {
+      applyGeneratedPlan: (plan, opts) => {
         // No undo snapshot here: the wizard and onboarding use this too. AI tool applies
-        // snapshot themselves (planner-agent).
+        // snapshot themselves (planner-agent); any other rebuild makes that snapshot stale.
+        if (!opts?.fromAi) discardPreApplyBackup();
         set((state) => ({
           brief: plan.brief,
           totalBudget: clampBudget(plan.totalBudget),
@@ -351,6 +353,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       loadPreset: (name) => {
+        discardPreApplyBackup();
         set((state) => {
           const preset = state.presets.find((p) => p.name === name);
           if (!preset) return state;
@@ -365,6 +368,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
+        discardPreApplyBackup();
         // "Reset to Zero": keep a channel structure so users don't have to re-add everything,
         // but zero out the budget and targets.
         localStorage.removeItem(MEDIA_PLAN_STORE_KEY);

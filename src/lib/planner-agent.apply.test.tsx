@@ -116,3 +116,36 @@ describe('Undo AI change button', () => {
     container.remove();
   });
 });
+
+describe('non-AI plan replacements drop the stale AI undo', () => {
+  const aiChange = async () => {
+    update({ monthlyBudget: 90000, markets: ['US'] });
+    await tick();
+    expect(localStorage.getItem(PRE_APPLY_BACKUP_KEY)).not.toBeNull();
+  };
+
+  it('a wizard rebuild after an AI change hides Undo, so it cannot bring back the old plan', async () => {
+    await aiChange();
+    useMediaPlanStore.getState().applyGeneratedPlan(generatePlan({ industry: 'igaming', monthlyBudget: 100000, markets: ['DE'] }));
+    expect(localStorage.getItem(PRE_APPLY_BACKUP_KEY)).toBeNull();
+
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    act(() => root.render(<UndoAiChangeButton />));
+    expect(container.textContent).toBe('');
+    act(() => root.unmount());
+    container.remove();
+  });
+
+  it('loading a preset or resetting also drops it', async () => {
+    await aiChange();
+    useMediaPlanStore.getState().resetAll();
+    expect(localStorage.getItem(PRE_APPLY_BACKUP_KEY)).toBeNull();
+
+    await aiChange();
+    useMediaPlanStore.getState().savePreset('p');
+    useMediaPlanStore.getState().loadPreset('p');
+    expect(localStorage.getItem(PRE_APPLY_BACKUP_KEY)).toBeNull();
+  });
+});

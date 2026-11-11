@@ -43,8 +43,8 @@ export interface MediaPlanData {
 }
 
 export interface MediaPlanActions {
-  /** `snapshot: false` when the caller already took the pre-apply snapshot for this change. */
-  applyGeneratedPlan: (plan: GeneratedPlan) => void;
+  /** `fromAi: true` only for AI tool applies, which keep their undo snapshot; any other caller drops it. */
+  applyGeneratedPlan: (plan: GeneratedPlan, opts?: { fromAi?: boolean }) => void;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
