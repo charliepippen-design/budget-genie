@@ -6,10 +6,10 @@ import { BrandLogo } from '@/components/common/BrandLogo';
 
 export default function Auth({ mode = 'sign-in' }: { mode?: 'sign-in' | 'sign-up' }) {
     return (
-        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
-            <div className="w-full max-w-md bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+        <div className="min-h-screen bg-[#1c1c1c] flex items-center justify-center p-4">
+            <div className="w-full max-w-md bg-[#2a2a2a] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
                 {/* Header */}
-                <div className="p-8 text-center border-b border-slate-700 bg-[#0f172a]/50">
+                <div className="p-8 text-center border-b border-slate-700 bg-[#1c1c1c]/50">
                     <BrandLogo size="lg" as="h1" stacked className="mb-2" />
                     <p className="text-slate-400 text-sm">
                         {mode === 'sign-up' ? 'Create your account to start planning' : 'Please sign in to access your media plans'}

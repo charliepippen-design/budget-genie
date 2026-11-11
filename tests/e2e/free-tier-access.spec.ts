@@ -25,7 +25,7 @@ test.describe('free tier: new user without a paid plan', () => {
       }
     });
     await page.goto('/app');
-    await expect(page.getByText('Smart Strategies')).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({ timeout: 20_000 });
     await page.waitForTimeout(1500);
     expect(new URL(page.url()).pathname).toBe('/app');
   });

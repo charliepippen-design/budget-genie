@@ -1,6 +1,6 @@
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { computePlanHealth, type PlanHealth } from '@/lib/plan-health';
+import { usePlanResult } from '@/hooks/use-media-plan-store';
+import { planHealthFromEconomics, type PlanHealth } from '@/lib/plan-health';
 
 export function LossBannerView({ health }: { health: PlanHealth }) {
   const { format } = useCurrency();
@@ -21,8 +21,6 @@ export function LossBannerView({ health }: { health: PlanHealth }) {
 }
 
 export function LossBanner() {
-  const blended = useBlendedMetrics();
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
-  return <LossBannerView health={computePlanHealth(blended, vertical, multipliers)} />;
+  const { economics } = usePlanResult();
+  return <LossBannerView health={planHealthFromEconomics(economics)} />;
 }

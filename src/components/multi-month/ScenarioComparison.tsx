@@ -20,11 +20,8 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/mediaplan-data';
-import {
-  useMultiMonthStore,
-  useMultiMonthMetrics,
-  useScenarioMetrics,
-} from '@/hooks/use-multi-month-store';
+import { useMultiMonthStore, useTimelineResult } from '@/hooks/use-multi-month-store';
+import type { TimelineComparisonMetric } from '@/engine/timeline';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 interface ComparisonMetric {
@@ -37,121 +34,59 @@ interface ComparisonMetric {
   format: 'currency' | 'number' | 'percentage' | 'month';
 }
 
+const METRIC_LABELS: Record<TimelineComparisonMetric, string> = {
+  allocatedBudget: 'Total Budget',
+  revenue: 'Total Revenue',
+  netProfit: 'Net Profit',
+  roas: 'Avg ROAS',
+  cpa: 'Avg CPA',
+  breakEvenMonth: 'Break-even Month',
+};
+
+const METRIC_FORMATS: Record<TimelineComparisonMetric, ComparisonMetric['format']> = {
+  allocatedBudget: 'currency',
+  revenue: 'currency',
+  netProfit: 'currency',
+  roas: 'number',
+  cpa: 'currency',
+  breakEvenMonth: 'month',
+};
+
 export function ScenarioComparison() {
   const { scenarios, comparisonScenarioId, setComparisonScenario } = useMultiMonthStore();
 
   const { symbol, format: formatCurrency } = useCurrency();
-  const currentMetrics = useMultiMonthMetrics();
   // Same revenue model as the active plan, so A and B are compared like for like.
-  const comparisonMetrics = useScenarioMetrics(comparisonScenarioId);
+  const { comparison } = useTimelineResult();
 
   const metrics: ComparisonMetric[] = useMemo(() => {
-    if (!comparisonMetrics) return [];
+    if (!comparison) return [];
 
-    const a = currentMetrics.totals;
-    const b = comparisonMetrics.totals;
+    const breakEvenLabel = (month: number | null) => (month !== null ? `M${month + 1}` : 'Never');
 
-    const compare = (
-      aVal: number,
-      bVal: number,
-      higherIsBetter: boolean
-    ): { diff: number; diffPct: number; winner: 'A' | 'B' | 'tie' } => {
-      const diff = aVal - bVal;
-      const diffPct = bVal !== 0 ? (diff / Math.abs(bVal)) * 100 : 0;
-      let winner: 'A' | 'B' | 'tie' = 'tie';
-      if (Math.abs(diff) > 0.01) {
-        winner = higherIsBetter ? (diff > 0 ? 'A' : 'B') : diff < 0 ? 'A' : 'B';
-      }
-      return { diff, diffPct, winner };
-    };
-
-    return [
-      {
-        label: 'Total Budget',
-        scenarioA: a.totalAllocatedBudget,
-        scenarioB: b.totalAllocatedBudget,
-        ...compare(a.totalAllocatedBudget, b.totalAllocatedBudget, false),
-        format: 'currency' as const,
-      },
-      {
-        label: 'Total Revenue',
-        scenarioA: a.totalRevenue,
-        scenarioB: b.totalRevenue,
-        ...compare(a.totalRevenue, b.totalRevenue, true),
-        format: 'currency' as const,
-      },
-      {
-        label: 'Net Profit',
-        scenarioA: a.netProfit,
-        scenarioB: b.netProfit,
-        ...compare(a.netProfit, b.netProfit, true),
-        format: 'currency' as const,
-      },
-      {
-        label: 'Avg ROAS',
-        scenarioA: a.avgRoas,
-        scenarioB: b.avgRoas,
-        ...compare(a.avgRoas, b.avgRoas, true),
-        format: 'number' as const,
-      },
-      {
-        label: 'Avg CPA',
-        scenarioA: a.avgCpa || 0,
-        scenarioB: b.avgCpa || 0,
-        ...compare(a.avgCpa || 0, b.avgCpa || 0, false),
-        format: 'currency' as const,
-      },
-      {
-        label: 'Break-even Month',
-        scenarioA: a.breakEvenMonth !== null ? `M${a.breakEvenMonth + 1}` : 'Never',
-        scenarioB: b.breakEvenMonth !== null ? `M${b.breakEvenMonth + 1}` : 'Never',
-        diff: (a.breakEvenMonth ?? 99) - (b.breakEvenMonth ?? 99),
-        diffPct: 0,
-        winner:
-          a.breakEvenMonth !== null && b.breakEvenMonth !== null
-            ? a.breakEvenMonth < b.breakEvenMonth
-              ? 'A'
-              : a.breakEvenMonth > b.breakEvenMonth
-                ? 'B'
-                : 'tie'
-            : a.breakEvenMonth !== null
-              ? 'A'
-              : b.breakEvenMonth !== null
-                ? 'B'
-                : 'tie',
-        format: 'month' as const,
-      },
-    ];
-  }, [currentMetrics, comparisonMetrics]);
+    return comparison.rows.map((row) => ({
+      label: METRIC_LABELS[row.metric],
+      scenarioA: row.metric === 'breakEvenMonth' ? breakEvenLabel(row.a) : (row.a ?? 0),
+      scenarioB: row.metric === 'breakEvenMonth' ? breakEvenLabel(row.b) : (row.b ?? 0),
+      diff: row.diff,
+      diffPct: row.diffPct,
+      winner: row.winner,
+      format: METRIC_FORMATS[row.metric],
+    }));
+  }, [comparison]);
 
   // Chart data for overlay
   const overlayData = useMemo(() => {
-    if (!comparisonMetrics) return [];
+    if (!comparison) return [];
 
-    const maxLen = Math.max(currentMetrics.months.length, comparisonMetrics.months.length);
-    const data: Array<{
-      name: string;
-      currentRevenue: number;
-      currentProfit: number;
-      compRevenue: number;
-      compProfit: number;
-    }> = [];
-
-    for (let i = 0; i < maxLen; i++) {
-      const currentMonth = currentMetrics.months[i];
-      const compMonth = comparisonMetrics.months[i];
-
-      data.push({
-        name: `M${i + 1}`,
-        currentRevenue: currentMonth?.revenue || 0,
-        currentProfit: currentMonth?.cumulativeProfit || 0,
-        compRevenue: compMonth?.revenue || 0,
-        compProfit: compMonth?.cumulativeProfit || 0,
-      });
-    }
-
-    return data;
-  }, [currentMetrics, comparisonMetrics]);
+    return comparison.overlay.map((point, i) => ({
+      name: `M${i + 1}`,
+      currentRevenue: point.aRevenue,
+      currentProfit: point.aCumulativeProfit,
+      compRevenue: point.bRevenue,
+      compProfit: point.bCumulativeProfit,
+    }));
+  }, [comparison]);
 
   const formatValue = (value: number | string, format: ComparisonMetric['format']) => {
     if (typeof value === 'string') return value;
@@ -210,7 +145,7 @@ export function ScenarioComparison() {
         </CardContent>
       </Card>
 
-      {!comparisonMetrics && (
+      {!comparison && (
         <Card className="border-border">
           <CardContent className="py-8 text-center text-sm text-muted-foreground">
             Pick a saved scenario above to compare it with the current plan.
@@ -218,7 +153,7 @@ export function ScenarioComparison() {
         </Card>
       )}
 
-      {comparisonMetrics && (
+      {comparison && (
         <>
           {/* Metrics Comparison */}
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

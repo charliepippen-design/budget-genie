@@ -54,6 +54,7 @@ import { cn, sanitizeChannelName } from '@/lib/utils';
 import { BRAND_NAME } from '@/lib/brand';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import { ChannelEditor } from './ChannelEditor';
 import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
@@ -178,7 +179,7 @@ const GlobalMultipliers: React.FC = () => {
               className={cn(
                 'h-10 pl-7 text-sm',
                 isDark
-                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  ? 'bg-[#141414] border-slate-700 text-slate-200'
                   : 'bg-white border-slate-300 text-slate-900'
               )}
             />
@@ -214,7 +215,7 @@ const GlobalMultipliers: React.FC = () => {
               className={cn(
                 'h-10 pl-7 text-sm',
                 isDark
-                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  ? 'bg-[#141414] border-slate-700 text-slate-200'
                   : 'bg-white border-slate-300 text-slate-900'
               )}
             />
@@ -268,7 +269,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -293,7 +294,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -320,7 +321,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -345,7 +346,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -370,7 +371,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -480,7 +481,7 @@ const ChannelItem: React.FC<{ channel: ChannelWithMetrics }> = ({ channel }) => 
                 isDark ? 'bg-slate-800' : 'bg-slate-100'
               )}
             >
-              {channel.buyingModel}
+              {BUYING_MODEL_INFO[channel.buyingModel]?.name ?? channel.buyingModel}
             </span>
             <span className={cn('truncate', isDark ? 'text-slate-400' : 'text-slate-600')}>
               {channel.allocationPct.toFixed(1)}% Alloc
@@ -536,6 +537,7 @@ export const SettingsConsole: React.FC = () => {
   const isDark = theme === 'dark' || theme === 'contrast';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
   const [newModel, setNewModel] = useState<BuyingModel>('CPM');
@@ -629,14 +631,15 @@ export const SettingsConsole: React.FC = () => {
     <div
       className={cn(
         'h-full w-full flex flex-col overflow-hidden transition-colors duration-300',
-        isDark ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'
+        isDark ? 'bg-[#141414] text-slate-100' : 'bg-slate-50 text-slate-900'
       )}
     >
       {/* <div className="text-yellow-500 font-mono">DEBUG MODE: Settings Console</div> */}
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       <div
         className={cn(
           'p-4 border-b space-y-4 flex-shrink-0 z-10 transition-colors duration-300',
-          isDark ? 'border-slate-800 bg-[#020617]' : 'border-slate-200 bg-white'
+          isDark ? 'border-slate-800 bg-[#141414]' : 'border-slate-200 bg-white'
         )}
       >
         <div className="flex items-center justify-between">
@@ -670,19 +673,20 @@ export const SettingsConsole: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Are you sure you want to reset the entire plan? This cannot be undone (except via Undo).'
-                  )
-                ) {
-                  resetAll();
-                  toast({
-                    title: 'Plan Reset',
-                    description: 'Use Undo (Ctrl+Z) to restore if needed.',
-                  });
-                }
-              }}
+              onClick={() =>
+                setConfirmRequest({
+                  title: 'Reset the entire plan?',
+                  description: 'This clears budget and channel settings. Ctrl+Z can undo it.',
+                  confirmLabel: 'Reset plan',
+                  onConfirm: () => {
+                    resetAll();
+                    toast({
+                      title: 'Plan Reset',
+                      description: 'Use Undo (Ctrl+Z) to restore if needed.',
+                    });
+                  },
+                })
+              }
               className={cn(
                 'text-sm h-9 px-3',
                 isDark
@@ -699,7 +703,7 @@ export const SettingsConsole: React.FC = () => {
         <div
           className={cn(
             'p-4 rounded-xl border shadow-sm mb-2 transition-colors duration-300',
-            isDark ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200'
+            isDark ? 'bg-[#1c1c1c] border-slate-800' : 'bg-white border-slate-200'
           )}
         >
           <GlobalMultipliers />

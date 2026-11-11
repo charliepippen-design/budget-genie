@@ -1,15 +1,14 @@
 import { getChannelGroup, GROUP_LABELS, type ChannelGroup } from '@/lib/planning-insights';
-import type { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
-import type { ChannelSandboxAdjustment } from '@/store/useSandboxStore';
-import { computeSandboxChannel } from '@/components/dashboard/ltv-sandbox-calc';
-import {
-  CHANNEL_GROUPS,
-  SANDBOX_DECREASE_FILL,
-  SANDBOX_DEFAULT_ADJUSTMENT,
-  SANDBOX_INCREASE_FILL,
-  SANDBOX_NEUTRAL_FILL,
-} from './constants';
-import type { AggregateMetrics, SandboxChannelMetric } from './types';
+import type { ChannelWithMetrics } from '@/lib/media-plan/types';
+import { CHANNEL_GROUPS, SANDBOX_DEFAULT_ADJUSTMENT } from './constants';
+import { computeSandboxChannel } from './sandbox-channel';
+import type {
+  AggregateMetrics,
+  ChannelSandboxAdjustment,
+  SandboxChannelMetric,
+  SandboxGroupImpact,
+  SandboxSummarySignals,
+} from './types';
 
 export function toBaselineAggregate(blended: {
   totalSpend: number;
@@ -117,12 +116,13 @@ export function aggregateMetrics(sandboxChannelMetrics: SandboxChannelMetric[]):
   };
 }
 
-export function buildSandboxSummary(
+/** The numbers behind the sandbox summary: ROI change and the two risk flags. */
+export function sandboxSummarySignals(
   baselineRoi: number,
   sandboxRoi: number,
   sandboxChannelMetrics: SandboxChannelMetric[],
   weightedSandboxChurnDeltaPct: number
-): string {
+): SandboxSummarySignals {
   const baselineRoiPct = baselineRoi * 100;
   const sandboxRoiPct = sandboxRoi * 100;
   const roiDeltaPct = sandboxRoiPct - baselineRoiPct;
@@ -146,50 +146,42 @@ export function buildSandboxSummary(
     paidSandboxRoas < paidBaselineRoas * 0.92 ||
     (paidBaselineSpend > 0 && paidSandboxSpend > paidBaselineSpend * 1.18);
 
-  const direction = roiDeltaPct >= 0 ? 'increase' : 'reduce';
+  return { roiDeltaPct, paidRiskRaised, churnPressure: weightedSandboxChurnDeltaPct > 2.5 };
+}
+
+/** Wording only: turns the summary signals into the sentence shown in the lab and exports. */
+export function formatSandboxSummary(signals: SandboxSummarySignals): string {
+  const direction = signals.roiDeltaPct >= 0 ? 'increase' : 'reduce';
   const riskSignals = [
-    paidRiskRaised ? 'raise risk in Paid Ads' : null,
-    weightedSandboxChurnDeltaPct > 2.5 ? 'increase churn pressure' : null,
+    signals.paidRiskRaised ? 'raise risk in Paid Ads' : null,
+    signals.churnPressure ? 'increase churn pressure' : null,
   ].filter(Boolean);
 
   const riskText =
     riskSignals.length > 0 ? `but ${riskSignals.join(' and ')}.` : 'while keeping risk stable.';
 
-  return `Your changes ${direction} total ROI by ${Math.abs(roiDeltaPct).toFixed(1)}% ${riskText}`;
+  return `Your changes ${direction} total ROI by ${Math.abs(signals.roiDeltaPct).toFixed(1)}% ${riskText}`;
 }
 
-export function groupImpact(sandboxChannelMetrics: SandboxChannelMetric[]) {
+export function buildSandboxSummary(
+  baselineRoi: number,
+  sandboxRoi: number,
+  sandboxChannelMetrics: SandboxChannelMetric[],
+  weightedSandboxChurnDeltaPct: number
+): string {
+  return formatSandboxSummary(
+    sandboxSummarySignals(baselineRoi, sandboxRoi, sandboxChannelMetrics, weightedSandboxChurnDeltaPct)
+  );
+}
+
+export function groupSpendImpact(sandboxChannelMetrics: SandboxChannelMetric[]): SandboxGroupImpact[] {
   return CHANNEL_GROUPS.map((group) => {
     const groupChannels = sandboxChannelMetrics.filter((channel) => channel.group === group);
     const baselineSpend = groupChannels.reduce((sum, item) => sum + item.baselineSpend, 0);
     const sandboxSpend = groupChannels.reduce((sum, item) => sum + item.adjustedSpend, 0);
-    const delta = sandboxSpend - baselineSpend;
 
-    return {
-      group: GROUP_LABELS[group],
-      baselineSpend,
-      sandboxSpend,
-      delta,
-      sandboxFill:
-        delta > 0
-          ? SANDBOX_INCREASE_FILL
-          : delta < 0
-            ? SANDBOX_DECREASE_FILL
-            : SANDBOX_NEUTRAL_FILL,
-    };
+    return { group, baselineSpend, sandboxSpend, delta: sandboxSpend - baselineSpend };
   });
-}
-
-export function spendDistributionSummary(groupImpactData: ReturnType<typeof groupImpact>): string {
-  const increases = groupImpactData.filter((item) => item.delta > 0).map((item) => item.group);
-  const decreases = groupImpactData.filter((item) => item.delta < 0).map((item) => item.group);
-
-  const increaseText =
-    increases.length > 0 ? `Increases: ${increases.join(', ')}.` : 'No group increases.';
-  const decreaseText =
-    decreases.length > 0 ? `Decreases: ${decreases.join(', ')}.` : 'No group decreases.';
-
-  return `${increaseText} ${decreaseText}`;
 }
 
 export function filterGroupedChannels(channels: ChannelWithMetrics[], channelFilter: string) {

@@ -4,7 +4,7 @@ import {
   churnEffectFor,
   computeSandboxChannel,
   resolveBaselineCpa,
-} from '../components/dashboard/ltv-sandbox-calc';
+} from './sandbox-channel';
 
 const NO_ADJUSTMENT = { spendPct: 0, cpaPct: 0, roasPct: 0, churnPct: 0 };
 

@@ -9,6 +9,7 @@ import { useAI, aiErrorKind, aiErrorMessage, getUiLang, isFreeTierLimit, newTurn
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan, type PlanDiffSide } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
+import { usePlannerPromptStore } from '@/store/usePlannerPromptStore';
 import { UndoAiChangeButton } from './UndoAiChangeButton';
 import { PlanDiff } from './PlanDiff';
 
@@ -121,7 +122,11 @@ export function ToolCard({ name, response }: { name: string; response: Record<st
   const listed = [...plan.channels]
     .filter(c => c.active && (c.spend ?? 0) > 0)
     .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0));
-  const totalShare = Math.round(listed.reduce((t, c) => t + (c.sharePct ?? 0), 0) * 10) / 10;
+  // Totals are the engine's, saved with the card. Cards saved before `blended.sharePct` existed add up their own rows.
+  const totalShare =
+    typeof plan.blended?.sharePct === 'number'
+      ? plan.blended.sharePct
+      : Math.round(listed.reduce((t, c) => t + (c.sharePct ?? 0), 0) * 10) / 10;
   const totalSpend = typeof plan.blended?.spend === 'number' ? plan.blended.spend : listed.reduce((t, c) => t + (c.spend ?? 0), 0);
   return (
     <div className="mx-2 rounded-lg border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs text-slate-300">
@@ -164,9 +169,16 @@ export function PlannerChat() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const hasBrief = useMediaPlanStore(s => !!s.brief);
+  const hasPlan = useMediaPlanStore(s => !!s.brief || s.hasCompletedOnboarding);
+  const planBudget = useMediaPlanStore(s => s.totalBudget);
+  const activeChannelCount = useMediaPlanStore(s => s.channels.filter(c => c.isActive !== false).length);
+  const { format: formatPlanMoney } = useCurrency();
+  // With a plan on screen the chat starts from it, instead of asking for the brief again.
+  const planWelcome = `Your plan is on screen: **${formatPlanMoney(planBudget)}/month** across **${activeChannelCount} channels**. Tell me what to change: move budget between channels, add or drop one, change markets or the goal. I adjust the plan; the engine recalculates every number.`;
   const callAI = useAI();
   const uiLang = getUiLang();
   const endRef = useRef<HTMLDivElement>(null);
+  const hasPendingPrompt = usePlannerPromptStore(s => s.queue.length > 0);
 
   // Phones: the panel is full-screen, so start hidden and let the user open it.
   useEffect(() => {
@@ -232,6 +244,18 @@ export function PlannerChat() {
     }
   };
 
+  // Prompts sent from elsewhere (the AI command bar): open the chat and send them as typed
+  // messages, one at a time. While a reply is running they wait in the store.
+  useEffect(() => {
+    if (!hasPendingPrompt || busy) return;
+    const prompt = usePlannerPromptStore.getState().take();
+    if (!prompt) return;
+    setOpen(true);
+    void send(prompt);
+    // `send` is rebuilt on every render; the queue and `busy` decide when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPendingPrompt, busy]);
+
   // Works without AI: builds a sensible default plan for the industry straight away.
   const quickStart = (industry: IndustryId) => {
     const plan = generatePlan({ industry, monthlyBudget: useMediaPlanStore.getState().totalBudget || 50000 });
@@ -282,10 +306,10 @@ export function PlannerChat() {
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
         <div className="rounded-2xl rounded-tl-none border border-slate-700 bg-slate-800 p-3 text-slate-200">
-          <RichText text={WELCOME} />
+          <RichText text={hasPlan ? planWelcome : WELCOME} />
         </div>
 
-        {!hasBrief && (
+        {!hasPlan && (
           <div className="flex flex-wrap gap-2">
             {INDUSTRY_PACKS.map(p => (
               <button
@@ -367,9 +391,13 @@ export function PlannerChat() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-      <div className="space-y-1 px-3 pb-3 text-[11px] leading-snug text-slate-500">
-        <p>{AI_DISCLOSURE_SHORT}</p>
-        {uiLang === 'it' && <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>}
+      <div className="space-y-1 px-3 pb-3 text-slate-500">
+        <p className="text-[11px] leading-snug">{AI_DISCLOSURE_SHORT}</p>
+        {uiLang === 'it' && (
+          <p lang="it" className="text-[11px] leading-snug">
+            {AI_DISCLOSURE_SHORT_IT}
+          </p>
+        )}
       </div>
     </aside>
   );

@@ -1,18 +1,21 @@
-import type { SandboxExportSnapshot } from '@/store/useSandboxStore';
-import type { AggregateMetrics, SandboxChannelMetric, ScenarioPoint } from './types';
+import type {
+  AggregateMetrics,
+  SandboxChannelMetric,
+  SandboxExportSnapshot,
+  ScenarioPoint,
+} from './types';
 
-export function buildExportSnapshot(input: {
+/** The snapshot's figures; the summary sentence is wording and is attached separately. */
+export function buildExportNumbers(input: {
   sandboxEnabled: boolean;
-  activeSummaryText: string;
   baselineMetrics: AggregateMetrics;
   sandboxMetrics: AggregateMetrics;
   sandboxChannelMetrics: SandboxChannelMetric[];
   baselineScenarioData: ScenarioPoint[];
   scenarioData: ScenarioPoint[];
-}): SandboxExportSnapshot {
+}): Omit<SandboxExportSnapshot, 'summaryText'> {
   const {
     sandboxEnabled,
-    activeSummaryText,
     baselineMetrics,
     sandboxMetrics,
     sandboxChannelMetrics,
@@ -22,7 +25,6 @@ export function buildExportSnapshot(input: {
 
   return {
     enabled: sandboxEnabled,
-    summaryText: activeSummaryText,
     baselineMetrics: {
       ...baselineMetrics,
       roiPct: baselineMetrics.roi * 100,
@@ -71,4 +73,24 @@ export function buildExportSnapshot(input: {
       };
     }),
   };
+}
+
+export function withSummaryText(
+  numbers: Omit<SandboxExportSnapshot, 'summaryText'>,
+  summaryText: string
+): SandboxExportSnapshot {
+  return {
+    enabled: numbers.enabled,
+    summaryText,
+    baselineMetrics: numbers.baselineMetrics,
+    adjustedMetrics: numbers.adjustedMetrics,
+    channelComparisons: numbers.channelComparisons,
+    scenarioComparisons: numbers.scenarioComparisons,
+  };
+}
+
+export function buildExportSnapshot(
+  input: Parameters<typeof buildExportNumbers>[0] & { activeSummaryText: string }
+): SandboxExportSnapshot {
+  return withSummaryText(buildExportNumbers(input), input.activeSummaryText);
 }

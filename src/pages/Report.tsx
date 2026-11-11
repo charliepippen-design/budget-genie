@@ -39,21 +39,18 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
-import {
-  getEfficiencyAlerts,
-  buildRoasTrendData,
-  GROUP_COLORS,
-  formatLtvToCac,
-} from '@/lib/planning-insights';
+import { GROUP_COLORS, formatLtvToCac } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
+import { narratorPlanFigures } from '@/lib/report-narrator';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { formatRoasPair } from '@/lib/roas-pair';
 
 const PIE_COLORS = [
-  '#6366f1',
+  '#b998df',
   '#8b5cf6',
   '#06b6d4',
   '#10b981',
@@ -66,7 +63,8 @@ const PIE_COLORS = [
 const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
-  const { alerts: alertsResult, channelInsights, groups } = usePlanResult();
+  const planResult = usePlanResult();
+  const { alerts: alertsResult, channelInsights, groups } = planResult;
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -93,8 +91,8 @@ const ReportContent = () => {
   const isProfit = netPnl >= 0;
 
   const topChannel = useMemo(
-    () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
-    [active]
+    () => active.find((c) => c.id === planResult.strongestChannelId),
+    [active, planResult.strongestChannelId]
   );
 
   const weakestChannel = useMemo(
@@ -102,14 +100,12 @@ const ReportContent = () => {
     [active, alertsResult.weakestChannelId]
   );
 
-  const roasTrend = useMemo(
-    () => buildRoasTrendData(active, { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 }, 6),
-    [active]
-  );
+  const roasTrend = groups.reportReturnTrend;
 
   const groupSpend = groups.spend;
 
-  const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
+  // Alerts over active, spending channels (the dashboard's list also weighs idle channels).
+  const alerts = alertsResult.efficiencyActive;
 
   const pieData = useMemo(
     () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
@@ -117,18 +113,8 @@ const ReportContent = () => {
   );
 
   const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    ...narratorPlanFigures(planResult),
     totalBudget,
-    totalSpend,
-    projectedRevenue,
-    projectedFtds,
-    blendedCpa,
-    blendedRoas,
-    month1Roas: roasPair.month1,
-    paybackMonths,
-    topChannel: topChannel?.name ?? 'Unknown',
-    weakestChannel: weakestChannel?.name ?? null,
-    scenarioBase: scenarioEnvelope[1],
-    alertCount: alerts.length,
     vertical: vc.vertical,
     geos: activeGeos,
     currency: code,
@@ -158,8 +144,8 @@ const ReportContent = () => {
         ? 'text-amber-400'
         : 'text-red-400';
 
-  const revenueVsSpendWidth =
-    totalSpend > 0 ? Math.min(100, (projectedRevenue / totalSpend) * 50) : 0;
+  // Bar scale: a 2x lifetime return fills the track.
+  const revenueVsSpendWidth = Math.min(100, blendedRoas * 50);
 
   const sortedActiveBySpend = useMemo(
     () => [...active].sort((a, b) => b.metrics.spend - a.metrics.spend),
@@ -174,23 +160,11 @@ const ReportContent = () => {
   const { exporting, run: runExportTask } = useExportRunner();
   const handleExportPdf = () => {
     if (userStatus === 'demo') {
-      toast.error('Exporting requires a Pro Acquisition License.');
+      toast.error('Exporting requires the Pro plan.');
       return;
     }
     void runExportTask('PDF', () =>
-      exportToPdf(
-        active,
-        totalBudget,
-        {
-          totalSpend,
-          totalConversions: projectedFtds,
-          blendedCpa,
-          projectedRevenue,
-          blendedRoas,
-          month1Roas: roasPair.month1,
-        },
-        { currencySymbol: symbol, formatCurrency: format }
-      )
+      exportToPdf(planResult, totalBudget, { currencySymbol: symbol, formatCurrency: format }, active)
     );
   };
 
@@ -278,7 +252,7 @@ const ReportContent = () => {
                 <Users className="h-5 w-5" />
                 <p className="text-sm">{vc.report.customerCountLabel}</p>
               </div>
-              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString()}</p>
+              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString('en-US')}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {blendedCpa
                   ? `at ${$(blendedCpa)} per ${vc.terms.conversion.toLowerCase()}`
@@ -510,11 +484,11 @@ const ReportContent = () => {
                 >
                   <div>
                     <p className="font-medium text-foreground">{c.name}</p>
-                    <span className="text-xs text-muted-foreground">{c.family}</span>
+                    <span className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</span>
                   </div>
                   <div>{$(c.metrics.spend)}</div>
                   <div>{pct.toFixed(1)}%</div>
-                  <div>{Math.round(c.metrics.conversions).toLocaleString()}</div>
+                  <div>{Math.round(c.metrics.conversions).toLocaleString('en-US')}</div>
                   <div>{c.metrics.cpa ? $(c.metrics.cpa) : 'N/A'}</div>
                   <div className={returnClass}>{c.metrics.roas.toFixed(2)}x</div>
                 </div>
@@ -565,8 +539,8 @@ const ReportContent = () => {
                   <Tooltip
                     formatter={(value: number) => [$(value), 'Spend']}
                     contentStyle={{
-                      background: '#0f172a',
-                      border: '1px solid #334155',
+                      background: '#1c1c1c',
+                      border: '1px solid #333333',
                       borderRadius: 10,
                     }}
                   />
@@ -631,13 +605,13 @@ const ReportContent = () => {
           <div className="rounded-2xl border border-border bg-card p-4">
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={roasTrend}>
-                <XAxis dataKey="month" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" tickFormatter={(v: number) => `${v.toFixed(1)}x`} />
+                <XAxis dataKey="month" stroke="#979797" />
+                <YAxis stroke="#979797" tickFormatter={(v: number) => `${v.toFixed(1)}x`} />
                 <Tooltip
                   formatter={(value: number) => `${value.toFixed(2)}x`}
                   contentStyle={{
-                    background: '#0f172a',
-                    border: '1px solid #334155',
+                    background: '#1c1c1c',
+                    border: '1px solid #333333',
                     borderRadius: 10,
                   }}
                 />

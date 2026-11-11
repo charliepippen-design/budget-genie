@@ -20,10 +20,12 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { StrategicSummary } from '@/components/StrategicSummary';
-import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
+import { formatLtvToCac } from '@/lib/planning-insights';
+import { narratorPlanFigures } from '@/lib/report-narrator';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { BUYING_MODEL_INFO, FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
@@ -31,7 +33,7 @@ import { BrandLogo } from '@/components/common/BrandLogo';
 import { BRAND_NAME } from '@/lib/brand';
 
 const PIE_COLORS = [
-  '#6366f1',
+  '#b998df',
   '#8b5cf6',
   '#06b6d4',
   '#10b981',
@@ -45,7 +47,8 @@ const OutputContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
-  const { alerts: alertsResult, channelInsights } = usePlanResult();
+  const planResult = usePlanResult();
+  const { alerts: alertsResult, channelInsights } = planResult;
   const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -77,16 +80,12 @@ const OutputContent = () => {
   const isProfit = netPnl >= 0;
 
   const topChannel = useMemo(
-    () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
-    [active]
+    () => active.find((c) => c.id === planResult.strongestChannelId),
+    [active, planResult.strongestChannelId]
   );
 
-  const weakestChannel = useMemo(
-    () => active.find((c) => c.id === alertsResult.weakestChannelId) ?? null,
-    [active, alertsResult.weakestChannelId]
-  );
-
-  const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
+  // Alerts over active, spending channels (the dashboard's list also weighs idle channels).
+  const alerts = alertsResult.efficiencyActive;
 
   const pieData = useMemo(
     () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
@@ -109,18 +108,8 @@ const OutputContent = () => {
   // ─── AI narrative ────────────────────────────────────────────────────────
 
   const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    ...narratorPlanFigures(planResult),
     totalBudget,
-    totalSpend,
-    projectedRevenue,
-    projectedFtds,
-    blendedCpa,
-    blendedRoas,
-    month1Roas: roasPair.month1,
-    paybackMonths,
-    topChannel: topChannel?.name ?? 'Unknown',
-    weakestChannel: weakestChannel?.name ?? null,
-    scenarioBase: scenarioEnvelope[1],
-    alertCount: alerts.length,
     vertical: vc.vertical,
     geos: activeGeos,
     currency: code,
@@ -225,7 +214,7 @@ const OutputContent = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:divide-x md:divide-border">
             {/* Left column */}
             <div className="md:pr-10">
-              <BrandLogo size="sm" tone="light" className="mb-3" />
+              <BrandLogo size="sm" tone={theme === 'light' ? 'light' : 'dark'} className="mb-3" />
               <p className="text-xs uppercase tracking-widest text-muted-foreground">Media Plan</p>
               <h1 className="text-5xl font-bold text-foreground mt-2 leading-tight break-words">
                 {projectName}
@@ -268,7 +257,7 @@ const OutputContent = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.customerCountLabel}</p>
                   <p className="text-2xl font-bold text-foreground mt-1">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {blendedCpa ? `at ${$(blendedCpa)} each` : 'cost not calculable'}
@@ -581,18 +570,18 @@ const OutputContent = () => {
                     <tr key={c.id} className="bg-card border-b border-border">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.family}</p>
+                        <p className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="bg-muted text-muted-foreground text-xs rounded px-2 py-0.5">
-                          {c.buyingModel}
+                          {BUYING_MODEL_INFO[c.buyingModel]?.name ?? c.buyingModel}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-foreground">
                         {$(c.metrics.spend)}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
-                        {Math.round(c.metrics.conversions).toLocaleString()}
+                        {Math.round(c.metrics.conversions).toLocaleString('en-US')}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
                         {c.metrics.cpa ? $(c.metrics.cpa) : '—'}
@@ -610,7 +599,7 @@ const OutputContent = () => {
                   <td className="px-4 py-3 text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-right text-foreground">{$(totalSpend)}</td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
                     {blendedCpa ? $(blendedCpa) : '—'}

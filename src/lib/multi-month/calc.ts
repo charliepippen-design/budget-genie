@@ -168,8 +168,14 @@ export function createMonth(
 
 // ========== METRICS CALCULATION ==========
 
+/** The month fields the metrics read. */
+export type MonthMetricsInput = Pick<
+  MonthData,
+  'budget' | 'budgetMultiplier' | 'spendMultiplier' | 'ctrBump' | 'channels'
+>;
+
 export function calculateMonthMetrics(
-  month: MonthData,
+  month: MonthMetricsInput,
   globalSettings: GlobalPlanSettings
 ): {
   totalSpend: number;
@@ -223,8 +229,8 @@ export function calculateMonthMetrics(
   };
 }
 
-export function calculatePlanMetrics(
-  months: MonthData[],
+export function calculatePlanMetrics<M extends MonthMetricsInput = MonthData>(
+  months: M[],
   globalSettings: GlobalPlanSettings,
   revenueModel?: {
     playerValue: number;
@@ -235,7 +241,22 @@ export function calculatePlanMetrics(
     bonusRate: number;
   }
 ): {
-  months: MonthData[];
+  months: Array<
+    M & {
+      totalSpend: number;
+      totalConversions: number;
+      revenue: number;
+      operatingCosts: number;
+      netProfit: number;
+      cumulativeProfit: number;
+      registrations?: number;
+      activePlayers?: number;
+      ggr?: number;
+      bonus?: number;
+      ngr?: number;
+      grossContribution?: number;
+    }
+  >;
   totals: {
     totalAllocatedBudget: number;
     totalSpend: number;

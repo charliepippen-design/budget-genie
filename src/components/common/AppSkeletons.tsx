@@ -3,7 +3,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 
 export function RouteLoadingSkeleton() {
   return (
-    <div className="min-h-screen p-6 bg-[#020617]">
+    <div className="min-h-screen p-6 bg-[#141414]">
       <div className="max-w-[1600px] mx-auto space-y-6">
         <Skeleton className="h-12 w-72" />
         <Skeleton className="h-44 w-full" />

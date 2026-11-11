@@ -17,6 +17,8 @@ test('report PDF export downloads', async ({ page }) => {
 });
 test('dashboard shows new tabs', async ({ page }) => {
   await page.goto('/app');
+  await page.getByRole('tab', { name: 'Timeline' }).click({ timeout: 20000 });
   await expect(page.getByText('Multi-Month Charts').first()).toBeVisible({ timeout: 20000 });
+  await page.getByRole('tab', { name: 'Scenarios' }).click();
   await expect(page.getByText('Scenario Comparison').first()).toBeVisible();
 });

@@ -1,17 +1,14 @@
 import React from 'react';
-import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { Target, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL, computeRoasPair } from '@/lib/roas-pair';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 
 export const ForecastCard = () => {
-  const blended = useBlendedMetrics();
-  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = blended;
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
-  const roasPair = computeRoasPair(blended, vertical, multipliers);
+  const { totals, roas: roasPair } = usePlanResult();
+  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = totals;
   const {
     isBudgetDragging,
     budgetDragBaselineRevenue,
@@ -127,7 +124,7 @@ export const ForecastCard = () => {
               )}
             >
               {symbol}
-              {projectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {projectedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
             {ghostProjectedRevenue !== null ? (
               <div
@@ -139,7 +136,7 @@ export const ForecastCard = () => {
                 )}
               >
                 {symbol}
-                {ghostProjectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {ghostProjectedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </div>
             ) : null}
           </div>
@@ -184,7 +181,7 @@ export const ForecastCard = () => {
               )}
             >
               {symbol}
-              {blendedCpa?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '--'}
+              {blendedCpa?.toLocaleString('en-US', { maximumFractionDigits: 2 }) ?? '--'}
             </div>
           </div>
 
@@ -273,7 +270,7 @@ export const ForecastCard = () => {
                 isDark ? 'text-white dark:text-white' : 'text-slate-900'
               )}
             >
-              {totalConversions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {totalConversions.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
           </div>
         </div>

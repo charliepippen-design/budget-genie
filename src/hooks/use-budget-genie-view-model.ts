@@ -4,8 +4,8 @@ import {
   useChannelsWithMetrics,
   useBlendedMetrics,
   useCategoryTotals,
+  usePlanResult,
 } from './use-media-plan-store';
-import { computeRoasPair } from '@/lib/roas-pair';
 
 export function useBudgetGenieViewModel() {
   const {
@@ -20,16 +20,9 @@ export function useBudgetGenieViewModel() {
 
   const channels = useChannelsWithMetrics();
   const plainBlended = useBlendedMetrics();
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
-  // Carries Month-1 ROAS (from computePlanEconomics) so exports can print both ROAS labels.
-  const blendedMetrics = useMemo(
-    () => ({
-      ...plainBlended,
-      month1Roas: computeRoasPair(plainBlended, vertical, multipliers).month1,
-    }),
-    [plainBlended, vertical, multipliers],
-  );
+  const month1Roas = usePlanResult().roas.month1;
+  // Carries Month-1 ROAS (from the engine result) next to the blended totals.
+  const blendedMetrics = useMemo(() => ({ ...plainBlended, month1Roas }), [plainBlended, month1Roas]);
   const categoryTotals = useCategoryTotals();
 
   const currentAllocations = useMemo(

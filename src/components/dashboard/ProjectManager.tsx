@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { ScenarioListSkeleton } from '@/components/common/AppSkeletons';
 import { discardPreApplyBackup } from '@/lib/crash-recovery';
 import { cn } from '@/lib/utils';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import type { MediaPlanState } from '@/hooks/use-media-plan-store';
 import type { MultiMonthState } from '@/hooks/use-multi-month-store';
 import {
@@ -26,6 +27,7 @@ import {
   exportProjectsJson,
   parseProjectsImport,
   mergeProjects,
+  hasUnsavedWork,
   type SavedProject as Project,
 } from '@/lib/saved-projects';
 
@@ -39,6 +41,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
   const [projects, setProjects] = useState<Project[]>([]);
   const [newProjectName, setNewProjectName] = useState('');
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
 
   // Always read storage fresh: this component is mounted twice (header + dashboard), and a
   // list cached at mount made one copy overwrite projects saved from the other.
@@ -66,7 +69,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
     setIsLoadingProjects(false);
   }, [open]);
 
-  const saveProject = () => {
+  const saveProject = (overwriteConfirmed = false) => {
     const name = newProjectName.trim();
     if (!name) {
       toast.error('Please enter a project name');
@@ -79,7 +82,13 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
       return;
     }
     const existing = current.find((p) => p.name.toLowerCase() === name.toLowerCase());
-    if (existing && !window.confirm(`A project called "${existing.name}" exists. Overwrite it?`)) {
+    if (existing && !overwriteConfirmed) {
+      setConfirmRequest({
+        title: `Overwrite "${existing.name}"?`,
+        description: 'A project with this name already exists. Saving replaces it with your current plan.',
+        confirmLabel: 'Overwrite',
+        onConfirm: () => saveProject(true),
+      });
       return;
     }
 
@@ -98,10 +107,24 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
     toast.success(existing ? 'Project updated' : 'Project saved in this browser');
   };
 
-  const loadProject = (project: Project) => {
+  const loadProject = (project: Project, replaceConfirmed = false) => {
     const prepared = prepareProjectForLoad(project);
     if (!prepared.ok) {
       toast.error('This project is damaged and cannot be loaded. Your current plan was not changed.');
+      return;
+    }
+    // Loading replaces the whole workspace: ask first when the current plan is not saved anywhere.
+    if (
+      !replaceConfirmed &&
+      hasUnsavedWork(useMediaPlanStore.getState(), useMultiMonthStore.getState(), readProjects().projects)
+    ) {
+      setConfirmRequest({
+        title: `Load "${project.name}"?`,
+        description:
+          'Your current plan has changes that are not saved in a project. Loading replaces it. Cancel and save it first if you want to keep it.',
+        confirmLabel: 'Load and replace',
+        onConfirm: () => loadProject(project, true),
+      });
       return;
     }
     try {
@@ -155,11 +178,19 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
     );
   };
 
-  const deleteProject = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering load
+  const deleteProject = (id: string, deleteConfirmed = false) => {
     const { projects: current, unsafeToSave } = readProjects();
     const target = current.find((p) => p.id === id);
-    if (!target || !window.confirm(`Delete "${target.name}"? This cannot be undone.`)) return;
+    if (!target) return;
+    if (!deleteConfirmed) {
+      setConfirmRequest({
+        title: `Delete "${target.name}"?`,
+        description: 'This cannot be undone.',
+        confirmLabel: 'Delete project',
+        onConfirm: () => deleteProject(id, true),
+      });
+      return;
+    }
     if (unsafeToSave) {
       toast.error('Deleting is turned off because your existing projects could not be backed up.');
       return;
@@ -184,7 +215,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
           My Projects
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] bg-[#0f172a] border-l border-slate-800 text-slate-100 sm:w-[540px]">
+      <SheetContent className="w-[400px] bg-[#1c1c1c] border-l border-slate-800 text-slate-100 sm:w-[540px]">
         <SheetHeader>
           <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
             Project Repository
@@ -208,7 +239,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
                 onChange={(e) => setNewProjectName(e.target.value)}
                 className="bg-slate-950 border-slate-800 text-slate-200 focus-visible:ring-blue-500"
               />
-              <Button onClick={saveProject} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button onClick={() => saveProject()} className="bg-blue-600 hover:bg-blue-700 text-white">
                 Save
               </Button>
             </div>
@@ -285,7 +316,10 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-slate-400 hover:text-red-400 hover:bg-red-950/30"
-                        onClick={(e) => deleteProject(project.id, e)}
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent triggering load
+                          deleteProject(project.id);
+                        }}
                         title="Delete Project"
                       >
                         <Trash2 className="h-4 w-4" />
@@ -297,6 +331,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
             </div>
           </div>
         </div>
+        <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       </SheetContent>
     </Sheet>
   );

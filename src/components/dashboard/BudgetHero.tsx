@@ -14,7 +14,7 @@ export const BudgetHero = () => {
   const { totalBudget, beginBudgetDrag, endBudgetDrag, isBudgetDragging } =
     useProjectStore();
   const { updateBudget } = useBudgetEngine();
-  const { symbol } = useCurrency();
+  const { symbol, format } = useCurrency();
   const blendedMetrics = useBlendedMetrics();
   const { totals } = usePlanResult();
   const { theme } = useTheme();
@@ -113,8 +113,8 @@ export const BudgetHero = () => {
   return (
     <div
       className={cn(
-        'w-full border-b p-6 md:p-8 flex flex-col items-center justify-center space-y-8 relative overflow-hidden shrink-0 transition-all duration-300',
-        isDark ? 'bg-[#020617] border-slate-800' : 'bg-transparent border-slate-200'
+        'w-full rounded-2xl flex flex-col items-center justify-center relative overflow-hidden shrink-0 transition-all duration-300',
+        isDark ? 'bg-[#141414]' : 'bg-transparent'
       )}
     >
       {/* Background Glow Effect */}
@@ -126,7 +126,7 @@ export const BudgetHero = () => {
       />
 
       {/* SPLIT LAYOUT CONTAINER */}
-      <div className="relative z-10 w-full max-w-6xl mx-auto grid grid-cols-1 2xl:grid-cols-2 gap-6">
+      <div className="relative z-10 w-full max-w-6xl mx-auto grid grid-cols-1 min-[1900px]:grid-cols-2 gap-6">
         {/* LEFT COLUMN: BUDGET INPUT */}
         <div
           className={cn(
@@ -152,7 +152,7 @@ export const BudgetHero = () => {
             <div className="flex items-center justify-center gap-2">
               <span
                 className={cn(
-                  'text-6xl md:text-7xl font-black tracking-tighter drop-shadow-2xl transition-all duration-300',
+                  'text-5xl lg:text-6xl font-black tracking-tighter drop-shadow-2xl transition-all duration-300',
                   isDark ? 'text-white' : 'text-slate-900'
                 )}
               >
@@ -173,7 +173,7 @@ export const BudgetHero = () => {
                   }
                 }}
                 className={cn(
-                  'w-full max-w-[520px] bg-transparent border-0 text-center text-6xl md:text-7xl font-black tracking-tighter drop-shadow-2xl transition-all duration-300 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
+                  'w-full max-w-[520px] bg-transparent border-0 text-center text-5xl lg:text-6xl font-black tracking-tighter drop-shadow-2xl transition-all duration-300 focus:outline-none focus:ring-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none',
                   isDark ? 'text-white' : 'text-slate-900'
                 )}
                 aria-label="Edit total budget"
@@ -226,8 +226,8 @@ export const BudgetHero = () => {
                       : 'ring-2 ring-blue-400 bg-blue-50 text-blue-900 border-blue-400')
                 )}
               >
-                {symbol}
-                {amount / 1000}k
+                {/* Round presets read "€25k"; an odd minimum reads like the Min label: "€2,058". */}
+                {amount % 500 === 0 ? `${symbol}${amount / 1000}k` : format(amount)}
               </button>
             ))}
           </div>

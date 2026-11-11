@@ -22,6 +22,7 @@ test('landing page renders', async ({ page }) => {
 test('scenario create share export flow smoke', async ({ page }) => {
   await page.goto('/app');
 
+  await page.getByRole('tab', { name: 'Scenarios' }).click({ timeout: 20_000 });
   await expect(page.getByText('Smart Strategies')).toBeVisible({ timeout: 20_000 });
 
   await page.getByPlaceholder('e.g. 4.0').fill('2');
@@ -32,6 +33,6 @@ test('scenario create share export flow smoke', async ({ page }) => {
     page.getByText(/Optimized Scenario Generated|No optimization opportunities found/).first()
   ).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole('main').getByRole('button', { name: 'My Projects' }).click();
+  await page.getByRole('button', { name: 'My Projects' }).click();
   await expect(page.getByText('Project Repository')).toBeVisible();
 });

@@ -86,8 +86,8 @@ export const BudgetWizard: React.FC<BudgetWizardProps> = ({ isOpen: controlledOp
     return (
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
             {trigger && <DialogTrigger asChild>{trigger}</DialogTrigger>}
-            <DialogContent className="bg-[#0f172a] border-slate-700 text-slate-100 max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
-                <DialogHeader className="p-6 border-b border-slate-800 bg-[#020617]">
+            <DialogContent className="bg-[#1c1c1c] border-slate-700 text-slate-100 max-w-4xl h-[80vh] flex flex-col p-0 overflow-hidden">
+                <DialogHeader className="p-6 border-b border-slate-800 bg-[#141414]">
                     <div className="flex items-center gap-2">
                         <Wand2 className="w-5 h-5 text-indigo-400" />
                         <DialogTitle className="text-xl font-bold tracking-tight">Budget Wizard: Master Edition</DialogTitle>
@@ -99,7 +99,7 @@ export const BudgetWizard: React.FC<BudgetWizardProps> = ({ isOpen: controlledOp
 
                 <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex-1 overflow-hidden flex flex-col md:flex-row h-full">
                     {/* Sidebar / Tabs */}
-                    <TabsList className="w-full md:w-64 flex-shrink-0 flex-col h-full justify-start rounded-none border-r border-slate-800 bg-[#0f172a] p-4 gap-2">
+                    <TabsList className="w-full md:w-64 flex-shrink-0 flex-col h-full justify-start rounded-none border-r border-slate-800 bg-[#1c1c1c] p-4 gap-2">
                         <TabsTrigger value="regulated" className="w-full justify-start data-[state=active]:bg-indigo-500/10 data-[state=active]:text-indigo-400">
                             <Shield className="w-4 h-4 mr-2" />
                             Regulated Markets
@@ -112,7 +112,7 @@ export const BudgetWizard: React.FC<BudgetWizardProps> = ({ isOpen: controlledOp
                     </TabsList>
 
                     {/* Content Area */}
-                    <ScrollArea className="flex-1 bg-[#020617] p-6">
+                    <ScrollArea className="flex-1 bg-[#141414] p-6">
                         <TabsContent value="regulated" className="mt-0 space-y-4">
                             <div className="mb-4">
                                 <h3 className="text-lg font-semibold text-white mb-1">Standard Strategies</h3>
@@ -157,7 +157,7 @@ const StrategyCard: React.FC<{ strategy: StrategyDef; vertical?: string; onApply
     const Icon = strategy.icon || Wand2;
 
     return (
-        <div className="group relative overflow-hidden rounded-xl border border-slate-800 bg-[#0f172a] p-4 transition-all hover:border-indigo-500/50 hover:bg-[#1e293b]">
+        <div className="group relative overflow-hidden rounded-xl border border-slate-800 bg-[#1c1c1c] p-4 transition-all hover:border-indigo-500/50 hover:bg-[#2a2a2a]">
             {/* Hover Glow */}
             <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 transition-opacity group-hover:opacity-100" />
 
@@ -184,7 +184,7 @@ const StrategyCard: React.FC<{ strategy: StrategyDef; vertical?: string; onApply
                         {Object.entries(strategy.distribution).map(([cat, pct], i) => (
                             <div
                                 key={cat}
-                                style={{ width: `${pct}%`, backgroundColor: CATEGORY_INFO[cat as ChannelCategory]?.color || '#94a3b8' }}
+                                style={{ width: `${pct}%`, backgroundColor: CATEGORY_INFO[cat as ChannelCategory]?.color || '#979797' }}
                                 className="h-full"
                             />
                         ))}

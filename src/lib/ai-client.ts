@@ -72,6 +72,11 @@ export function aiErrorMessage(err: unknown, fallback = 'Something went wrong.')
     case 'unavailable':
       return 'The AI is unavailable right now. Your plan and sliders still work.';
     default:
+      // A 5xx body is a server-side error string (stack traces, provider names): never show it.
+      if ((err.status ?? 0) >= 500) {
+        console.error('[ai] server error', err.status, own);
+        return 'The AI could not answer just now. Your plan is unchanged. Please try again.';
+      }
       return own;
   }
 }

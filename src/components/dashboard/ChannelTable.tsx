@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  formatDecimal,
   formatNumber,
   formatPercentage,
   CATEGORY_INFO,
@@ -112,7 +113,7 @@ function EditableCell({
     if (value === null || value === undefined) return 'N/A';
     if (type === 'currency' && formatCurrencyFn) return formatCurrencyFn(value);
     if (type === 'percentage') return `${value.toFixed(2)}%`;
-    return `${prefix}${value.toFixed(2)}${suffix}`;
+    return `${prefix}${formatDecimal(value)}${suffix}`;
   }, [value, type, prefix, suffix, formatCurrencyFn]);
 
   const handleStartEdit = useCallback(() => {
@@ -499,7 +500,7 @@ export function ChannelTable() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/20 hover:bg-muted/20">
-              <TableHead className="w-[250px]">Channel</TableHead>
+              <TableHead className="w-[360px]">Channel</TableHead>
               <TableHead className="w-[180px]">Allocation %</TableHead>
               <TableHead className="text-right">{renderSortHeader('Spend', 'spend')}</TableHead>
               <TableHead className="text-right">Price</TableHead>
@@ -584,12 +585,12 @@ export function ChannelTable() {
                             : undefined
                         }
                       >
-                        <TableCell className="font-medium">
-                          <div className="flex flex-wrap items-center gap-2">
+                        <TableCell className="py-1.5 font-medium">
+                          <div className="flex items-center gap-2">
                             <button
                               type="button"
                               onClick={() => toggleRowExpansion(channel)}
-                              className="inline-flex h-5 w-5 items-center justify-center rounded hover:bg-slate-800/60 text-slate-400 hover:text-cyan-300 transition-colors"
+                              className="inline-flex h-5 min-h-0 w-5 shrink-0 items-center justify-center rounded hover:bg-slate-800/60 text-slate-400 hover:text-cyan-300 transition-colors"
                               aria-label="Toggle monthly timeline"
                             >
                               {expandedRows[channel.id] ? (
@@ -611,13 +612,16 @@ export function ChannelTable() {
                               }
                               className="h-4 min-h-0 w-7 shrink-0 print-mode-hide [&>span]:h-3 [&>span]:w-3 [&>span]:data-[state=checked]:translate-x-3"
                             />
-                            <span className={cn('text-sm', isWarning && 'text-destructive')}>
+                            <span
+                              className={cn('min-w-0 flex-1 truncate text-sm', isWarning && 'text-destructive')}
+                              title={channel.name}
+                            >
                               {channel.name}
                             </span>
                             <Button
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 shrink-0 print-mode-hide"
+                              className="h-7 min-h-0 w-7 shrink-0 print-mode-hide"
                               onClick={() => {
                                 if (!isAllocationFixedByModel) {
                                   toggleChannelLock(channel.id);
@@ -640,19 +644,11 @@ export function ChannelTable() {
                                 <Unlock className="h-4 w-4 text-gray-400" />
                               )}
                             </Button>
-                            <Badge variant="outline" className="text-xs px-2 py-0 h-5">
+                            <Badge variant="outline" className="h-5 shrink-0 whitespace-nowrap px-2 py-0 text-xs">
                               {(channel.buyingModel &&
                                 BUYING_MODEL_INFO[channel.buyingModel]?.name) ||
                                 'CPM'}
                             </Badge>
-                            {channel.tier === 'fixed' && (
-                              <Badge
-                                variant="secondary"
-                                className="text-xs px-2 py-0 h-5 bg-slate-800 text-slate-400 border-slate-700"
-                              >
-                                FIXED
-                              </Badge>
-                            )}
                             <ChannelEditor channel={channel} />
                           </div>
                         </TableCell>

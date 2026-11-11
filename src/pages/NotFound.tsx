@@ -11,13 +11,13 @@ const NotFound = () => {
   }, [location.pathname]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-[#1c1c1c] flex items-center justify-center p-4">
       <Helmet>
         <title>Page not found | MediaPlanner Pro</title>
         <meta name="robots" content="noindex" />
       </Helmet>
-      <div className="w-full max-w-md bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
-        <div className="p-8 text-center border-b border-slate-700 bg-[#0f172a]/50">
+      <div className="w-full max-w-md bg-[#2a2a2a] rounded-2xl shadow-xl border border-slate-700 overflow-hidden">
+        <div className="p-8 text-center border-b border-slate-700 bg-[#1c1c1c]/50">
           <div className="mx-auto h-16 w-16 bg-blue-600/20 rounded-2xl flex items-center justify-center mb-4 border border-blue-500/30">
             <DollarSign className="h-8 w-8 text-blue-500" />
           </div>
@@ -31,7 +31,7 @@ const NotFound = () => {
           <p className="text-slate-400 text-sm mb-4">
             The page you are looking for does not exist or may have been moved.
           </p>
-          <p className="mb-6 break-all rounded-lg border border-slate-700 bg-[#0f172a] px-3 py-2 font-mono text-xs text-slate-300">
+          <p className="mb-6 break-all rounded-lg border border-slate-700 bg-[#1c1c1c] px-3 py-2 font-mono text-xs text-slate-300">
             {location.pathname}
           </p>
           <div className="flex flex-col gap-3 sm:flex-row sm:justify-center">

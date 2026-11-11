@@ -1,10 +1,4 @@
-import {
-  applyObservedCalibration,
-  baselineLtvCurve,
-  buildLtvCurve,
-  clamp,
-  type DecayCurveArchitecture,
-} from '@/lib/ltv-model';
+import type { DecayCurveArchitecture } from '@/lib/ltv-model';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Area,
@@ -23,23 +17,14 @@ import {
 } from 'recharts';
 import { Lock, Sparkles, TrendingUp, TimerReset, Landmark } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  useBlendedMetrics,
-  useChannelsWithMetrics,
-  useMediaPlanStore,
-} from '@/hooks/use-media-plan-store';
+import { useChannelsWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useWhatIfResult } from '@/hooks/use-what-if-result';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tooltip as ReactTooltip } from 'react-tooltip';
-import {
-  buildScenarioEnvelope,
-  formatLtvToCac,
-  getChannelGroup,
-  GROUP_LABELS,
-  type ChannelGroup,
-} from '@/lib/planning-insights';
+import { formatLtvToCac, GROUP_LABELS } from '@/lib/planning-insights';
 import { useTheme } from '@/hooks/use-theme';
 import { Switch } from '@/components/ui/switch';
 import { SandboxSpendChart } from '@/components/dashboard/SandboxSpendChart';
@@ -52,24 +37,17 @@ import {
   SCENARIO_COLORS,
   SCENARIO_DOT_CLASS,
 } from './ltv-forecast/constants';
-import { buildExportSnapshot } from './ltv-forecast/export-snapshot';
-import { compareBaseScenario, scenarioRoiData } from './ltv-forecast/scenario-math';
 import {
-  aggregateMetrics,
-  buildSandboxSummary,
-  computeSandboxChannelMetrics,
-  filterGroupedChannels,
-  groupImpact,
+  groupImpactBars,
   spendDistributionSummary as buildSpendDistributionSummary,
-  toBaselineAggregate,
-  weightedChurnDeltaPct,
-} from './ltv-forecast/sandbox-math';
-import type { AggregateMetrics, ScenarioPoint } from './ltv-forecast/types';
+} from './ltv-forecast/group-impact';
+import { withSummaryText } from '@/lib/what-if/export-snapshot';
+import { filterGroupedChannels, formatSandboxSummary } from '@/lib/what-if/sandbox-math';
+import { formatBaseScenarioComparison } from '@/lib/what-if/scenario-math';
+import type { ScenarioPoint } from '@/lib/what-if/types';
 
 export function LtvForecastPanel() {
-  const blended = useBlendedMetrics();
   const channels = useChannelsWithMetrics();
-  const playerValue = useMediaPlanStore((state) => state.globalMultipliers.playerValue);
   const observedLtv = useMediaPlanStore((state) => state.observedLtv);
   const setObservedLtv = useMediaPlanStore((state) => state.setObservedLtv);
   const clearObservedLtv = useMediaPlanStore((state) => state.clearObservedLtv);
@@ -89,6 +67,8 @@ export function LtvForecastPanel() {
   const selectedChannelIds = useSandboxStore((state) => state.selectedChannelIds);
   const channelAdjustments = useSandboxStore((state) => state.channelAdjustments);
   const groupAdjustments = useSandboxStore((state) => state.groupAdjustments);
+  // Every number of the lab comes from the engine's what-if result.
+  const whatIf = useWhatIfResult({ churnRatePct, cpaShockPct, roasLiftPct, decayCurve });
   const channelFilter = useSandboxStore((state) => state.channelFilter);
   const collapsedGroups = useSandboxStore((state) => state.collapsedGroups);
   const setSandboxEnabled = useSandboxStore((state) => state.setSandboxEnabled);
@@ -100,7 +80,7 @@ export function LtvForecastPanel() {
   const resetSandbox = useSandboxStore((state) => state.resetSandbox);
   const setExportSnapshot = useSandboxStore((state) => state.setExportSnapshot);
 
-  const chartAxisColor = theme === 'dark' ? '#94a3b8' : '#475569';
+  const chartAxisColor = theme === 'dark' ? '#979797' : '#4a4a4a';
   const chartGridColor = theme === 'dark' ? 'rgba(100,116,139,0.22)' : 'rgba(148,163,184,0.32)';
   const tooltipStyle =
     theme === 'dark'
@@ -108,7 +88,7 @@ export function LtvForecastPanel() {
           backgroundColor: 'rgba(2,6,23,0.95)',
           border: '1px solid rgba(71,85,105,0.7)',
           borderRadius: '12px',
-          color: '#e2e8f0',
+          color: '#dcdcdc',
         }
       : {
           backgroundColor: 'rgba(255,255,255,0.98)',
@@ -117,106 +97,17 @@ export function LtvForecastPanel() {
           color: '#1f2937',
         };
 
-  const baselineMetrics = useMemo<AggregateMetrics>(
-    () => toBaselineAggregate(blended),
-    [blended]
-  );
+  const baselineMetrics = whatIf.baseline;
+  const sandboxMetrics = whatIf.adjusted;
+  const activeMetrics = whatIf.active;
+  const sandboxChannelMetrics = whatIf.channels;
+  const baselineScenarioData = whatIf.scenarios.baseline;
+  const scenarioData = whatIf.scenarios.active;
+  const baselineScenarioRoiData = whatIf.scenarios.baselineRoi;
+  const adjustedScenarioRoiData = whatIf.scenarios.adjustedRoi;
+  const { curve: curveData, monthlyChurn, monthlyExpansion, paybackMonth } = whatIf.customerValue;
 
   const selectedSet = useMemo(() => new Set(selectedChannelIds), [selectedChannelIds]);
-
-  const sandboxChannelMetrics = useMemo(
-    () => computeSandboxChannelMetrics(channels, selectedSet, channelAdjustments, groupAdjustments),
-    [channelAdjustments, channels, groupAdjustments, selectedSet]
-  );
-
-  const weightedSandboxChurnDeltaPct = useMemo(
-    () => weightedChurnDeltaPct(sandboxChannelMetrics, selectedSet),
-    [sandboxChannelMetrics, selectedSet]
-  );
-
-  const sandboxMetrics = useMemo<AggregateMetrics>(
-    () => aggregateMetrics(sandboxChannelMetrics),
-    [sandboxChannelMetrics]
-  );
-
-  const activeMetrics = sandboxEnabled ? sandboxMetrics : baselineMetrics;
-
-  const assumptions = useMemo(
-    () => ({
-      churnRate: clamp(
-        (churnRatePct + (sandboxEnabled ? weightedSandboxChurnDeltaPct : 0)) / 100,
-        0.01,
-        0.2
-      ),
-      cpaMultiplier: 1 + cpaShockPct / 100,
-      roasMultiplier: 1 + roasLiftPct / 100,
-    }),
-    [churnRatePct, cpaShockPct, roasLiftPct, sandboxEnabled, weightedSandboxChurnDeltaPct]
-  );
-
-  const scenarioCalibration = useMemo(() => {
-    const roasLift = 1 + roasLiftPct / 100;
-
-    const computeBaselineCumulative = (blendedRoas: number) =>
-      baselineLtvCurve({
-        playerValue,
-        blendedRoas,
-        churnRate: assumptions.churnRate,
-        roasLiftPct,
-        decayCurve,
-      }).cumulative;
-
-    const baselineCal = applyObservedCalibration(
-      computeBaselineCumulative(Math.max(0, baselineMetrics.blendedRoas)),
-      observedLtv
-    );
-    const activeCal = applyObservedCalibration(
-      computeBaselineCumulative(Math.max(0, activeMetrics.blendedRoas)),
-      observedLtv
-    );
-
-    return {
-      baselineMultiplier: baselineCal.multiplier,
-      activeMultiplier: activeCal.multiplier,
-      isCalibrated: baselineCal.isCalibrated,
-    };
-  }, [
-    activeMetrics.blendedRoas,
-    assumptions.churnRate,
-    baselineMetrics.blendedRoas,
-    decayCurve,
-    observedLtv,
-    playerValue,
-    roasLiftPct,
-  ]);
-
-  const baselineScenarioData = useMemo(
-    () =>
-      buildScenarioEnvelope({
-        baseLtvPerUser:
-          (baselineMetrics.blendedCpa ?? 0) *
-          Math.max(0, baselineMetrics.blendedRoas) *
-          scenarioCalibration.baselineMultiplier,
-        conversions: baselineMetrics.totalConversions,
-        cpa: baselineMetrics.blendedCpa ?? 0,
-        assumptions,
-      }) as ScenarioPoint[],
-    [assumptions, baselineMetrics, scenarioCalibration.baselineMultiplier]
-  );
-
-  const scenarioData = useMemo(
-    () =>
-      buildScenarioEnvelope({
-        baseLtvPerUser:
-          (activeMetrics.blendedCpa ?? 0) *
-          Math.max(0, activeMetrics.blendedRoas) *
-          scenarioCalibration.activeMultiplier,
-        conversions: activeMetrics.totalConversions,
-        cpa: activeMetrics.blendedCpa ?? 0,
-        assumptions,
-      }) as ScenarioPoint[],
-    [activeMetrics, assumptions, scenarioCalibration.activeMultiplier]
-  );
 
   const baselineScenarioLookup = useMemo(
     () =>
@@ -227,21 +118,9 @@ export function LtvForecastPanel() {
     [baselineScenarioData]
   );
 
-  const activeSummaryText = useMemo(
-    () =>
-      buildSandboxSummary(
-        baselineMetrics.roi,
-        sandboxMetrics.roi,
-        sandboxChannelMetrics,
-        weightedSandboxChurnDeltaPct
-      ),
-    [baselineMetrics.roi, sandboxChannelMetrics, sandboxMetrics.roi, weightedSandboxChurnDeltaPct]
-  );
+  const activeSummaryText = useMemo(() => formatSandboxSummary(whatIf.summary), [whatIf.summary]);
 
-  const groupImpactData = useMemo(
-    () => groupImpact(sandboxChannelMetrics),
-    [sandboxChannelMetrics]
-  );
+  const groupImpactData = useMemo(() => groupImpactBars(whatIf.groups), [whatIf.groups]);
 
   const spendDistributionSummary = useMemo(
     () => buildSpendDistributionSummary(groupImpactData),
@@ -273,46 +152,7 @@ export function LtvForecastPanel() {
     [channelFilter, channels]
   );
 
-  const baselineScenarioRoiData = useMemo(
-    () => scenarioRoiData(baselineScenarioData, baselineMetrics.totalSpend),
-    [baselineMetrics.totalSpend, baselineScenarioData]
-  );
-
-  const adjustedScenarioRoiData = useMemo(
-    () => scenarioRoiData(scenarioData, sandboxMetrics.totalSpend),
-    [sandboxMetrics.totalSpend, scenarioData]
-  );
-
-  const scenarioComparisonSummary = useMemo(
-    () => compareBaseScenario(baselineScenarioRoiData, adjustedScenarioRoiData),
-    [adjustedScenarioRoiData, baselineScenarioRoiData]
-  );
-
-  const { curveData, monthlyChurn, monthlyExpansion, paybackMonth } = useMemo(() => {
-    const curve = buildLtvCurve(activeMetrics, {
-      playerValue,
-      blendedRoas: activeMetrics.blendedRoas,
-      churnRate: assumptions.churnRate,
-      roasLiftPct,
-      decayCurve,
-      cpaShockPct,
-      observedLtv,
-    });
-    return {
-      curveData: curve.points,
-      monthlyChurn: assumptions.churnRate,
-      monthlyExpansion: curve.monthlyExpansion,
-      paybackMonth: curve.paybackMonth,
-    };
-  }, [
-    activeMetrics,
-    assumptions.churnRate,
-    cpaShockPct,
-    decayCurve,
-    observedLtv,
-    playerValue,
-    roasLiftPct,
-  ]);
+  const scenarioComparisonSummary = formatBaseScenarioComparison(whatIf.scenarios.baseRoiDelta);
 
   const terminalPoint = curveData[curveData.length - 1];
 
@@ -325,27 +165,8 @@ export function LtvForecastPanel() {
   };
 
   useEffect(() => {
-    setExportSnapshot(
-      buildExportSnapshot({
-        sandboxEnabled,
-        activeSummaryText,
-        baselineMetrics,
-        sandboxMetrics,
-        sandboxChannelMetrics,
-        baselineScenarioData,
-        scenarioData,
-      })
-    );
-  }, [
-    activeSummaryText,
-    baselineMetrics,
-    baselineScenarioData,
-    sandboxEnabled,
-    sandboxMetrics,
-    sandboxChannelMetrics,
-    scenarioData,
-    setExportSnapshot,
-  ]);
+    setExportSnapshot(withSummaryText(whatIf.exportSnapshot, activeSummaryText));
+  }, [activeSummaryText, setExportSnapshot, whatIf.exportSnapshot]);
 
   if (!terminalPoint || activeMetrics.totalConversions <= 0) {
     return (
@@ -399,7 +220,7 @@ export function LtvForecastPanel() {
                 })}{' '}
                 users
               </span>
-              {scenarioCalibration.isCalibrated ? (
+              {whatIf.customerValue.isCalibrated ? (
                 <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1 text-amber-200">
                   Calibrated from M1/M3/M6
                 </span>

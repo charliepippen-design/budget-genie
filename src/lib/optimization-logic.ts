@@ -5,6 +5,7 @@ import {
   calculateChannelMetrics,
 } from '@/hooks/use-media-plan-store';
 // import { calculateChannelMetrics } from '@/lib/mediaplan-data'; // Use store version
+import { isFixedCostChannel } from '@/lib/media-plan/plan-snapshot';
 import { normalizeAllocations } from './math-utils';
 
 export interface OptimizationResult {
@@ -57,9 +58,7 @@ export function optimizeBudget(
     if (
       ch.locked ||
       !ch.isActive ||
-      ch.tier === 'fixed' ||
-      ch.buyingModel === 'FLAT_FEE' ||
-      ch.buyingModel === 'RETAINER'
+      isFixedCostChannel(ch)
     ) {
       return ch;
     }
