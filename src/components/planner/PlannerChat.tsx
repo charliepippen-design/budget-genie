@@ -169,6 +169,11 @@ export function PlannerChat() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const hasBrief = useMediaPlanStore(s => !!s.brief);
+  const planBudget = useMediaPlanStore(s => s.totalBudget);
+  const activeChannelCount = useMediaPlanStore(s => s.channels.filter(c => c.isActive !== false).length);
+  const { format: formatPlanMoney } = useCurrency();
+  // With a plan on screen the chat starts from it, instead of asking for the brief again.
+  const planWelcome = `Your plan is on screen: **${formatPlanMoney(planBudget)}/month** across **${activeChannelCount} channels**. Tell me what to change: move budget between channels, add or drop one, change markets or the goal. I adjust the plan; the engine recalculates every number.`;
   const callAI = useAI();
   const uiLang = getUiLang();
   const endRef = useRef<HTMLDivElement>(null);
@@ -300,7 +305,7 @@ export function PlannerChat() {
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
         <div className="rounded-2xl rounded-tl-none border border-slate-700 bg-slate-800 p-3 text-slate-200">
-          <RichText text={WELCOME} />
+          <RichText text={hasBrief ? planWelcome : WELCOME} />
         </div>
 
         {!hasBrief && (
