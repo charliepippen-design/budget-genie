@@ -1,5 +1,5 @@
 import { act } from 'react';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { CurrencyProvider, formatMoney } from '@/contexts/CurrencyContext';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
@@ -83,5 +83,27 @@ describe('OnboardWizard', () => {
     const casino = IGAMING_SUBVERTICAL_PRESETS.casino;
     expect(el.textContent).toContain(`Player Value: ${formatMoney(casino.playerValue, 'EUR')}`);
     expect(el.textContent).not.toContain('$');
+  });
+
+  it('shows the Italian AI disclosure only to Italian browsers', async () => {
+    const lang = vi.spyOn(navigator, 'language', 'get');
+    lang.mockReturnValue('en-US');
+    setDraft({ step: 6, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    let el = await render();
+    expect(el.textContent).toContain('AI replies are generated with Google Gemini');
+    expect(el.querySelector('[lang="it"]')).toBeNull();
+    await cleanup();
+
+    lang.mockReturnValue('it-IT');
+    el = await render();
+    expect(el.querySelector('[lang="it"]')?.textContent).toContain('Google Gemini');
+    lang.mockRestore();
+  });
+
+  it('does not describe the AI provider tier as the plan of the customer', async () => {
+    setDraft({ step: 6, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    const el = await render();
+    expect(el.textContent).not.toMatch(/\(free plan\)|\(piano gratuito\)/);
+    expect(el.textContent).toContain('this is not about your MediaPlanner Pro plan');
   });
 });

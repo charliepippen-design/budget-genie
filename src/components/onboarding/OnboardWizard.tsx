@@ -19,6 +19,7 @@ import {
 } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
+import { getUiLang } from '@/lib/ai-client';
 import {
   BUDGET_TIERS,
   WIZARD_MAX_BUDGET,
@@ -931,7 +932,7 @@ export const OnboardWizard = () => {
             </div>
             <div className="mt-4 space-y-1 text-xs text-slate-500">
               <p>{AI_DISCLOSURE_SHORT}</p>
-              <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>
+              {getUiLang() === 'it' && <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>}
             </div>
           </section>
         )}
