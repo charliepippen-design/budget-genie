@@ -3,7 +3,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { CurrencyProvider, formatMoney } from '@/contexts/CurrencyContext';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 import { byText, cleanup, click, mount } from '@/test/mount';
 import { OnboardWizard } from './OnboardWizard';
