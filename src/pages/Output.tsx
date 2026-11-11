@@ -214,7 +214,7 @@ const OutputContent = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-10 md:divide-x md:divide-border">
             {/* Left column */}
             <div className="md:pr-10">
-              <BrandLogo size="sm" tone="light" className="mb-3" />
+              <BrandLogo size="sm" tone={theme === 'light' ? 'light' : 'dark'} className="mb-3" />
               <p className="text-xs uppercase tracking-widest text-muted-foreground">Media Plan</p>
               <h1 className="text-5xl font-bold text-foreground mt-2 leading-tight break-words">
                 {projectName}

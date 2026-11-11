@@ -377,15 +377,16 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
           <Button
             variant="ghost"
             size="sm"
+            title="Configure buying model, price and funnel rates"
             className={cn(
-              'h-9 shrink-0 whitespace-nowrap px-3 gap-2 print-mode-hide transition-all duration-300',
+              'h-7 min-h-0 w-7 shrink-0 p-0 print-mode-hide transition-all duration-300',
               isDark
                 ? 'bg-gradient-to-r from-cyan-500/10 to-transparent hover:from-cyan-500/20 text-cyan-300'
                 : 'bg-gradient-to-r from-blue-400/10 to-transparent hover:from-blue-400/20 text-blue-600'
             )}
           >
             <Settings2 className="h-3.5 w-3.5" />
-            <span className="leading-none">Configure</span>
+            <span className="sr-only">Configure</span>
           </Button>
         )}
       </SheetTrigger>
