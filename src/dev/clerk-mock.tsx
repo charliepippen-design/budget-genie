@@ -5,8 +5,11 @@
 import type { ReactNode } from 'react';
 
 // localStorage 'qa-mock-user' = 'free' simulates a newly signed-up user without a paid plan
-// (empty publicMetadata). Anything else keeps the default superuser.
-const mockFreeUser = typeof window !== 'undefined' && window.localStorage.getItem('qa-mock-user') === 'free';
+// (empty publicMetadata); 'signed-out' simulates a visitor, to view the public pages.
+// Anything else keeps the default superuser.
+const mockMode = typeof window !== 'undefined' ? window.localStorage.getItem('qa-mock-user') : null;
+const mockFreeUser = mockMode === 'free';
+const mockSignedOut = mockMode === 'signed-out';
 
 const user = mockFreeUser
   ? {
@@ -40,13 +43,13 @@ export const ClerkProvider = ({ children }: MockProviderProps) => <>{children}</
 
 export const useAuth = () => ({
   isLoaded: true,
-  isSignedIn: true,
-  userId: user.id,
+  isSignedIn: !mockSignedOut,
+  userId: mockSignedOut ? null : user.id,
   getToken: async () => null,
   signOut: async () => undefined,
 });
 
-export const useUser = () => ({ isLoaded: true, isSignedIn: true, user });
+export const useUser = () => ({ isLoaded: true, isSignedIn: !mockSignedOut, user: mockSignedOut ? null : user });
 
 export const useClerk = () => ({
   signOut: async () => undefined,
@@ -69,6 +72,6 @@ export const SignUp = (props: MockAuthProps) => {
   void props;
   return <div data-qa="mock-sign-in">Mock sign-up (QA mode)</div>;
 };
-export const SignedIn = ({ children }: { children: ReactNode }) => <>{children}</>;
-export const SignedOut = () => null;
+export const SignedIn = ({ children }: { children: ReactNode }) => (mockSignedOut ? null : <>{children}</>);
+export const SignedOut = ({ children }: { children?: ReactNode }) => (mockSignedOut ? <>{children}</> : null);
 export const UserButton = () => <div data-qa="mock-user-button">QA</div>;
