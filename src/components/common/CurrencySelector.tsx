@@ -22,7 +22,7 @@ export function CurrencySelector({ compact = false }: CurrencySelectorProps) {
     <Select value={code} onValueChange={(v) => setCode(v as CurrencyCode)}>
       <SelectTrigger
         className={cn(
-          'h-10 rounded-lg border px-3 text-sm font-medium transition-colors',
+          'h-9 rounded-full border px-3 text-sm font-medium transition-colors',
           compact ? 'w-[112px]' : 'w-[152px]',
           isDark
             ? 'border-slate-700 bg-slate-900/60 text-slate-100 focus:ring-slate-600'

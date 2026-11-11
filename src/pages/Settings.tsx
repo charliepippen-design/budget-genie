@@ -351,7 +351,7 @@ export default function Settings() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-slate-100 p-8 font-sans">
+    <div className="min-h-screen bg-[#1c1c1c] text-slate-100 p-8 font-sans">
       <UpgradeGatewayModal
         open={isUpgradeModalOpen}
         onOpenChange={setIsUpgradeModalOpen}
@@ -385,7 +385,7 @@ export default function Settings() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* User Profile */}
-          <Card className="bg-[#1e293b] border-slate-700">
+          <Card className="bg-[#2a2a2a] border-slate-700">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <UserIcon className="h-5 w-5 text-blue-400" />
@@ -446,7 +446,7 @@ export default function Settings() {
           </Card>
 
           {/* Cloud Status */}
-          <Card className="bg-[#1e293b] border-slate-700">
+          <Card className="bg-[#2a2a2a] border-slate-700">
             <CardHeader>
               <div className="flex items-center gap-2">
                 <Cloud className="h-5 w-5 text-blue-400" />
@@ -454,7 +454,7 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#0f172a] border border-slate-800">
+              <div className="flex items-center justify-between p-3 rounded-lg bg-[#1c1c1c] border border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="h-2 w-2 rounded-full bg-amber-400"></div>
                   <span className="text-sm font-medium text-slate-300">Storage</span>
@@ -480,7 +480,7 @@ export default function Settings() {
 
           {/* Internal billing debug card: never shown to customers. */}
           {import.meta.env.DEV ? (
-          <Card className="md:col-span-2 bg-[#1e293b] border-slate-700">
+          <Card className="md:col-span-2 bg-[#2a2a2a] border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
                 <CardTitle className="text-lg text-white">Billing Sync Status</CardTitle>
@@ -537,7 +537,7 @@ export default function Settings() {
           </Card>
           ) : null}
 
-          <Card className="md:col-span-2 relative overflow-hidden border-slate-700 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(165deg,_#0f172a_0%,_#111827_50%,_#1e293b_100%)]">
+          <Card className="md:col-span-2 relative overflow-hidden border-slate-700 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(165deg,_#1c1c1c_0%,_#111827_50%,_#2a2a2a_100%)]">
             <div className="absolute top-0 right-0 p-3">
               <ShieldCheck className="h-24 w-24 text-slate-800/50 -rotate-12" />
             </div>

@@ -700,3 +700,124 @@
     font-size: 1.6rem;
   }
 }
+
+/* ===== Charcoal theme: neutral surfaces, white primary, one lilac accent ===== */
+@layer base {
+  :root {
+    --background: 0 0% 98%;
+    --foreground: 0 0% 8%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 0 0% 8%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 93%;
+    --secondary-foreground: 0 0% 8%;
+    --muted: 0 0% 94%;
+    --muted-foreground: 0 0% 38%;
+    --accent: 270 44% 56%;
+    --accent-foreground: 0 0% 100%;
+    --border: 0 0% 86%;
+    --input: 0 0% 86%;
+    --ring: 270 44% 56%;
+    --radius: 0.75rem;
+    --chart-1: 270 44% 56%;
+    --chart-2: 150 55% 42%;
+    --chart-3: 38 92% 50%;
+    --chart-4: 0 0% 45%;
+    --chart-5: 0 72% 55%;
+    --chart-6: 0 0% 70%;
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 8%), hsl(0 0% 8%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 100%), hsl(0 0% 100%));
+    --gradient-accent: linear-gradient(135deg, hsl(270 44% 56%), hsl(270 44% 56%));
+    --shadow-glow: none;
+  }
+
+  .dark,
+  .theme-dark {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 100%;
+    --card: 0 0% 11%;
+    --card-foreground: 0 0% 100%;
+    --popover: 0 0% 11%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 16%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 0 0% 14%;
+    --muted-foreground: 0 0% 59%;
+    --accent: 270 58% 80%;
+    --accent-foreground: 0 0% 8%;
+    --border: 0 0% 17%;
+    --input: 0 0% 17%;
+    --ring: 270 58% 80%;
+    --chart-1: 270 58% 80%;
+    --chart-2: 150 60% 55%;
+    --chart-3: 38 100% 60%;
+    --chart-4: 0 0% 75%;
+    --chart-5: 3 100% 68%;
+    --chart-6: 0 0% 50%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-accent: 0 0% 14%;
+    --sidebar-border: 0 0% 17%;
+    --gradient-primary: linear-gradient(135deg, hsl(0 0% 100%), hsl(0 0% 100%));
+    --gradient-card: linear-gradient(180deg, hsl(0 0% 11%), hsl(0 0% 11%));
+    --gradient-accent: linear-gradient(135deg, hsl(270 58% 80%), hsl(270 58% 80%));
+    --shadow-glow: none;
+  }
+
+  body {
+    letter-spacing: -0.011em;
+    background: hsl(var(--background));
+  }
+
+  .theme-dark body,
+  body.theme-dark {
+    background: hsl(var(--background));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-weight: 600;
+    letter-spacing: -0.03em;
+  }
+
+  /* Figures read as data: fixed-width digits wherever a number is tabular. */
+  .tabular-nums {
+    font-family: 'JetBrains Mono', ui-monospace, monospace;
+    letter-spacing: -0.02em;
+  }
+}
+
+/* Primary action: a solid pill in the foreground colour (white on dark, near-black on light). */
+@layer base {
+  :root {
+    --action: 20 20 20;
+    --action-hover: 51 51 51;
+    --action-fg: 255 255 255;
+  }
+
+  .dark,
+  .theme-dark {
+    --action: 255 255 255;
+    --action-hover: 220 220 220;
+    --action-fg: 20 20 20;
+  }
+}
+
+@layer utilities {
+  .bg-indigo-600,
+  .hover\:bg-indigo-500:hover,
+  .data-\[state\=active\]\:bg-indigo-600[data-state='active'] {
+    color: rgb(var(--action-fg)) !important;
+  }
+
+  .bg-indigo-600 .text-white,
+  .bg-indigo-600 svg {
+    color: inherit;
+  }
+}

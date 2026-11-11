@@ -33,7 +33,7 @@ import { BrandLogo } from '@/components/common/BrandLogo';
 import { BRAND_NAME } from '@/lib/brand';
 
 const PIE_COLORS = [
-  '#6366f1',
+  '#b998df',
   '#8b5cf6',
   '#06b6d4',
   '#10b981',

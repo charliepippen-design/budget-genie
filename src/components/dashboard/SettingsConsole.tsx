@@ -179,7 +179,7 @@ const GlobalMultipliers: React.FC = () => {
               className={cn(
                 'h-10 pl-7 text-sm',
                 isDark
-                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  ? 'bg-[#141414] border-slate-700 text-slate-200'
                   : 'bg-white border-slate-300 text-slate-900'
               )}
             />
@@ -215,7 +215,7 @@ const GlobalMultipliers: React.FC = () => {
               className={cn(
                 'h-10 pl-7 text-sm',
                 isDark
-                  ? 'bg-[#020617] border-slate-700 text-slate-200'
+                  ? 'bg-[#141414] border-slate-700 text-slate-200'
                   : 'bg-white border-slate-300 text-slate-900'
               )}
             />
@@ -269,7 +269,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -294,7 +294,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -321,7 +321,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -346,7 +346,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -371,7 +371,7 @@ const GlobalMultipliers: React.FC = () => {
                 className={cn(
                   'h-10 text-sm',
                   isDark
-                    ? 'bg-[#020617] border-slate-700 text-slate-200'
+                    ? 'bg-[#141414] border-slate-700 text-slate-200'
                     : 'bg-white border-slate-300 text-slate-900'
                 )}
               />
@@ -631,7 +631,7 @@ export const SettingsConsole: React.FC = () => {
     <div
       className={cn(
         'h-full w-full flex flex-col overflow-hidden transition-colors duration-300',
-        isDark ? 'bg-[#020617] text-slate-100' : 'bg-slate-50 text-slate-900'
+        isDark ? 'bg-[#141414] text-slate-100' : 'bg-slate-50 text-slate-900'
       )}
     >
       {/* <div className="text-yellow-500 font-mono">DEBUG MODE: Settings Console</div> */}
@@ -639,7 +639,7 @@ export const SettingsConsole: React.FC = () => {
       <div
         className={cn(
           'p-4 border-b space-y-4 flex-shrink-0 z-10 transition-colors duration-300',
-          isDark ? 'border-slate-800 bg-[#020617]' : 'border-slate-200 bg-white'
+          isDark ? 'border-slate-800 bg-[#141414]' : 'border-slate-200 bg-white'
         )}
       >
         <div className="flex items-center justify-between">
@@ -703,7 +703,7 @@ export const SettingsConsole: React.FC = () => {
         <div
           className={cn(
             'p-4 rounded-xl border shadow-sm mb-2 transition-colors duration-300',
-            isDark ? 'bg-[#0f172a] border-slate-800' : 'bg-white border-slate-200'
+            isDark ? 'bg-[#1c1c1c] border-slate-800' : 'bg-white border-slate-200'
           )}
         >
           <GlobalMultipliers />

@@ -50,7 +50,7 @@ import { RoasPair } from '@/components/RoasPair';
 import { formatRoasPair } from '@/lib/roas-pair';
 
 const PIE_COLORS = [
-  '#6366f1',
+  '#b998df',
   '#8b5cf6',
   '#06b6d4',
   '#10b981',
@@ -539,8 +539,8 @@ const ReportContent = () => {
                   <Tooltip
                     formatter={(value: number) => [$(value), 'Spend']}
                     contentStyle={{
-                      background: '#0f172a',
-                      border: '1px solid #334155',
+                      background: '#1c1c1c',
+                      border: '1px solid #333333',
                       borderRadius: 10,
                     }}
                   />
@@ -605,13 +605,13 @@ const ReportContent = () => {
           <div className="rounded-2xl border border-border bg-card p-4">
             <ResponsiveContainer width="100%" height={280}>
               <AreaChart data={roasTrend}>
-                <XAxis dataKey="month" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" tickFormatter={(v: number) => `${v.toFixed(1)}x`} />
+                <XAxis dataKey="month" stroke="#979797" />
+                <YAxis stroke="#979797" tickFormatter={(v: number) => `${v.toFixed(1)}x`} />
                 <Tooltip
                   formatter={(value: number) => `${value.toFixed(2)}x`}
                   contentStyle={{
-                    background: '#0f172a',
-                    border: '1px solid #334155',
+                    background: '#1c1c1c',
+                    border: '1px solid #333333',
                     borderRadius: 10,
                   }}
                 />

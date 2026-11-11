@@ -128,7 +128,7 @@ You are powered by Claude claude-sonnet-4-6 for analysis and Gemini Flash for qu
       cohortValueLabel: 'Player Cohort Value',
       primaryKpi: 'LTV : CAC Ratio',
     },
-    accent: { primary: 'indigo', hex: '#6366f1' },
+    accent: { primary: 'indigo', hex: '#b998df' },
   },
 
   ecommerce: {
@@ -395,7 +395,7 @@ Focus on ROAS, cost per conversion, and budget efficiency.
       cohortValueLabel: 'Customer Cohort Value',
       primaryKpi: 'Return on Ad Spend',
     },
-    accent: { primary: 'indigo', hex: '#6366f1' },
+    accent: { primary: 'indigo', hex: '#b998df' },
   },
 };
 

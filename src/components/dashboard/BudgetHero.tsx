@@ -114,7 +114,7 @@ export const BudgetHero = () => {
     <div
       className={cn(
         'w-full rounded-2xl flex flex-col items-center justify-center relative overflow-hidden shrink-0 transition-all duration-300',
-        isDark ? 'bg-[#020617]' : 'bg-transparent'
+        isDark ? 'bg-[#141414]' : 'bg-transparent'
       )}
     >
       {/* Background Glow Effect */}

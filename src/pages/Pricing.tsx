@@ -46,18 +46,18 @@ export default function Pricing() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
+    <div className="min-h-screen bg-slate-950 px-4 py-12 text-white">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-12">
-          <BrandLogo size="md" tone="light" className="justify-center mb-6" />
-          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">Choose Your Plan</h1>
-          <p className="text-lg md:text-xl text-gray-700">Plan your media budget with an AI planner</p>
+          <BrandLogo size="md" tone="dark" className="justify-center mb-6" />
+          <h1 className="mb-4 text-4xl font-semibold text-white md:text-5xl">Choose Your Plan</h1>
+          <p className="text-lg text-slate-400 md:text-xl">Plan your media budget with an AI planner</p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
           {PAID_PLANS.map((plan, idx) => {
             // A paying customer is never offered the plan they have, or a lower one.
-            // Cards set their own light colours: this page is light whatever the app theme is.
+            // Cards set their own colours: this page is dark whatever the app theme is.
             const isCurrent = currentPaidTier === plan.tier;
             const isIncluded = currentPaidTier === 'enterprise' && plan.tier === 'pro';
             return (
@@ -65,28 +65,28 @@ export default function Pricing() {
               key={plan.tier}
               className={
                 idx === 0
-                  ? 'relative border-2 border-blue-500 bg-white text-gray-900 shadow-lg'
-                  : 'relative border-2 border-gray-200 bg-white text-gray-900 hover:border-blue-500 transition-colors'
+                  ? 'relative border border-slate-500 bg-slate-900 text-white'
+                  : 'relative border border-slate-800 bg-slate-900 text-white transition-colors hover:border-slate-500'
               }
             >
               {idx === 0 && (
-                <div className="absolute top-4 right-4 bg-blue-700 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                <div className="absolute right-4 top-4 rounded-full border border-slate-700 px-3 py-0.5 text-xs font-medium text-slate-300">
                   Most Popular
                 </div>
               )}
               <CardHeader>
                 <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
-                <p className="text-gray-700 mt-2">{plan.tagline}</p>
+                <p className="mt-2 text-slate-400">{plan.tagline}</p>
               </CardHeader>
               <CardContent className="space-y-6">
                 <div>
                   <span className="text-4xl font-bold">{plan.priceLabel}</span>
-                  <span className="text-gray-700 ml-2">/month</span>
+                  <span className="ml-2 text-slate-400">/month</span>
                 </div>
-                <ul className="space-y-3 text-gray-900">
+                <ul className="space-y-3 text-slate-200">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-center gap-2">
-                      <span className="text-green-700" aria-hidden="true">✓</span>
+                      <span className="text-emerald-400" aria-hidden="true">✓</span>
                       {feature}
                     </li>
                   ))}
@@ -94,7 +94,7 @@ export default function Pricing() {
                 <Button
                   onClick={() => startCheckout(plan.tier)}
                   disabled={processingTier !== null || isCurrent || isIncluded}
-                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6"
+                  className="w-full rounded-full bg-indigo-600 py-6 hover:bg-indigo-500"
                 >
                   {isCurrent
                     ? 'Current plan'
@@ -112,12 +112,12 @@ export default function Pricing() {
 
         {currentPaidTier ? (
           <p className="text-center mb-4">
-            <Link to="/app" className="text-sm font-semibold text-blue-700 underline">
+            <Link to="/app" className="text-sm font-semibold text-white underline underline-offset-4">
               Back to my plan
             </Link>
           </p>
         ) : null}
-        <p className="text-center text-sm text-gray-700 mb-4">
+        <p className="mb-4 text-center text-sm text-slate-400">
           Billed monthly. Cancel any time. 14-day money-back guarantee on your first payment.
         </p>
         <LegalLinks />

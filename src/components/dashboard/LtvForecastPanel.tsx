@@ -80,7 +80,7 @@ export function LtvForecastPanel() {
   const resetSandbox = useSandboxStore((state) => state.resetSandbox);
   const setExportSnapshot = useSandboxStore((state) => state.setExportSnapshot);
 
-  const chartAxisColor = theme === 'dark' ? '#94a3b8' : '#475569';
+  const chartAxisColor = theme === 'dark' ? '#979797' : '#4a4a4a';
   const chartGridColor = theme === 'dark' ? 'rgba(100,116,139,0.22)' : 'rgba(148,163,184,0.32)';
   const tooltipStyle =
     theme === 'dark'
@@ -88,7 +88,7 @@ export function LtvForecastPanel() {
           backgroundColor: 'rgba(2,6,23,0.95)',
           border: '1px solid rgba(71,85,105,0.7)',
           borderRadius: '12px',
-          color: '#e2e8f0',
+          color: '#dcdcdc',
         }
       : {
           backgroundColor: 'rgba(255,255,255,0.98)',

@@ -1,6 +1,20 @@
 import type { Config } from 'tailwindcss';
 import tailwindcssAnimate from 'tailwindcss-animate';
 
+const IRIS = {
+  50: '#f6f1fb',
+  100: '#ece2f7',
+  200: '#dcc9f0',
+  300: '#cdb2ea',
+  400: '#b998df',
+  500: '#a17fcf',
+  600: '#8767b8',
+  700: '#6c4f99',
+  800: '#523c75',
+  900: '#3a2b52',
+  950: '#241a34',
+};
+
 export default {
   darkMode: ['class'],
   content: [
@@ -24,6 +38,29 @@ export default {
         mono: ['JetBrains Mono', 'monospace'],
       },
       colors: {
+        // Neutral charcoal scale. Every `slate-*` class in the app resolves here.
+        slate: {
+          50: '#fafafa',
+          100: '#f2f2f2',
+          200: '#dcdcdc',
+          300: '#bdbdbd',
+          400: '#979797',
+          500: '#6e6e6e',
+          600: '#4a4a4a',
+          700: '#333333',
+          800: '#2a2a2a',
+          900: '#1c1c1c',
+          950: '#141414',
+        },
+        // One accent hue. `indigo`, `cyan` and `blue` all resolve to it, so legacy accents stay coherent.
+        // 600/500 are the primary action fill and its hover: white on dark, near-black on light.
+        indigo: {
+          ...IRIS,
+          500: 'rgb(var(--action-hover) / <alpha-value>)',
+          600: 'rgb(var(--action) / <alpha-value>)',
+        },
+        cyan: IRIS,
+        blue: IRIS,
         border: 'hsl(var(--border))',
         input: 'hsl(var(--input))',
         ring: 'hsl(var(--ring))',

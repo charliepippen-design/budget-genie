@@ -27,7 +27,7 @@ import { cn } from '@/lib/utils';
 import { LossBanner } from './LossBanner';
 
 const CHANNEL_COLORS = [
-  '#6366f1',
+  '#b998df',
   '#22d3ee',
   '#34d399',
   '#fbbf24',
@@ -283,11 +283,11 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                     <stop offset="100%" stopColor="#34d399" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#1e293b' : '#e2e8f0'} vertical={false} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
+                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? '#2a2a2a' : '#dcdcdc'} vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#979797' }} tickLine={false} axisLine={false} />
                 <YAxis
                   width={44}
-                  tick={{ fontSize: 11, fill: '#94a3b8' }}
+                  tick={{ fontSize: 11, fill: '#979797' }}
                   tickLine={false}
                   axisLine={false}
                   tickFormatter={(value: number) => `${symbol}${compact(value)}`}
@@ -295,8 +295,8 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                 <Tooltip
                   formatter={(value: number) => [format(value), 'Cohort value']}
                   contentStyle={{
-                    backgroundColor: isDark ? '#0f172a' : '#ffffff',
-                    border: `1px solid ${isDark ? '#334155' : '#cbd5e1'}`,
+                    backgroundColor: isDark ? '#1c1c1c' : '#ffffff',
+                    border: `1px solid ${isDark ? '#333333' : '#bdbdbd'}`,
                     borderRadius: 8,
                     fontSize: 12,
                   }}

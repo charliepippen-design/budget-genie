@@ -162,7 +162,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
       )}
     >
       <Dialog open={isPremiumMarketModalOpen} onOpenChange={setIsPremiumMarketModalOpen}>
-        <DialogContent className="max-w-md border-slate-700 bg-[linear-gradient(160deg,_#020617,_#0f172a_55%,_#111827)] text-slate-100">
+        <DialogContent className="max-w-md border-slate-700 bg-[linear-gradient(160deg,_#141414,_#1c1c1c_55%,_#111827)] text-slate-100">
           <DialogHeader className="text-left">
             <DialogTitle className="text-xl font-black tracking-tight text-white">
               Premium Market Access Required

@@ -27,7 +27,7 @@ export function CloudStatus() {
     // Mission 3: High Visibility
     return (
         <div className={cn(
-            "fixed bottom-4 left-4 z-[9999] bg-[#0f172a] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
+            "fixed bottom-4 left-4 z-[9999] bg-[#1c1c1c] border border-slate-700 rounded-full px-3 py-1.5 flex items-center gap-2 shadow-lg transition-all duration-300",
             displayStatus === 'error' ? "border-red-500/50 bg-red-950/20" : "border-blue-500/20"
         )}>
             {displayStatus === 'syncing' && (

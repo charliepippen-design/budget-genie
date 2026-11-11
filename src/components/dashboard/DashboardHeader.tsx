@@ -77,7 +77,7 @@ export function DashboardHeader({
   const isDark = theme === 'dark' || theme === 'contrast';
   const isDemo = userStatus === 'demo';
   const controlShellClass = cn(
-    'h-10 rounded-lg border px-3 text-sm font-semibold transition-all duration-200',
+    'h-9 rounded-full border px-3.5 text-sm font-medium transition-all duration-200',
     isDark
       ? 'border-slate-700 bg-slate-900/60 text-slate-100 hover:bg-slate-800 hover:border-slate-600'
       : 'border-slate-300 bg-white text-slate-900 hover:bg-slate-100 hover:border-slate-400'
@@ -99,7 +99,7 @@ export function DashboardHeader({
     >
       <div className="px-4 py-2.5">
         <Dialog open={isExportHostageModalOpen} onOpenChange={setIsExportHostageModalOpen}>
-          <DialogContent className="max-w-lg border-slate-700 bg-[linear-gradient(160deg,_#020617,_#0f172a_55%,_#111827)] text-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.8)]">
+          <DialogContent className="max-w-lg border-slate-700 bg-[linear-gradient(160deg,_#141414,_#1c1c1c_55%,_#111827)] text-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.8)]">
             <DialogHeader className="text-left">
               <DialogTitle className="text-2xl font-black tracking-tight text-white">
                 Deployment Blocked
@@ -162,7 +162,7 @@ export function DashboardHeader({
 
             <Button
               onClick={() => navigate('/output')}
-              className="h-10 gap-2 rounded-lg border-0 bg-indigo-600 px-4 text-sm font-semibold text-white hover:bg-indigo-500"
+              className="h-9 gap-2 rounded-full border-0 bg-indigo-600 px-4 text-sm font-semibold hover:bg-indigo-500"
             >
               <FileText className="h-4 w-4" />
               View Plan
@@ -278,7 +278,7 @@ export function DashboardHeader({
               onClick={cycleTheme}
               aria-label={`Current theme ${currentThemeLabel}. Switch to ${nextThemeLabel} theme`}
               title={`Current theme ${currentThemeLabel}. Switch to ${nextThemeLabel} theme`}
-              className={cn(controlShellClass, 'w-10 px-0')}
+              className={cn(controlShellClass, 'w-9 px-0')}
             >
               {theme === 'contrast' ? (
                 <span className="text-xs font-bold">HC</span>
@@ -291,14 +291,14 @@ export function DashboardHeader({
 
             <a
               href="/settings"
-              className={cn(controlShellClass, 'inline-flex w-10 items-center justify-center px-0')}
+              className={cn(controlShellClass, 'inline-flex w-9 items-center justify-center px-0')}
               aria-label="Open account settings"
               title="Account Settings"
             >
               <Settings className="h-4 w-4" />
             </a>
 
-            <AccountMenu isDark={isDark} className={cn(controlShellClass, 'w-10 px-0')} />
+            <AccountMenu isDark={isDark} className={cn(controlShellClass, 'w-9 px-0')} />
           </div>
         </div>
       </div>

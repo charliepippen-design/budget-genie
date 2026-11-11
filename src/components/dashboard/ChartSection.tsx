@@ -79,7 +79,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
   const [groupView, setGroupView] = useState<ChannelGroup | 'all'>('all');
   const { groups } = usePlanResult();
 
-  const chartAxisColor = theme === 'dark' ? '#94a3b8' : '#475569';
+  const chartAxisColor = theme === 'dark' ? '#979797' : '#4a4a4a';
   const chartGridColor = theme === 'dark' ? 'rgba(100,116,139,0.25)' : 'rgba(148,163,184,0.3)';
   const tooltipClass =
     theme === 'dark'
@@ -495,7 +495,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
                   />
                   <ReferenceLine
                     y={0}
-                    stroke={theme === 'dark' ? '#94a3b8' : '#64748b'}
+                    stroke={theme === 'dark' ? '#979797' : '#6e6e6e'}
                     strokeDasharray="4 4"
                   />
                   <Line
@@ -512,7 +512,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
                     type="monotone"
                     dataKey="marketingCost"
                     name="Marketing Cost"
-                    stroke={theme === 'dark' ? '#94a3b8' : '#64748b'}
+                    stroke={theme === 'dark' ? '#979797' : '#6e6e6e'}
                     strokeWidth={2}
                     strokeDasharray="6 4"
                     dot={false}

@@ -24,7 +24,7 @@ export function ExportIntelButton() {
       const canvas = await html2canvas(captureRoot, {
         useCORS: true,
         scale: 2,
-        backgroundColor: '#020617',
+        backgroundColor: '#141414',
         logging: false,
       });
 

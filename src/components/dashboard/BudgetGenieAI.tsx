@@ -175,7 +175,7 @@ export const BudgetGenieAI = () => {
       <div
         className={cn(
           'flex h-screen overflow-hidden font-inter selection:bg-indigo-500/30 transition-colors duration-300',
-          isDark ? 'bg-[#020617] text-white' : 'bg-slate-100 text-slate-900'
+          isDark ? 'bg-[#141414] text-white' : 'bg-slate-100 text-slate-900'
         )}
       >
         {/* WIZARD MODAL */}
@@ -216,7 +216,7 @@ export const BudgetGenieAI = () => {
           id="dashboard-main-capture"
           className={cn(
             'relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden transition-colors duration-300',
-            isDark ? 'bg-[#020617]' : 'bg-slate-50'
+            isDark ? 'bg-[#141414]' : 'bg-slate-50'
           )}
         >
           <DashboardHeader
@@ -241,7 +241,7 @@ export const BudgetGenieAI = () => {
                 aria-pressed={isSidebarOpen}
                 title="Targets, multipliers and the channel list"
                 className={cn(
-                  'hidden h-[46px] min-h-0 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors lg:flex',
+                  'hidden h-10 min-h-0 shrink-0 items-center gap-2 rounded-full border px-4 text-sm font-medium transition-colors lg:flex',
                   isSidebarOpen
                     ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
                     : isDark
@@ -254,7 +254,7 @@ export const BudgetGenieAI = () => {
               </button>
               <TabsList
                 className={cn(
-                  'h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto border p-1',
+                  'h-10 min-w-0 flex-1 justify-start gap-1 overflow-x-auto rounded-full border p-1',
                   isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                 )}
               >
@@ -263,7 +263,7 @@ export const BudgetGenieAI = () => {
                     key={id}
                     value={id}
                     className={cn(
-                      'gap-2 px-4 py-2 transition-all data-[state=active]:bg-indigo-600 data-[state=active]:text-white',
+                      'h-8 gap-2 rounded-full px-4 py-0 transition-all data-[state=active]:bg-indigo-600',
                       !isDark && 'text-slate-700'
                     )}
                   >

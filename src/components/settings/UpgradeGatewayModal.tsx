@@ -61,7 +61,7 @@ export function UpgradeGatewayModal({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-3xl border-slate-700 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_40%),linear-gradient(155deg,_#020617,_#0f172a_45%,_#111827)] p-0 text-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.8)]"
+        className="max-w-3xl border-slate-700 bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_40%),linear-gradient(155deg,_#141414,_#1c1c1c_45%,_#111827)] p-0 text-slate-100 shadow-[0_30px_90px_rgba(15,23,42,0.8)]"
         overlayClassName="bg-slate-950/80 backdrop-blur-sm"
       >
         <div className="overflow-hidden rounded-lg border border-slate-700/70">

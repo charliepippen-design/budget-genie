@@ -215,7 +215,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
           My Projects
         </Button>
       </SheetTrigger>
-      <SheetContent className="w-[400px] bg-[#0f172a] border-l border-slate-800 text-slate-100 sm:w-[540px]">
+      <SheetContent className="w-[400px] bg-[#1c1c1c] border-l border-slate-800 text-slate-100 sm:w-[540px]">
         <SheetHeader>
           <SheetTitle className="text-2xl font-bold bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">
             Project Repository
