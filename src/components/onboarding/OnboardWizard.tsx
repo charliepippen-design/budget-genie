@@ -237,10 +237,15 @@ export const OnboardWizard = () => {
       goToStep('generating');
 
       const startedAt = Date.now();
-      // AI failure never blocks onboarding: continue with the standard template and say so.
-      const aiResult = await generateOnboardingPlan(answers, code).catch(
-        (): OnboardingAIResult => ({ ok: false, reason: 'error' })
-      );
+      // Industries with a channel pack are planned by the deterministic generator: the engine computes
+      // every number, so the AI is not asked for channel percentages. Other verticals still use the
+      // AI-refined preset. AI failure never blocks onboarding: continue with the standard template and say so.
+      const generatedPlan = generateWizardPlan(answers);
+      const aiResult: OnboardingAIResult = generatedPlan
+        ? { ok: false, reason: 'error' }
+        : await generateOnboardingPlan(answers, code).catch(
+            (): OnboardingAIResult => ({ ok: false, reason: 'error' })
+          );
       const refinedPlan = aiResult.ok ? aiResult.plan : null;
       const elapsed = Date.now() - startedAt;
       if (elapsed < 2000) {
@@ -303,9 +308,6 @@ export const OnboardWizard = () => {
         };
       });
 
-      // Without AI, the goal and markets drive the deterministic plan generator
-      // (industries with a channel pack); otherwise the vertical preset is used.
-      const generatedPlan = refinedPlan ? null : generateWizardPlan(answers);
       if (generatedPlan) {
         applyGeneratedPlan(generatedPlan);
       } else {
@@ -353,7 +355,7 @@ export const OnboardWizard = () => {
 
       const planReadyToast = buildPlanReadyToast();
       toast(planReadyToast.title, planReadyToast.options);
-      if (!aiResult.ok) toast.info(ONBOARDING_AI_UNAVAILABLE_NOTICE);
+      if (!generatedPlan && !aiResult.ok) toast.info(ONBOARDING_AI_UNAVAILABLE_NOTICE);
     },
     [
       code,
