@@ -15,6 +15,8 @@ import {
   getMetricIntegrityIssues,
 } from '@/lib/planning-insights';
 import type { EngineChannelInsight, EngineInput, EngineResult, PlanEngine } from './contract';
+import { computePlaceholderTimeline } from './placeholder-timeline';
+import { computePlaceholderWhatIf } from './placeholder-what-if';
 
 /** Churn used by the dashboard's return-by-group trend (the value model uses DEFAULT_CHURN_RATE). */
 const RETURN_TREND_CHURN = 0.04;
@@ -136,4 +138,8 @@ export const placeholderEngine: PlanEngine = {
   id: 'placeholder',
   version: '0.1.0',
   compute,
+  computeTimeline: (input, timeline) =>
+    computePlaceholderTimeline(input, timeline, { id: placeholderEngine.id, version: placeholderEngine.version }),
+  computeWhatIf: (input, whatIf) =>
+    computePlaceholderWhatIf(input, whatIf, { id: placeholderEngine.id, version: placeholderEngine.version }),
 };

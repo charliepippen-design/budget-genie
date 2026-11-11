@@ -29,6 +29,8 @@ import type {
   ScenarioEnvelopePoint,
 } from '@/lib/planning-insights';
 import type { IgamingRevenueMonthValues } from '@/lib/igaming-revenue-model';
+import type { TimelineInput, TimelineResult } from './timeline';
+import type { WhatIfInput, WhatIfResult } from './what-if';
 
 // ========== INPUT ==========
 
@@ -150,4 +152,8 @@ export interface PlanEngine {
   version: string;
   /** Pure: must not read stores, storage or the network. */
   compute(input: EngineInput): EngineResult;
+  /** The plan over several months (see timeline.ts). Pure, like `compute`. */
+  computeTimeline(input: EngineInput, timeline: TimelineInput): TimelineResult;
+  /** The plan under the customer-value lab's assumptions and sandbox (see what-if.ts). Pure, like `compute`. */
+  computeWhatIf(input: EngineInput, whatIf: WhatIfInput): WhatIfResult;
 }
