@@ -23,13 +23,13 @@ import {
   useMediaPlanStore,
   useChannelsWithMetrics,
   useBlendedMetrics,
-  computePlanSnapshot,
-  getSpendSharePct,
+  usePlanResult,
 } from '@/hooks/use-media-plan-store';
+import { getEngine, selectEngineInput } from '@/engine';
 // import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { cn } from '@/lib/utils';
-import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL, computeRoasPair } from '@/lib/roas-pair';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 import {
   Search,
   Megaphone,
@@ -185,13 +185,11 @@ export function ChannelTable() {
     toggleChannelLock,
     toggleChannelActive,
     setGhostProjectedRevenue,
-    globalMultipliers,
   } = useMediaPlanStore();
   // const { rebalance } = useBudgetEngine();
   const channels = useChannelsWithMetrics();
   const blendedMetrics = useBlendedMetrics();
-  const onboardingVertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const roasPair = computeRoasPair(blendedMetrics, onboardingVertical, globalMultipliers);
+  const { roas: roasPair, totals, channelInsights } = usePlanResult();
   const categoryTotals = useCategoryTotals();
   const { symbol, format: formatCurrency } = useCurrency();
   const [priceHintChannelId, setPriceHintChannelId] = useState<string | null>(null);
@@ -216,15 +214,7 @@ export function ChannelTable() {
   >(
     channels,
     (row, key) => {
-      const ngrPerPlayer =
-        globalMultipliers.playerValue *
-        globalMultipliers.turnoverRate *
-        globalMultipliers.margin *
-        (1 - globalMultipliers.bonusRate);
-      const paybackMonths =
-        row.metrics.cpa && ngrPerPlayer > 0 && globalMultipliers.retentionRate > 0
-          ? row.metrics.cpa / (ngrPerPlayer * globalMultipliers.retentionRate)
-          : null;
+      const paybackMonths = channelInsights[row.id]?.paybackMonths ?? null;
 
       switch (key) {
         case 'spend':
@@ -246,25 +236,8 @@ export function ChannelTable() {
   );
 
   const getPaybackMonths = useCallback(
-    (channel: ChannelWithMetrics) => {
-      const ngrPerPlayer =
-        globalMultipliers.playerValue *
-        globalMultipliers.turnoverRate *
-        globalMultipliers.margin *
-        (1 - globalMultipliers.bonusRate);
-
-      if (
-        !channel.metrics.cpa ||
-        channel.metrics.cpa <= 0 ||
-        ngrPerPlayer <= 0 ||
-        globalMultipliers.retentionRate <= 0
-      ) {
-        return null;
-      }
-
-      return channel.metrics.cpa / (ngrPerPlayer * globalMultipliers.retentionRate);
-    },
-    [globalMultipliers]
+    (channel: ChannelWithMetrics) => channelInsights[channel.id]?.paybackMonths ?? null,
+    [channelInsights]
   );
 
   const getPaybackTone = useCallback((paybackMonths: number | null) => {
@@ -350,7 +323,7 @@ export function ChannelTable() {
       if (!isPointerDraggingRef.current) return;
 
       setGhostProjectedRevenue(
-        computePlanSnapshot(useMediaPlanStore.getState()).blended.projectedRevenue
+        getEngine().compute(selectEngineInput(useMediaPlanStore.getState())).totals.projectedRevenue
       );
     },
     [setChannelAllocation, setGhostProjectedRevenue]
@@ -426,10 +399,7 @@ export function ChannelTable() {
   );
 
   // Shares are of plan spend, so fixed-fee rows count and inactive rows don't.
-  const totalAllocation = useMemo(
-    () => channels.reduce((sum, ch) => sum + getSpendSharePct(ch, blendedMetrics), 0),
-    [channels, blendedMetrics]
-  );
+  const totalAllocation = totals.spendShareTotalPct;
 
   const renderSortHeader = (label: string, key: SortKey) => {
     const isActive = sortKey === key;
@@ -470,7 +440,7 @@ export function ChannelTable() {
                   Remaining Budget
                 </p>
                 <p className="text-sm font-mono text-cyan-300">
-                  {formatCurrency(Math.max(0, totalBudget - blendedMetrics.totalSpend))}
+                  {formatCurrency(totals.unallocated)}
                 </p>
               </div>
               <div>
@@ -595,7 +565,7 @@ export function ChannelTable() {
                   const isInactive = channel.isActive === false;
                   const isAllocationDisabled =
                     channel.locked || isAllocationFixedByModel || isInactive;
-                  const sharePct = getSpendSharePct(channel, blendedMetrics);
+                  const sharePct = channelInsights[channel.id]?.spendSharePct ?? 0;
 
                   return (
                     <Fragment key={channel.id}>
@@ -921,7 +891,7 @@ export function ChannelTable() {
                 const isInactive = channel.isActive === false;
                 const isAllocationDisabled =
                   channel.locked || isAllocationFixedByModel || isInactive;
-                const sharePct = getSpendSharePct(channel, blendedMetrics);
+                const sharePct = channelInsights[channel.id]?.spendSharePct ?? 0;
 
                 return (
                   <div
