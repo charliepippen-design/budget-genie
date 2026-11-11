@@ -3,12 +3,12 @@ import { motion } from 'framer-motion';
 // FIX: Use the requested relative import for the store
 // FIX: Use the requested relative import for the store
 import { useProjectStore } from '../../store/useProjectStore';
-import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
 import {
-  calculateIgamingRevenueMonth,
-  normalizeIgamingRevenueInputs,
-  parseRateInput,
-} from '@/lib/igaming-revenue-model';
+  ChannelWithMetrics,
+  useChannelsWithMetrics,
+  usePlanResult,
+} from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
+import { parseRateInput } from '@/lib/igaming-revenue-model';
 
 // FIX: Use relative imports for UI components as requested
 import { Button } from '../../components/ui/button';
@@ -94,7 +94,7 @@ const GlobalMultipliers: React.FC = () => {
     setGlobalMultipliers,
     totalBudget,
   } = useProjectStore();
-  const channelsWithMetrics = useChannelsWithMetrics();
+  const { revenueModelMonth } = usePlanResult();
   const vc = useVerticalConfig();
   const { symbol, format } = useCurrency();
   const { toast } = useToast();
@@ -102,24 +102,7 @@ const GlobalMultipliers: React.FC = () => {
   const isDark = theme === 'dark' || theme === 'contrast';
   const isIgaming = vc.vertical === 'igaming';
 
-  const revenueModelOutputs = useMemo(() => {
-    if (!isIgaming) return null;
-
-    const marketingCost = channelsWithMetrics.reduce(
-      (sum, channel) => sum + channel.metrics.spend,
-      0
-    );
-    const ftds = channelsWithMetrics.reduce((sum, channel) => sum + channel.metrics.conversions, 0);
-
-    return calculateIgamingRevenueMonth(
-      {
-        ftds,
-        marketingCost,
-      },
-      0,
-      normalizeIgamingRevenueInputs(globalMultipliers, globalMultipliers.playerValue)
-    );
-  }, [channelsWithMetrics, globalMultipliers, isIgaming]);
+  const revenueModelOutputs = isIgaming ? revenueModelMonth : null;
 
   return (
     <div className="space-y-4">
