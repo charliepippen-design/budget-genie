@@ -43,6 +43,11 @@ describe('route redirects', () => {
     ['/planner', '/app'],
     ['/demo', '/app'],
     ['/refund', '/refund-policy'],
+    ['/sign-in', '/auth'],
+    ['/signin', '/auth'],
+    ['/login', '/auth'],
+    ['/signup', '/sign-up'],
+    ['/register', '/sign-up'],
   ])('%s redirects to %s', async (from, to) => {
     expect(await landed(from)).toBe(to);
   });
