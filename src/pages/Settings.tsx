@@ -495,6 +495,8 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+          {/* Internal billing debug card: never shown to customers. */}
+          {import.meta.env.DEV ? (
           <Card className="md:col-span-2 bg-[#1e293b] border-slate-700">
             <CardHeader>
               <div className="flex items-center justify-between gap-3">
@@ -550,6 +552,7 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+          ) : null}
 
           <Card className="md:col-span-2 relative overflow-hidden border-slate-700 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.18),_transparent_32%),linear-gradient(165deg,_#0f172a_0%,_#111827_50%,_#1e293b_100%)]">
             <div className="absolute top-0 right-0 p-3">
