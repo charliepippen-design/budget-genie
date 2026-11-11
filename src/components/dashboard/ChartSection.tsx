@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/accordion';
 import { ChannelWithMetrics, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
+import { useTimelineResult } from '@/hooks/use-multi-month-store';
 import {
   buildChannelStackData,
   getChannelGroup,
@@ -74,7 +74,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
   const { format: formatCurrency } = useCurrency();
   const { theme } = useTheme();
   const vc = useVerticalConfig();
-  const { months: multiMonthMetrics } = useMultiMonthMetrics();
+  const { months: multiMonthMetrics } = useTimelineResult().plan;
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [groupView, setGroupView] = useState<ChannelGroup | 'all'>('all');
   const { groups } = usePlanResult();
@@ -182,10 +182,10 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
     () =>
       multiMonthMetrics.map((month, index) => ({
         month: month.label.split(' ')[0]?.slice(0, 3) || `Month ${index + 1}`,
-        grossContribution: month.grossContribution || 0,
-        marketingCost: month.totalSpend || 0,
-        delta: (month.grossContribution || 0) - (month.totalSpend || 0),
-        ngr: month.ngr || 0,
+        grossContribution: month.revenueModel?.grossContribution || 0,
+        marketingCost: month.spend || 0,
+        delta: month.contributionDelta,
+        ngr: month.revenueModel?.ngr || 0,
       })),
     [multiMonthMetrics]
   );
