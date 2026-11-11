@@ -1,14 +1,15 @@
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Sparkles, Users, TrendingUp, FlaskConical, Shield, CheckCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Sparkles, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { buildPlanReadyToast } from '@/lib/plan-ready-toast';
+import { announcePlanReady, applyOnboardingPlan, replacePlanConfirm } from '@/lib/onboarding-apply';
+import { GOAL_OPTIONS } from '@/lib/onboarding-goals';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { ChannelData, useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { getOnboardingMarkets, marketsToGeoSelection, TIER_DEFAULTS } from '@/lib/geo-market-data';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { getOnboardingMarkets } from '@/lib/geo-market-data';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
 import {
   ONBOARDING_AI_UNAVAILABLE_NOTICE,
@@ -42,38 +43,6 @@ const STATUS_MESSAGES = [
   'Almost ready...',
 ] as const;
 
-const GOAL_OPTIONS: Array<{
-  key: WizardAnswers['goal'];
-  title: string;
-  subtitle: string;
-  Icon: typeof Users;
-}> = [
-  {
-    key: 'acquire_volume',
-    title: 'Acquire as many new customers as possible',
-    subtitle: 'Focus on reaching more people and growing quickly.',
-    Icon: Users,
-  },
-  {
-    key: 'maximize_revenue',
-    title: 'Maximise revenue per customer',
-    subtitle: 'Prioritise higher value outcomes over raw volume.',
-    Icon: TrendingUp,
-  },
-  {
-    key: 'test_channels',
-    title: 'Test new channels and find what works',
-    subtitle: 'Spread budget across options to learn faster.',
-    Icon: FlaskConical,
-  },
-  {
-    key: 'maintain',
-    title: 'Maintain current performance, minimise risk',
-    subtitle: 'Protect consistency and avoid major swings.',
-    Icon: Shield,
-  },
-];
-
 const GEO_GROUPS: Array<{ title: string; tier: 'tier1' | 'tier2' | 'tier3' }> = [
   { title: 'Premium Markets (Tier 1)', tier: 'tier1' },
   { title: 'Volume Markets (Tier 2)', tier: 'tier2' },
@@ -95,16 +64,6 @@ function parsePositive(value: string): number | undefined {
 export const OnboardWizard = () => {
   const { format, symbol, code } = useCurrency();
   const navigate = useNavigate();
-  const setTotalBudget = useMediaPlanStore((state) => state.setTotalBudget);
-  const setOnboardingVertical = useMediaPlanStore((state) => state.setOnboardingVertical);
-  const setOnboardingSubvertical = useMediaPlanStore((state) => state.setOnboardingSubvertical);
-  const setChannels = useMediaPlanStore((state) => state.setChannels);
-  const normalizeAllocations = useMediaPlanStore((state) => state.normalizeAllocations);
-  const setGlobalMultipliers = useMediaPlanStore((state) => state.setGlobalMultipliers);
-  const applyGeneratedPlan = useMediaPlanStore((state) => state.applyGeneratedPlan);
-  const clearActiveGeos = useMediaPlanStore((state) => state.clearActiveGeos);
-  const setTierAllocation = useMediaPlanStore((state) => state.setTierAllocation);
-  const setHasCompletedOnboarding = useMediaPlanStore((state) => state.setHasCompletedOnboarding);
   const hasExistingPlan = useMediaPlanStore((state) => state.hasCompletedOnboarding);
 
   // Answers and step live in a persisted store so a reload resumes where the user left off.
@@ -215,7 +174,6 @@ export const OnboardWizard = () => {
     async (withBenchmarks: boolean, replaceConfirmed = false) => {
       if (!state.vertical || !state.goal || typeof state.budget !== 'number') return;
 
-      const preset = VERTICAL_PRESETS[state.vertical];
       const parsedCpa = withBenchmarks ? parsePositive(state.benchmarks.cpa) : undefined;
       const parsedLtv = withBenchmarks ? parsePositive(state.benchmarks.ltv) : undefined;
 
@@ -231,12 +189,7 @@ export const OnboardWizard = () => {
       };
 
       if (hasExistingPlan && !replaceConfirmed) {
-        setConfirmRequest({
-          title: 'Replace your current media plan?',
-          description: 'Building a new plan replaces the channels and budget you have now.',
-          confirmLabel: 'Replace plan',
-          onConfirm: () => void applyPlan(withBenchmarks, true),
-        });
+        setConfirmRequest(replacePlanConfirm(() => void applyPlan(withBenchmarks, true)));
         return;
       }
 
@@ -258,126 +211,28 @@ export const OnboardWizard = () => {
         await new Promise((resolve) => window.setTimeout(resolve, 2000 - elapsed));
       }
 
-      setOnboardingVertical(answers.vertical);
-      setOnboardingSubvertical(state.subvertical);
-      setHasCompletedOnboarding(true);
-      setTotalBudget(answers.budget);
-      // A new wizard plan supersedes any AI planner brief built on the old plan.
-      useMediaPlanStore.setState({ brief: null, planRationale: [], planWarnings: [] });
-
-      const adjustedPresetChannels = preset.channels.map((channel) => {
-        const aiAdj = refinedPlan?.channelAdjustments.find(
-          (adj) => adj.channelName === channel.name
-        );
-        return {
-          ...channel,
-          allocationPct: aiAdj?.allocationPct ?? channel.allocationPct,
-        };
+      applyOnboardingPlan({
+        vertical: answers.vertical,
+        subvertical: state.subvertical,
+        budget: answers.budget,
+        geos: answers.geos,
+        generatedPlan,
+        refinedPlan,
+        knownCpa: parsedCpa,
+        knownLtv: parsedLtv,
       });
-
-      const mappedChannels: ChannelData[] = adjustedPresetChannels.map((channel) => {
-        // FLAT_FEE and RETAINER channels are "fixed cost" — their typeConfig.price IS
-        // their monthly spend. Presets set price:0 as a placeholder; compute the actual
-        // spend from the budget allocation so the pool-aware engine deducts them correctly.
-        const fixedChannelPrice =
-          channel.buyingModel === 'RETAINER' || channel.buyingModel === 'FLAT_FEE'
-            ? Math.round((channel.allocationPct / 100) * answers.budget)
-            : channel.typeConfig.price;
-
-        return {
-          id: crypto.randomUUID(),
-          name: channel.name,
-          category: channel.category,
-          family: channel.family,
-          buyingModel: channel.buyingModel,
-          allocationPct: channel.allocationPct,
-          typeConfig: {
-            family: channel.family,
-            buyingModel: channel.buyingModel,
-            price: fixedChannelPrice,
-            secondaryPrice: channel.typeConfig.secondaryPrice ?? 0,
-            baselineMetrics: {
-              ctr: channel.typeConfig.baselineMetrics.ctr ?? 1,
-              conversionRate: channel.typeConfig.baselineMetrics.conversionRate ?? 2.5,
-              aov: channel.typeConfig.baselineMetrics.aov,
-              trafficPerUnit: channel.typeConfig.baselineMetrics.trafficPerUnit,
-              saturationCeiling: channel.typeConfig.baselineMetrics.saturationCeiling,
-            },
-          },
-          tier:
-            channel.buyingModel === 'RETAINER' || channel.buyingModel === 'FLAT_FEE'
-              ? 'fixed'
-              : 'scalable',
-          locked: false,
-          isActive: true,
-          maxSpendLimit: 0,
-        };
-      });
-
-      if (generatedPlan) {
-        applyGeneratedPlan(generatedPlan);
-      } else {
-        setChannels(mappedChannels);
-        normalizeAllocations();
-      }
-
-      // Use || (not ??) so that a zero returned by the AI falls through to the preset
-      // default. playerValue === 0 would make all revenue calculations return 0.
-      const revenueModelDefaults =
-        answers.vertical === 'igaming' && state.subvertical
-          ? IGAMING_SUBVERTICAL_PRESETS[state.subvertical]
-          : null;
-
-      setGlobalMultipliers({
-        playerValue:
-          parsedLtv ||
-          refinedPlan?.recommendedPlayerValue ||
-          revenueModelDefaults?.playerValue ||
-          generatedPlan?.multipliers.playerValue ||
-          preset.defaultPlayerValue,
-        cpaTarget: parsedCpa || refinedPlan?.recommendedCpaTarget || preset.defaultCpaTarget,
-        roasTarget: refinedPlan?.recommendedRoasTarget || preset.defaultRoasTarget,
-        retentionRate: revenueModelDefaults?.retentionRate,
-        regToFtdCvr: revenueModelDefaults?.regToFtdCvr,
-        turnoverRate: revenueModelDefaults?.turnoverRate,
-        margin: revenueModelDefaults?.margin,
-        bonusRate: revenueModelDefaults?.bonusRate,
-        spendMultiplier: 1,
-      });
-
-      if (!generatedPlan) {
-        clearActiveGeos();
-        if (answers.geos.length > 0) {
-          const geo = marketsToGeoSelection(answers.geos);
-          useMediaPlanStore.setState({ activeGeos: geo.activeGeos, activeTiers: geo.activeTiers });
-        } else {
-          setTierAllocation('tier1', TIER_DEFAULTS.tier1);
-          setTierAllocation('tier2', TIER_DEFAULTS.tier2);
-        }
-      }
 
       goToStep('done');
       window.requestAnimationFrame(() => navigate('/app', { replace: true }));
 
-      const planReadyToast = buildPlanReadyToast();
-      toast(planReadyToast.title, planReadyToast.options);
+      announcePlanReady();
       if (!generatedPlan && !aiResult.ok) toast.info(ONBOARDING_AI_UNAVAILABLE_NOTICE);
     },
     [
       code,
       hasExistingPlan,
-      applyGeneratedPlan,
-      clearActiveGeos,
       goToStep,
       navigate,
-      normalizeAllocations,
-      setChannels,
-      setGlobalMultipliers,
-      setHasCompletedOnboarding,
-      setOnboardingSubvertical,
-      setOnboardingVertical,
-      setTierAllocation,
-      setTotalBudget,
       state,
     ]
   );
@@ -462,6 +317,12 @@ export const OnboardWizard = () => {
                 }`}
               />
             ))}
+            <Link
+              to="/onboard"
+              className="ml-auto rounded text-sm text-slate-400 underline-offset-4 hover:text-white hover:underline"
+            >
+              Quick start (one screen)
+            </Link>
           </div>
         )}
 
