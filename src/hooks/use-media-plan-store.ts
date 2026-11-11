@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useMemo } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { ChannelCategory } from '@/lib/mediaplan-data';
 import { normalizeAllocations as normalizeAllocationsUtil } from '@/lib/math-utils';
 import { calculateScoredAllocation } from '@/lib/distribution-logic';
@@ -18,7 +18,10 @@ import type {
 } from '@/lib/media-plan/types';
 import { DEFAULT_MULTIPLIERS, createInitialChannels } from '@/lib/media-plan/defaults';
 import { calculateChannelMetricsWithGeo, getGeoMarketProfile } from '@/lib/media-plan/channel-metrics';
-import { computePlanSnapshot, computeCategoryTotals, type PlanSnapshot } from '@/lib/media-plan/plan-snapshot';
+import { computeCategoryTotals, type PlanSnapshot } from '@/lib/media-plan/plan-snapshot';
+import { getEngine, subscribeEngine } from '@/engine/registry';
+import { selectEngineInput } from '@/engine/input';
+import type { EngineResult } from '@/engine/contract';
 import type { MediaPlanData, MediaPlanState } from '@/lib/media-plan/state';
 import {
   MEDIA_PLAN_STORE_KEY,
@@ -285,7 +288,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       setChannels: (channels) => set({ channels }),
 
       setChannelType: (channelId, family, buyingModel) => {
-        const current = computePlanSnapshot(get()).channels.find((c) => c.id === channelId);
+        const current = getEngine().compute(selectEngineInput(get())).channels.find((c) => c.id === channelId);
         const price = translatePriceForModel(current, buyingModel);
         set((state) => ({
           channels: applyChannelType(state.channels, channelId, family, buyingModel, price),
@@ -409,19 +412,60 @@ export const useMediaPlanStore = create<MediaPlanState>()(
 
 // ========== SELECTOR HOOKS ==========
 
-/** The engine snapshot for the live plan (channels, blended totals, over-budget flag). */
-export function usePlanSnapshot(): PlanSnapshot {
+/**
+ * The live plan computed by the active engine (see src/engine). Every plan number on screen
+ * comes from here, directly or through the hooks below.
+ */
+export function usePlanResult(): EngineResult {
+  const engine = useSyncExternalStore(subscribeEngine, getEngine, getEngine);
   const totalBudget = useMediaPlanStore((state) => state.totalBudget);
   const channels = useMediaPlanStore((state) => state.channels);
   const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
   const activeTiers = useMediaPlanStore((state) => state.activeTiers);
   const activeGeos = useMediaPlanStore((state) => state.activeGeos);
   const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
+  const onboardingVertical = useMediaPlanStore((state) => state.onboardingVertical);
+  const observedLtv = useMediaPlanStore((state) => state.observedLtv);
 
   return useMemo(
-    () => computePlanSnapshot({ totalBudget, channels, globalMultipliers, activeTiers, activeGeos, geoOverrides }),
-    [activeGeos, activeTiers, channels, geoOverrides, globalMultipliers, totalBudget]
+    () =>
+      engine.compute(
+        selectEngineInput({
+          totalBudget,
+          channels,
+          globalMultipliers,
+          activeTiers,
+          activeGeos,
+          geoOverrides,
+          onboardingVertical,
+          observedLtv,
+        })
+      ),
+    [engine, totalBudget, channels, globalMultipliers, activeTiers, activeGeos, geoOverrides, onboardingVertical, observedLtv]
   );
+}
+
+/** Channels, blended totals and over-budget flag of the live plan, read from the engine result. */
+export function usePlanSnapshot(): PlanSnapshot {
+  const result = usePlanResult();
+  return useMemo(() => {
+    const t = result.totals;
+    return {
+      channels: result.channels,
+      blended: {
+        totalSpend: t.totalSpend,
+        totalImpressions: t.totalImpressions,
+        totalClicks: t.totalClicks,
+        totalConversions: t.totalConversions,
+        blendedCpa: t.blendedCpa,
+        projectedRevenue: t.projectedRevenue,
+        blendedRoas: t.blendedRoas,
+      },
+      fixedSpend: t.fixedSpend,
+      overBudget: t.overBudget,
+      overBudgetBy: t.overBudgetBy,
+    };
+  }, [result]);
 }
 
 export function useChannelsWithMetrics(): ChannelWithMetrics[] {
