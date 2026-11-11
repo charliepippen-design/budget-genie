@@ -3,7 +3,11 @@ import * as React from "react";
 import type { ToastActionElement, ToastProps } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 1;
-const TOAST_REMOVE_DELAY = 1000000;
+// A closed toast leaves the list after its exit animation.
+const TOAST_REMOVE_DELAY = 1000;
+// Radix pauses its own timer while the pointer is over the toast or the window is unfocused,
+// so a toast sitting on top of a button could stay there forever. This timer always fires.
+export const TOAST_DEFAULT_DURATION = 5000;
 
 type ToasterToast = ToastProps & {
   id: string;
@@ -155,6 +159,9 @@ function toast({ ...props }: Toast) {
       },
     },
   });
+
+  const duration = props.duration ?? TOAST_DEFAULT_DURATION;
+  if (Number.isFinite(duration)) setTimeout(dismiss, duration);
 
   return {
     id: id,
