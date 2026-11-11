@@ -1,11 +1,11 @@
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { useChannelsWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 
 export function EfficiencyAlertBanner() {
   const { format } = useCurrency();
-  const channels = useChannelsWithMetrics();
+  const { channels, alerts } = usePlanResult();
   const subscriptionTier = useMediaPlanStore((state) => state.subscriptionTier);
   const globalMultipliers = useMediaPlanStore((state) => state.globalMultipliers);
   const setIsGenieOpen = useMediaPlanStore((state) => state.setIsGenieOpen);
@@ -15,22 +15,13 @@ export function EfficiencyAlertBanner() {
 
   const isPro = subscriptionTier === 'pro' || subscriptionTier === 'enterprise';
 
-  const roasUnderperformers = useMemo(
-    () => channels.filter((c) => c.isActive && c.metrics.roas < 1 && c.metrics.spend > 0),
-    [channels]
-  );
-
+  const roasUnderperformers = alerts.belowBreakEven;
   const saturationChannels = useMemo(
-    () =>
-      channels.filter((c) => {
-        const ceiling = c.typeConfig.baselineMetrics.saturationCeiling ?? 0;
-        return c.isActive && ceiling > 0 && c.metrics.spend > ceiling * 0.9;
-      }),
-    [channels]
+    () => channels.filter((c) => alerts.nearSaturation.includes(c.id)),
+    [channels, alerts.nearSaturation]
   );
 
-  const wastedSpend = roasUnderperformers.reduce((sum, c) => sum + c.metrics.spend, 0);
-  const money = format(wastedSpend);
+  const money = format(alerts.wastedSpend);
 
   if (!isPro) {
     return null;

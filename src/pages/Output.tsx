@@ -18,7 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
-import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { StrategicSummary } from '@/components/StrategicSummary';
 import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
@@ -45,7 +45,7 @@ const OutputContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
-  const channels = useChannelsWithMetrics();
+  const { alerts: alertsResult, channelInsights } = usePlanResult();
   const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -81,12 +81,15 @@ const OutputContent = () => {
     [active]
   );
 
-  const weakestChannel = useMemo(() => active.find((c) => c.metrics.roas < 1) ?? null, [active]);
+  const weakestChannel = useMemo(
+    () => active.find((c) => c.id === alertsResult.weakestChannelId) ?? null,
+    [active, alertsResult.weakestChannelId]
+  );
 
   const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
 
   const pieData = useMemo(
-    () => active.map((c) => ({ name: c.name, value: c.metrics.spend })),
+    () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
     [active]
   );
 
@@ -373,8 +376,8 @@ const OutputContent = () => {
                   <Tooltip
                     content={({ active: isActive, payload }) => {
                       if (!isActive || !payload?.length) return null;
-                      const d = payload[0].payload as { name: string; value: number };
-                      const pct = totalSpend > 0 ? ((d.value / totalSpend) * 100).toFixed(1) : '0';
+                      const d = payload[0].payload as { id: string; name: string; value: number };
+                      const pct = totalSpend > 0 ? (channelInsights[d.id]?.spendSharePct ?? 0).toFixed(1) : '0';
                       return (
                         <div className="bg-card border border-border rounded-lg p-2 text-sm shadow-md">
                           <p className="font-medium text-foreground">{d.name}</p>
@@ -399,7 +402,7 @@ const OutputContent = () => {
             {/* Allocation list */}
             <div>
               {sortedPieData.map((row) => {
-                const pct = totalSpend > 0 ? ((row.value / totalSpend) * 100).toFixed(1) : '0';
+                const pct = totalSpend > 0 ? (channelInsights[row.id]?.spendSharePct ?? 0).toFixed(1) : '0';
                 return (
                   <div
                     key={row.name}

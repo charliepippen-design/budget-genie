@@ -1,5 +1,7 @@
 export type {
   EngineAlerts,
+  EngineChannelGroups,
+  EngineChannelInsight,
   EngineCustomerValue,
   EngineInput,
   EngineMarkets,

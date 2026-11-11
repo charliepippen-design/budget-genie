@@ -1,12 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { AlertTriangle, TrendingUp, Activity, CheckCircle2 } from 'lucide-react';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useToast } from '@/hooks/use-toast';
 import { useActionPulseStore } from '@/store/useActionPulseStore';
 import { useLayoutEffect, useMemo, useRef } from 'react';
-import { getEfficiencyAlerts, getMetricIntegrityIssues } from '@/lib/planning-insights';
 import { planAutoFixAllocation, planReallocation } from '@/lib/insight-actions';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -26,7 +24,7 @@ function BarFill({ pct, className }: { pct: number; className: string }) {
 export const StrategicInsightsPanel = () => {
   const { toast } = useToast();
   const { format: fmt } = useCurrency();
-  const channels = useChannelsWithMetrics();
+  const { channels, alerts, channelInsights } = usePlanResult();
   const { setChannelAllocation, setAllocations, toggleChannelLock } = useMediaPlanStore();
   const dispatchActionPulse = useActionPulseStore((state) => state.dispatchActionPulse);
   const { theme } = useTheme();
@@ -34,8 +32,8 @@ export const StrategicInsightsPanel = () => {
 
   // --- LIVE DATA COMPUTATIONS ---
 
-  const efficiencyAlerts = useMemo(() => getEfficiencyAlerts(channels), [channels]);
-  const integrityIssues = useMemo(() => getMetricIntegrityIssues(channels), [channels]);
+  const efficiencyAlerts = alerts.efficiency;
+  const integrityIssues = alerts.integrity;
 
   // Card 1: Efficiency Alert — real worst offender
   const efficiencyTarget = useMemo(() => {
@@ -88,17 +86,11 @@ export const StrategicInsightsPanel = () => {
 
   // Card 3: Market Saturation — real saturation channels
   const saturationChannels = useMemo(
-    () =>
-      channels.filter((c) => {
-        const ceiling = c.typeConfig.baselineMetrics.saturationCeiling ?? 0;
-        return c.isActive && ceiling > 0 && c.metrics.spend > ceiling * 0.9;
-      }),
-    [channels]
+    () => channels.filter((c) => alerts.nearSaturation.includes(c.id)),
+    [channels, alerts.nearSaturation]
   );
   const topSaturation = saturationChannels[0] ?? null;
-  const saturationPct = topSaturation
-    ? Math.min(100, Math.round((topSaturation.metrics.spend / (topSaturation.typeConfig.baselineMetrics.saturationCeiling ?? topSaturation.metrics.spend)) * 100))
-    : 0;
+  const saturationPct = topSaturation ? (channelInsights[topSaturation.id]?.saturationPct ?? 0) : 0;
 
   // Are there any issues at all?
   const hasAnyAlert = !!efficiencyTarget || !!arbitrage || saturationChannels.length > 0;
