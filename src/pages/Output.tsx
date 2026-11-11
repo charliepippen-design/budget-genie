@@ -17,9 +17,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { StrategicSummary } from '@/components/StrategicSummary';
-import { getEfficiencyAlerts } from '@/lib/planning-insights';
+import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -45,7 +46,14 @@ const OutputContent = () => {
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
   const channels = useChannelsWithMetrics();
-  const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore();
+  const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
+    useShallow((s) => ({
+      totalBudget: s.totalBudget,
+      globalMultipliers: s.globalMultipliers,
+      activeGeos: s.activeGeos,
+      projectName: s.projectName,
+    }))
+  );
   const { format, code } = useCurrency();
 
   const $ = (n: number) => format(n);
@@ -485,7 +493,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[0].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[0].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">If conditions worsen by 15%</p>
             </div>
@@ -507,7 +515,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[1].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[1].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">Expected outcome</p>
             </div>
@@ -529,7 +537,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[2].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[2].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">If conditions improve by 15%</p>
             </div>

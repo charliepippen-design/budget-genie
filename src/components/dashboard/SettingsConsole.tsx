@@ -4,7 +4,11 @@ import { motion } from 'framer-motion';
 // FIX: Use the requested relative import for the store
 import { useProjectStore } from '../../store/useProjectStore';
 import { ChannelWithMetrics, useChannelsWithMetrics } from '@/hooks/use-media-plan-store'; // Keep types/helpers valid
-import { calculateIgamingRevenueMonth } from '@/lib/igaming-revenue-model';
+import {
+  calculateIgamingRevenueMonth,
+  normalizeIgamingRevenueInputs,
+  parseRateInput,
+} from '@/lib/igaming-revenue-model';
 
 // FIX: Use relative imports for UI components as requested
 import { Button } from '../../components/ui/button';
@@ -113,14 +117,7 @@ const GlobalMultipliers: React.FC = () => {
         marketingCost,
       },
       0,
-      {
-        playerValue: globalMultipliers.playerValue,
-        retentionRate: globalMultipliers.retentionRate,
-        regToFtdCvr: globalMultipliers.regToFtdCvr,
-        turnoverRate: globalMultipliers.turnoverRate,
-        margin: globalMultipliers.margin,
-        bonusRate: globalMultipliers.bonusRate,
-      }
+      normalizeIgamingRevenueInputs(globalMultipliers, globalMultipliers.playerValue)
     );
   }, [channelsWithMetrics, globalMultipliers, isIgaming]);
 
@@ -259,6 +256,12 @@ const GlobalMultipliers: React.FC = () => {
             <p className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}>
               Inputs drive the iGaming waterfall. Downstream values are computed and read-only.
             </p>
+            <p
+              id="rate-input-hint"
+              className={cn('text-xs', isDark ? 'text-slate-400' : 'text-slate-600')}
+            >
+              Enter rates as decimals between 0 and 1: 0.55 means 55%.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
@@ -275,12 +278,10 @@ const GlobalMultipliers: React.FC = () => {
                 type="number"
                 step="0.01"
                 min="0"
+                max="1"
+                aria-describedby="rate-input-hint"
                 value={globalMultipliers.regToFtdCvr}
-                onChange={(e) =>
-                  setGlobalMultipliers({
-                    regToFtdCvr: Math.max(0, parseFloat(e.target.value) || 0),
-                  })
-                }
+                onChange={(e) => setGlobalMultipliers({ regToFtdCvr: parseRateInput(e.target.value) })}
                 className={cn(
                   'h-10 text-sm',
                   isDark
@@ -302,12 +303,10 @@ const GlobalMultipliers: React.FC = () => {
                 type="number"
                 step="0.01"
                 min="0"
+                max="1"
+                aria-describedby="rate-input-hint"
                 value={globalMultipliers.retentionRate}
-                onChange={(e) =>
-                  setGlobalMultipliers({
-                    retentionRate: Math.max(0, parseFloat(e.target.value) || 0),
-                  })
-                }
+                onChange={(e) => setGlobalMultipliers({ retentionRate: parseRateInput(e.target.value) })}
                 className={cn(
                   'h-10 text-sm',
                   isDark
@@ -356,10 +355,10 @@ const GlobalMultipliers: React.FC = () => {
                 type="number"
                 step="0.01"
                 min="0"
+                max="1"
+                aria-describedby="rate-input-hint"
                 value={globalMultipliers.margin}
-                onChange={(e) =>
-                  setGlobalMultipliers({ margin: Math.max(0, parseFloat(e.target.value) || 0) })
-                }
+                onChange={(e) => setGlobalMultipliers({ margin: parseRateInput(e.target.value) })}
                 className={cn(
                   'h-10 text-sm',
                   isDark
@@ -381,10 +380,10 @@ const GlobalMultipliers: React.FC = () => {
                 type="number"
                 step="0.01"
                 min="0"
+                max="1"
+                aria-describedby="rate-input-hint"
                 value={globalMultipliers.bonusRate}
-                onChange={(e) =>
-                  setGlobalMultipliers({ bonusRate: Math.max(0, parseFloat(e.target.value) || 0) })
-                }
+                onChange={(e) => setGlobalMultipliers({ bonusRate: parseRateInput(e.target.value) })}
                 className={cn(
                   'h-10 text-sm',
                   isDark
