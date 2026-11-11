@@ -54,6 +54,7 @@ import { cn, sanitizeChannelName } from '@/lib/utils';
 import { BRAND_NAME } from '@/lib/brand';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import { ChannelEditor } from './ChannelEditor';
 import { OptimizationControls } from './OptimizationControls';
 import { ChannelCategory } from '@/lib/mediaplan-data';
@@ -536,6 +537,7 @@ export const SettingsConsole: React.FC = () => {
   const isDark = theme === 'dark' || theme === 'contrast';
 
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [newName, setNewName] = useState('');
   const [newCat, setNewCat] = useState<ChannelCategory>('Display/Programmatic');
   const [newModel, setNewModel] = useState<BuyingModel>('CPM');
@@ -633,6 +635,7 @@ export const SettingsConsole: React.FC = () => {
       )}
     >
       {/* <div className="text-yellow-500 font-mono">DEBUG MODE: Settings Console</div> */}
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       <div
         className={cn(
           'p-4 border-b space-y-4 flex-shrink-0 z-10 transition-colors duration-300',
@@ -670,19 +673,20 @@ export const SettingsConsole: React.FC = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    'Are you sure you want to reset the entire plan? This cannot be undone (except via Undo).'
-                  )
-                ) {
-                  resetAll();
-                  toast({
-                    title: 'Plan Reset',
-                    description: 'Use Undo (Ctrl+Z) to restore if needed.',
-                  });
-                }
-              }}
+              onClick={() =>
+                setConfirmRequest({
+                  title: 'Reset the entire plan?',
+                  description: 'This clears budget and channel settings. Ctrl+Z can undo it.',
+                  confirmLabel: 'Reset plan',
+                  onConfirm: () => {
+                    resetAll();
+                    toast({
+                      title: 'Plan Reset',
+                      description: 'Use Undo (Ctrl+Z) to restore if needed.',
+                    });
+                  },
+                })
+              }
               className={cn(
                 'text-sm h-9 px-3',
                 isDark

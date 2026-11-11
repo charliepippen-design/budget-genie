@@ -13,7 +13,6 @@ import {
   ArrowUpRight,
   BarChart,
   Sparkles,
-  Share2,
   Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -42,6 +41,7 @@ import {
 import { BUDGET_PRESETS, BudgetPresetKey } from '@/lib/mediaplan-data';
 import { CurrencySelector } from '@/components/common/CurrencySelector';
 import { ProjectManager } from '@/components/dashboard/ProjectManager';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
@@ -76,6 +76,7 @@ export function DashboardHeader({
   const { theme, cycleTheme } = useTheme();
   const navigate = useNavigate();
   const [isExportHostageModalOpen, setIsExportHostageModalOpen] = useState(false);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const multiplier = globalMultipliers.spendMultiplier || 1;
   // The multiplier scales variable channels only (fixed fees are contractual), so show real spend.
   const effectiveBudget = useBlendedMetrics().totalSpend;
@@ -257,9 +258,14 @@ export function DashboardHeader({
 
           {/* Reset Button - FORCED CONTRAST */}
           <Button
-            onClick={() => {
-              if (window.confirm('Reset the plan? This clears budget and channel settings (Ctrl+Z can undo).')) onReset();
-            }}
+            onClick={() =>
+              setConfirmRequest({
+                title: 'Reset the plan?',
+                description: 'This clears budget and channel settings. Ctrl+Z can undo it.',
+                confirmLabel: 'Reset plan',
+                onConfirm: onReset,
+              })
+            }
             title="Reset Plan"
             aria-label="Reset plan"
             className={cn(controlShellClass, 'w-10 px-0')}
@@ -297,7 +303,7 @@ export function DashboardHeader({
               onClick={() => navigate('/output')}
               className="gap-2"
             >
-              <Share2 className="w-4 h-4" />
+              <FileText className="w-4 h-4" />
               View Plan
             </Button>
 
@@ -410,6 +416,7 @@ export function DashboardHeader({
           </div>
         </div>
       </div>
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
     </header>
   );
 }

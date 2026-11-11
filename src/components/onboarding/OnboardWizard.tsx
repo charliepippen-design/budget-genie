@@ -20,6 +20,7 @@ import {
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
 import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
 import { getUiLang } from '@/lib/ai-client';
+import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import {
   BUDGET_TIERS,
   WIZARD_MAX_BUDGET,
@@ -118,6 +119,7 @@ export const OnboardWizard = () => {
     if (useOnboardingDraftStore.getState().draft.step === 'done') resetDraft();
   }, [resetDraft]);
   const [statusIndex, setStatusIndex] = useState(0);
+  const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
   const [isContinueAttentionActive, setIsContinueAttentionActive] = useState(false);
   const [showContinueLetsGo, setShowContinueLetsGo] = useState(false);
   const continuePulseTimerRef = useRef<number | null>(null);
@@ -210,7 +212,7 @@ export const OnboardWizard = () => {
   const onboardingMarkets = useMemo(() => getOnboardingMarkets(state.vertical), [state.vertical]);
 
   const applyPlan = useCallback(
-    async (withBenchmarks: boolean) => {
+    async (withBenchmarks: boolean, replaceConfirmed = false) => {
       if (!state.vertical || !state.goal || typeof state.budget !== 'number') return;
 
       const preset = VERTICAL_PRESETS[state.vertical];
@@ -228,10 +230,13 @@ export const OnboardWizard = () => {
         },
       };
 
-      if (
-        hasExistingPlan &&
-        !window.confirm('This will replace your current media plan. Continue?')
-      ) {
+      if (hasExistingPlan && !replaceConfirmed) {
+        setConfirmRequest({
+          title: 'Replace your current media plan?',
+          description: 'Building a new plan replaces the channels and budget you have now.',
+          confirmLabel: 'Replace plan',
+          onConfirm: () => void applyPlan(withBenchmarks, true),
+        });
         return;
       }
 
@@ -431,6 +436,7 @@ export const OnboardWizard = () => {
 
   return (
     <div className="min-h-screen bg-slate-950 text-white">
+      <ConfirmDialog request={confirmRequest} onClose={() => setConfirmRequest(null)} />
       <div className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-5 pb-12 pt-8 sm:px-8">
         {hasExistingPlan && state.step !== 'generating' && (
           <button
@@ -832,7 +838,7 @@ export const OnboardWizard = () => {
                   className="bg-indigo-600 px-7 hover:bg-indigo-500"
                   onClick={() => goToStep(6)}
                 >
-                  Continue -&gt;
+                  Continue →
                 </Button>
               </div>
             </div>
@@ -926,7 +932,7 @@ export const OnboardWizard = () => {
                   className="h-12 bg-indigo-600 px-8 text-base hover:bg-indigo-500"
                   onClick={() => void applyPlan(true)}
                 >
-                  Build my plan -&gt;
+                  Build my plan →
                 </Button>
               </div>
             </div>
