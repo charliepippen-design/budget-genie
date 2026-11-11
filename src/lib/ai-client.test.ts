@@ -21,6 +21,16 @@ describe('AI error kinds', () => {
     expect(aiErrorMessage(new AIError('Limit reached', 'FREE_TIER_LIMIT', 402))).toBe('Limit reached');
   });
 
+  it('never shows a raw server error string for an HTTP 500', () => {
+    const logged = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const raw = 'GoogleGenerativeAI Error: upstream connect error at fetchWithRetry (/var/task/api/_gateway.js:61:13)';
+    const message = aiErrorMessage(new AIError(raw, undefined, 500));
+    expect(message).toBe('The AI could not answer just now. Your plan is unchanged. Please try again.');
+    expect(aiErrorKind(new AIError(raw, undefined, 500))).toBe('generic'); // generic errors keep the Retry button
+    expect(logged).toHaveBeenCalled();
+    logged.mockRestore();
+  });
+
   it('parses Retry-After', () => {
     expect(parseRetryAfter('12')).toBe(12);
     expect(parseRetryAfter(null, 7.2)).toBe(8);
