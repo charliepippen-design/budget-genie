@@ -1,24 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useShallow } from 'zustand/react/shallow';
-import { isIgamingVertical, normalizeIgamingRevenueInputs } from '@/lib/igaming-revenue-model';
-import { computePlanSnapshot, useMediaPlanStore } from './use-media-plan-store';
-import type {
-  ChannelMonthConfig,
-  MonthData,
-  OptimizationResult,
-  PlanScenario,
-  ProgressionPattern,
-} from '@/lib/multi-month/types';
+import { useMemo, useSyncExternalStore } from 'react';
+import { getEngine, subscribeEngine } from '@/engine/registry';
+import { selectEngineInput } from '@/engine/input';
+import type { TimelineInput, TimelineResult } from '@/engine/timeline';
+import { selectTimelineInput, type TimelineSource } from '@/engine/timeline-input';
+import { useMediaPlanStore } from './use-media-plan-store';
+import { useEngineInput } from './use-engine-input';
+import type { MonthData, OptimizationResult, PlanScenario } from '@/lib/multi-month/types';
 import type { MultiMonthState } from '@/lib/multi-month/state';
 import { DEFAULT_CONSTRAINTS, DEFAULT_GLOBAL_SETTINGS } from '@/lib/multi-month/defaults';
-import {
-  calculateDistribution,
-  calculatePlanMetrics,
-  channelsFromPlanSnapshot,
-  createMonth,
-  toMonthValue,
-} from '@/lib/multi-month/calc';
+import { createMonth, toMonthValue } from '@/lib/multi-month/calc';
 import {
   MULTI_MONTH_STORE_KEY,
   MULTI_MONTH_STORE_VERSION,
@@ -47,11 +40,15 @@ export {
 } from '@/lib/multi-month/calc';
 
 /**
- * Month channels mirror the main plan: each channel's share and unit economics are read from
- * the engine snapshot, so month totals reproduce the dashboard's numbers at the same budget.
+ * The timeline of the given store state, computed by the active engine against the live plan.
+ * Store actions read month budgets (`patternBudgets`), the plan's channel mix (`baseChannels`)
+ * and optimiser candidates from it instead of computing them.
  */
-function channelsFromPlan(): ChannelMonthConfig[] {
-  return channelsFromPlanSnapshot(computePlanSnapshot(useMediaPlanStore.getState()).channels);
+function timelineFor(state: TimelineSource, redistribute?: TimelineInput['redistribute']): TimelineResult {
+  return getEngine().computeTimeline(selectEngineInput(useMediaPlanStore.getState()), {
+    ...selectTimelineInput(state),
+    redistribute,
+  });
 }
 
 // ========== STORE ==========
@@ -136,12 +133,10 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           const totalMonths = state.months.length || state.planningMonths;
           const newTotalBudget = newSettings.baseMonthlyBudget * totalMonths;
 
-          const budgets = calculateDistribution(
-            state.progressionPattern,
-            newTotalBudget,
-            totalMonths,
-            { ...state.patternParams, growthRate: newSettings.growthRate }
-          );
+          const budgets = timelineFor(get(), {
+            totalBudget: newTotalBudget,
+            monthCount: totalMonths,
+          }).patternBudgets;
 
           set((curr) => ({
             months: curr.months.map((m, i) => ({
@@ -173,12 +168,11 @@ export const useMultiMonthStore = create<MultiMonthState>()(
           targetBudget = state.globalSettings.baseMonthlyBudget * totalMonths;
         }
 
-        const budgets = calculateDistribution(state.progressionPattern, targetBudget, totalMonths, {
-          ...state.patternParams,
-          growthRate: state.globalSettings.growthRate,
+        const { patternBudgets: budgets, baseChannels: planChannels } = timelineFor(state, {
+          totalBudget: targetBudget,
+          monthCount: totalMonths,
         });
 
-        const planChannels = channelsFromPlan();
         const newMonths: MonthData[] = [];
         for (let i = 0; i < totalMonths; i++) {
           const isSoftLaunch = state.includeSoftLaunch && i === 0;
@@ -190,17 +184,12 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
       applyPattern: () => {
         const state = get();
-        // Calculate CURRENT Total Budget from existing months
-        const currentTotalBudget = state.months.reduce((sum, m) => sum + m.budget, 0);
+        // Re-distributes the CURRENT total budget of the existing months
+        const timeline = timelineFor(state);
 
-        if (currentTotalBudget === 0) return;
+        if (timeline.plan.totals.allocatedBudget === 0) return;
 
-        const budgets = calculateDistribution(
-          state.progressionPattern,
-          currentTotalBudget,
-          state.months.length,
-          { ...state.patternParams, growthRate: state.globalSettings.growthRate }
-        );
+        const budgets = timeline.patternBudgets;
 
         set({
           months: state.months.map((month, idx) => ({
@@ -258,6 +247,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       },
 
       resetMonthToGlobal: (monthId) => {
+        const planChannels = timelineFor(get()).baseChannels;
         set((state) => ({
           months: state.months.map((m) =>
             m.id === monthId
@@ -266,7 +256,7 @@ export const useMultiMonthStore = create<MultiMonthState>()(
                   spendMultiplier: null,
                   cpmOverride: null,
                   ctrBump: null,
-                  channels: channelsFromPlan(),
+                  channels: planChannels,
                   useGlobalChannels: true,
                 }
               : m
@@ -396,76 +386,22 @@ export const useMultiMonthStore = create<MultiMonthState>()(
       runOptimization: async () => {
         set({ isOptimizing: true, optimizationResults: [] });
 
-        // Simulate optimization with different patterns
-        const state = get();
-        const patterns: ProgressionPattern[] = [
-          'linear',
-          'exponential',
-          'aggressive-launch',
-          'flat',
-          'step',
-        ];
-        const results: OptimizationResult[] = [];
-
-        // We need a baseline total budget to optimize against?
-        // Or assume use current base * months?
-        const baseTotal = state.globalSettings.baseMonthlyBudget * state.months.length;
-
-        for (const pattern of patterns) {
-          const budgets = calculateDistribution(pattern, baseTotal, state.months.length, {
-            growthRate: state.globalSettings.growthRate,
-          });
-
-          const testMonths = state.months.map((m, idx) => ({
-            ...m,
-            budget: budgets[idx],
-          }));
-
-          const metrics = calculatePlanMetrics(testMonths, state.globalSettings);
-
-          let score = 0;
-          switch (state.optimizationGoal) {
-            case 'maximize-roas':
-              score = metrics.totals.avgRoas * 100;
-              break;
-            case 'minimize-cac':
-              score = metrics.totals.avgCpa ? 100 / metrics.totals.avgCpa : 0;
-              break;
-            case 'maximize-revenue':
-              score = metrics.totals.totalRevenue / 10000;
-              break;
-            case 'maximize-profit':
-              score = metrics.totals.netProfit / 1000;
-              break;
-            case 'breakeven-fastest':
-              score =
-                metrics.totals.breakEvenMonth !== null
-                  ? (12 - metrics.totals.breakEvenMonth) * 10
-                  : 0;
-              break;
-            default:
-              score = metrics.totals.avgRoas * 20 + metrics.totals.netProfit / 5000;
-          }
-
-          results.push({
-            scenario: { progressionPattern: pattern },
-            score,
-            metrics: {
-              totalAllocatedBudget: metrics.totals.totalAllocatedBudget,
-              totalSpend: metrics.totals.totalSpend,
-              totalRevenue: metrics.totals.totalRevenue,
-              netProfit: metrics.totals.netProfit,
-              avgRoas: metrics.totals.avgRoas,
-              avgCac: metrics.totals.avgCpa || 0,
-              breakEvenMonth: metrics.totals.breakEvenMonth,
-            },
-            reasoning: `${pattern.replace('-', ' ')} pattern achieves ${metrics.totals.avgRoas.toFixed(2)}x ROAS`,
-            confidence: Math.min(95, 60 + score / 10),
-          });
-        }
-
-        // Sort by score descending
-        results.sort((a, b) => b.score - a.score);
+        // The engine scores the candidate patterns, best first
+        const results: OptimizationResult[] = timelineFor(get()).optimisation.map((candidate) => ({
+          scenario: { progressionPattern: candidate.pattern },
+          score: candidate.score,
+          metrics: {
+            totalAllocatedBudget: candidate.totals.allocatedBudget,
+            totalSpend: candidate.totals.spend,
+            totalRevenue: candidate.totals.revenue,
+            netProfit: candidate.totals.netProfit,
+            avgRoas: candidate.totals.roas,
+            avgCac: candidate.totals.cpa || 0,
+            breakEvenMonth: candidate.totals.breakEvenMonth,
+          },
+          reasoning: `${candidate.pattern.replace('-', ' ')} pattern achieves ${candidate.totals.roas.toFixed(2)}x ROAS`,
+          confidence: candidate.confidence,
+        }));
 
         set({ optimizationResults: results.slice(0, 3), isOptimizing: false });
       },
@@ -515,35 +451,29 @@ export const useMultiMonthStore = create<MultiMonthState>()(
 
 // ========== SELECTORS ==========
 
-export function useMultiMonthMetrics() {
-  const { months, globalSettings } = useMultiMonthStore(
-    useShallow((s) => ({ months: s.months, globalSettings: s.globalSettings }))
+/**
+ * The live timeline computed by the active engine (see src/engine/timeline.ts). Every number of
+ * the multi-month view comes from here.
+ */
+export function useTimelineResult(): TimelineResult {
+  const engine = useSyncExternalStore(subscribeEngine, getEngine, getEngine);
+  const input = useEngineInput();
+  const source = useMultiMonthStore(
+    useShallow(
+      (s): TimelineSource => ({
+        includeSoftLaunch: s.includeSoftLaunch,
+        planningMonths: s.planningMonths,
+        startMonth: s.startMonth,
+        progressionPattern: s.progressionPattern,
+        patternParams: s.patternParams,
+        globalSettings: s.globalSettings,
+        months: s.months,
+        scenarios: s.scenarios,
+        comparisonScenarioId: s.comparisonScenarioId,
+        optimizationGoal: s.optimizationGoal,
+      })
+    )
   );
-  const vertical = useMediaPlanStore((state) => state.onboardingVertical);
-  const multipliers = useMediaPlanStore((state) => state.globalMultipliers);
 
-  return calculatePlanMetrics(
-    months,
-    globalSettings,
-    isIgamingVertical(vertical)
-      ? normalizeIgamingRevenueInputs(multipliers, multipliers.playerValue)
-      : undefined
-  );
-}
-
-export function useScenarioMetrics(scenarioId: string | null) {
-  const { scenarios, globalSettings } = useMultiMonthStore(
-    useShallow((s) => ({ scenarios: s.scenarios, globalSettings: s.globalSettings }))
-  );
-  const vertical = useMediaPlanStore((state) => state.onboardingVertical);
-  const multipliers = useMediaPlanStore((state) => state.globalMultipliers);
-  const scenario = scenarios.find((s) => s.id === scenarioId);
-  if (!scenario) return null;
-  return calculatePlanMetrics(
-    scenario.months,
-    scenario.globalSettings || globalSettings,
-    isIgamingVertical(vertical)
-      ? normalizeIgamingRevenueInputs(multipliers, multipliers.playerValue)
-      : undefined
-  );
+  return useMemo(() => engine.computeTimeline(input, selectTimelineInput(source)), [engine, input, source]);
 }

@@ -18,7 +18,8 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatNumber } from '@/lib/mediaplan-data';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useMultiMonthStore, useMultiMonthMetrics, MonthData } from '@/hooks/use-multi-month-store';
+import { useMultiMonthStore, useTimelineResult, MonthData } from '@/hooks/use-multi-month-store';
+import type { TimelineMonthResult } from '@/engine/timeline';
 import { usePlGridNavigation } from '@/hooks/use-pl-grid-navigation';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 
@@ -35,19 +36,16 @@ const GRID_COLS = 'grid-cols-[1.5fr_1.2fr_0.8fr_0.8fr_0.8fr_0.8fr_0.8fr_1fr]';
 
 function MonthRow({
   month,
+  row,
   monthOrder,
   isExpanded,
   onToggle,
   formatCurrency,
 }: {
-  month: MonthData & {
-    totalSpend?: number;
-    totalConversions?: number;
-    revenue?: number;
-    operatingCosts?: number;
-    netProfit?: number;
-    cumulativeProfit?: number;
-  };
+  /** The month as stored: what the inputs edit. */
+  month: MonthData;
+  /** The month's numbers from the engine. */
+  row: TimelineMonthResult;
   monthOrder: number;
   isExpanded: boolean;
   onToggle: () => void;
@@ -62,18 +60,17 @@ function MonthRow({
   } = useMultiMonthStore();
 
   const profitClass = useMemo(() => {
-    if (!month.netProfit) return '';
-    if (month.netProfit > 0) return 'text-green-500';
-    if (month.netProfit < 0) return 'text-destructive';
+    if (!row.netProfit) return '';
+    if (row.netProfit > 0) return 'text-green-500';
+    if (row.netProfit < 0) return 'text-destructive';
     return 'text-primary';
-  }, [month.netProfit]);
+  }, [row.netProfit]);
 
   const cumulativeClass = useMemo(() => {
-    if (month.cumulativeProfit === undefined) return '';
-    if (month.cumulativeProfit > 0) return 'text-green-500';
-    if (month.cumulativeProfit < 0) return 'text-destructive';
+    if (row.cumulativeProfit > 0) return 'text-green-500';
+    if (row.cumulativeProfit < 0) return 'text-destructive';
     return '';
-  }, [month.cumulativeProfit]);
+  }, [row.cumulativeProfit]);
 
   return (
     <Collapsible open={isExpanded} onOpenChange={onToggle} asChild>
@@ -130,24 +127,24 @@ function MonthRow({
             </div>
           </TableCell>
           <TableCell className="text-right font-mono text-sm p-0">
-            {formatCurrency(month.totalSpend || 0, true)}
+            {formatCurrency(row.spend || 0, true)}
           </TableCell>
           <TableCell className="text-right font-mono text-sm p-0">
-            {formatNumber(month.totalConversions || 0)}
+            {formatNumber(row.conversions || 0)}
           </TableCell>
           <TableCell className="text-right font-mono text-sm p-0">
-            {formatCurrency(month.revenue || 0, true)}
+            {formatCurrency(row.revenue || 0, true)}
           </TableCell>
           <TableCell className="text-right font-mono text-sm text-muted-foreground p-0">
-            {formatCurrency(month.operatingCosts || 0, true)}
+            {formatCurrency(row.operatingCosts || 0, true)}
           </TableCell>
           <TableCell className={cn('text-right font-mono text-sm font-medium p-0', profitClass)}>
-            {formatCurrency(month.netProfit || 0, true)}
+            {formatCurrency(row.netProfit || 0, true)}
           </TableCell>
           <TableCell
             className={cn('text-right font-mono text-sm font-medium p-0 pr-2', cumulativeClass)}
           >
-            {formatCurrency(month.cumulativeProfit || 0, true)}
+            {formatCurrency(row.cumulativeProfit || 0, true)}
           </TableCell>
         </TableRow>
 
@@ -278,7 +275,8 @@ function MonthRow({
 
 export function PLTable() {
   const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
-  const { months: planMetrics, totals } = useMultiMonthMetrics();
+  const months = useMultiMonthStore((s) => s.months);
+  const { months: planMetrics, totals } = useTimelineResult().plan;
   const { format: formatCurrency } = useCurrency();
   const { containerRef, handleGridKeyDownCapture } = usePlGridNavigation();
   const vc = useVerticalConfig();
@@ -321,11 +319,11 @@ export function PLTable() {
                     {formatCurrency(month.budget, true)}
                   </TableCell>
                   <TableCell className="text-right font-mono">
-                    {formatCurrency(month.totalSpend || 0, true)}
+                    {formatCurrency(month.spend || 0, true)}
                   </TableCell>
                   {isIgaming ? (
                     <TableCell className="text-right font-mono">
-                      {formatNumber(month.activePlayers || 0)}
+                      {formatNumber(month.revenueModel?.activePlayers || 0)}
                     </TableCell>
                   ) : null}
                   <TableCell className="text-right font-mono">
@@ -333,7 +331,7 @@ export function PLTable() {
                   </TableCell>
                   {isIgaming ? (
                     <TableCell className="text-right font-mono">
-                      {formatCurrency(month.ngr || 0, true)}
+                      {formatCurrency(month.revenueModel?.ngr || 0, true)}
                     </TableCell>
                   ) : null}
                   <TableCell
@@ -390,16 +388,19 @@ export function PLTable() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {planMetrics.map((month, monthIndex) => (
-                  <MonthRow
-                    key={month.id}
-                    month={month}
-                    monthOrder={monthIndex}
-                    isExpanded={expandedMonths.has(month.id)}
-                    onToggle={() => toggleMonth(month.id)}
-                    formatCurrency={formatCurrency}
-                  />
-                ))}
+                {months.map((month, monthIndex) =>
+                  planMetrics[monthIndex] ? (
+                    <MonthRow
+                      key={month.id}
+                      month={month}
+                      row={planMetrics[monthIndex]}
+                      monthOrder={monthIndex}
+                      isExpanded={expandedMonths.has(month.id)}
+                      onToggle={() => toggleMonth(month.id)}
+                      formatCurrency={formatCurrency}
+                    />
+                  ) : null
+                )}
                 {isIgaming ? (
                   <>
                     <TableRow className="bg-muted/10 hover:bg-muted/10">
@@ -412,7 +413,7 @@ export function PLTable() {
                               key={`${month.id}-active-players`}
                               className="text-right font-mono text-sm text-muted-foreground"
                             >
-                              {formatNumber(month.activePlayers || 0)}
+                              {formatNumber(month.revenueModel?.activePlayers || 0)}
                             </div>
                           ))}
                         </div>
@@ -428,7 +429,7 @@ export function PLTable() {
                               key={`${month.id}-ggr`}
                               className="text-right font-mono text-sm text-muted-foreground"
                             >
-                              {formatCurrency(month.ggr || 0, true)}
+                              {formatCurrency(month.revenueModel?.ggr || 0, true)}
                             </div>
                           ))}
                         </div>
@@ -444,7 +445,7 @@ export function PLTable() {
                               key={`${month.id}-bonus`}
                               className="text-right font-mono text-sm text-muted-foreground"
                             >
-                              {formatCurrency(month.bonus || 0, true)}
+                              {formatCurrency(month.revenueModel?.bonus || 0, true)}
                             </div>
                           ))}
                         </div>
@@ -460,7 +461,7 @@ export function PLTable() {
                               key={`${month.id}-ngr`}
                               className="text-right font-mono text-sm text-muted-foreground"
                             >
-                              {formatCurrency(month.ngr || 0, true)}
+                              {formatCurrency(month.revenueModel?.ngr || 0, true)}
                             </div>
                           ))}
                         </div>
@@ -476,12 +477,12 @@ export function PLTable() {
                               key={`${month.id}-gross-contribution`}
                               className={cn(
                                 'text-right font-mono text-sm',
-                                (month.grossContribution || 0) >= 0
+                                (month.revenueModel?.grossContribution || 0) >= 0
                                   ? 'text-emerald-500'
                                   : 'text-destructive'
                               )}
                             >
-                              {formatCurrency(month.grossContribution || 0, true)}
+                              {formatCurrency(month.revenueModel?.grossContribution || 0, true)}
                             </div>
                           ))}
                         </div>
@@ -498,16 +499,16 @@ export function PLTable() {
                 >
                   <TableCell className="pl-4 p-0">TOTALS</TableCell>
                   <TableCell className="font-mono text-xs p-0">
-                    {formatCurrency(totals.totalAllocatedBudget, true)}
+                    {formatCurrency(totals.allocatedBudget, true)}
                   </TableCell>
                   <TableCell className="text-right font-mono p-0">
-                    {formatCurrency(totals.totalSpend, true)}
+                    {formatCurrency(totals.spend, true)}
                   </TableCell>
                   <TableCell className="text-right font-mono p-0">
-                    {formatNumber(totals.totalConversions)}
+                    {formatNumber(totals.conversions)}
                   </TableCell>
                   <TableCell className="text-right font-mono p-0">
-                    {formatCurrency(totals.totalRevenue, true)}
+                    {formatCurrency(totals.revenue, true)}
                   </TableCell>
                   <TableCell className="text-right font-mono text-muted-foreground p-0">
                     {formatCurrency(totals.operatingCosts, true)}

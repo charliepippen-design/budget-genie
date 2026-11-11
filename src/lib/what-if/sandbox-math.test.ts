@@ -1,22 +1,24 @@
 import { describe, expect, it } from 'vitest';
 import type { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
-import type { ChannelSandboxAdjustment } from '@/store/useSandboxStore';
 import {
   SANDBOX_DECREASE_FILL,
   SANDBOX_INCREASE_FILL,
   SANDBOX_NEUTRAL_FILL,
-} from './constants';
+} from '@/components/dashboard/ltv-forecast/constants';
+import {
+  groupImpactBars,
+  spendDistributionSummary,
+} from '@/components/dashboard/ltv-forecast/group-impact';
 import {
   aggregateMetrics,
   buildSandboxSummary,
   computeSandboxChannelMetrics,
   filterGroupedChannels,
-  groupImpact,
-  spendDistributionSummary,
+  groupSpendImpact,
   toBaselineAggregate,
   weightedChurnDeltaPct,
 } from './sandbox-math';
-import type { SandboxChannelMetric } from './types';
+import type { ChannelSandboxAdjustment, SandboxChannelMetric } from './types';
 
 const channel = (
   id: string,
@@ -320,8 +322,11 @@ describe('buildSandboxSummary', () => {
 });
 
 describe('groupImpact and spendDistributionSummary', () => {
+  // Numbers come from lib (groupSpendImpact); labels and fills are added by the UI helper.
+  const bars = (metrics: SandboxChannelMetric[]) => groupImpactBars(groupSpendImpact(metrics));
+
   it('covers all four groups with labels and fills', () => {
-    const data = groupImpact([
+    const data = bars([
       metric({ group: 'paid', baselineSpend: 100, adjustedSpend: 150 }),
       metric({ group: 'organic', baselineSpend: 100, adjustedSpend: 50 }),
       metric({ group: 'affiliate', baselineSpend: 100, adjustedSpend: 100 }),
@@ -337,7 +342,7 @@ describe('groupImpact and spendDistributionSummary', () => {
   });
 
   it('describes increases and decreases', () => {
-    const data = groupImpact([
+    const data = bars([
       metric({ group: 'paid', baselineSpend: 100, adjustedSpend: 150 }),
       metric({ group: 'organic', baselineSpend: 100, adjustedSpend: 50 }),
     ]);
@@ -345,7 +350,7 @@ describe('groupImpact and spendDistributionSummary', () => {
   });
 
   it('describes no change', () => {
-    expect(spendDistributionSummary(groupImpact([metric()]))).toBe(
+    expect(spendDistributionSummary(bars([metric()]))).toBe(
       'No group increases. No group decreases.'
     );
   });

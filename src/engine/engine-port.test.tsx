@@ -110,6 +110,7 @@ describe('swapping the engine', () => {
     expect(seen.at(-1)).toBe('placeholder');
 
     const stub: PlanEngine = {
+      ...placeholderEngine,
       id: 'stub',
       version: '1.0.0',
       compute: (input) => ({ ...placeholderEngine.compute(input), engine: { id: 'stub', version: '1.0.0' } }),
@@ -129,6 +130,7 @@ describe('swapping the engine', () => {
     }
     await mount(<Probe />);
     const fixed: PlanEngine = {
+      ...placeholderEngine,
       id: 'fixed',
       version: '1.0.0',
       compute: (input) => {

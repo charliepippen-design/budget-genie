@@ -1,53 +1,16 @@
 import { create } from 'zustand';
 import { type ChannelGroup } from '@/lib/planning-insights';
 
-export interface ChannelSandboxAdjustment {
-  spendPct: number;
-  cpaPct: number;
-  roasPct: number;
-  churnPct: number;
-}
+import type { ChannelSandboxAdjustment, SandboxExportSnapshot } from '@/lib/what-if/types';
 
-export interface SandboxMetricSummary {
-  totalSpend: number;
-  totalConversions: number;
-  blendedCpa: number | null;
-  blendedRoas: number;
-  projectedRevenue: number;
-  roiPct: number;
-}
-
-export interface SandboxChannelComparison {
-  channelId: string;
-  channelName: string;
-  group: ChannelGroup;
-  baselineSpend: number;
-  adjustedSpend: number;
-  baselineCpa: number;
-  adjustedCpa: number;
-  baselineRoas: number;
-  adjustedRoas: number;
-  churnPct: number;
-}
-
-export interface SandboxScenarioComparison {
-  scenario: 'Bear' | 'Base' | 'Bull';
-  baselineProjectedCohortValue: number;
-  adjustedProjectedCohortValue: number;
-  baselineLtvToCac: number | null;
-  adjustedLtvToCac: number | null;
-  baselineRoiPct: number;
-  adjustedRoiPct: number;
-}
-
-export interface SandboxExportSnapshot {
-  enabled: boolean;
-  summaryText: string;
-  baselineMetrics: SandboxMetricSummary;
-  adjustedMetrics: SandboxMetricSummary;
-  channelComparisons: SandboxChannelComparison[];
-  scenarioComparisons: SandboxScenarioComparison[];
-}
+// The sandbox types live with the what-if maths; re-exported so existing imports keep working.
+export type {
+  ChannelSandboxAdjustment,
+  SandboxChannelComparison,
+  SandboxExportSnapshot,
+  SandboxMetricSummary,
+  SandboxScenarioComparison,
+} from '@/lib/what-if/types';
 
 interface SandboxStoreState {
   sandboxEnabled: boolean;

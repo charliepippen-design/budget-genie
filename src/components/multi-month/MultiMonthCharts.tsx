@@ -15,7 +15,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
+import { useTimelineResult } from '@/hooks/use-multi-month-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 
 const CHANNEL_COLORS = [
@@ -33,7 +33,7 @@ const CHANNEL_COLORS = [
 ];
 
 export function MultiMonthCharts() {
-  const { months, totals } = useMultiMonthMetrics();
+  const { months } = useTimelineResult().plan;
   const { format: formatCurrency, symbol } = useCurrency();
 
   // Budget vs Revenue trend data
@@ -41,7 +41,7 @@ export function MultiMonthCharts() {
     return months.map((m, idx) => ({
       name: m.label.replace(' (Soft Launch)', '').split(' ')[0].slice(0, 3),
       month: `M${idx + 1}`,
-      budget: m.totalSpend || 0,
+      budget: m.spend || 0,
       revenue: m.revenue || 0,
       profit: m.netProfit || 0,
     }));
@@ -53,9 +53,8 @@ export function MultiMonthCharts() {
       const data: Record<string, number | string> = {
         name: m.label.replace(' (Soft Launch)', '').split(' ')[0].slice(0, 3),
       };
-      m.channels.forEach((ch) => {
-        const spend = (ch.allocationPct / 100) * (m.totalSpend || m.budget);
-        data[ch.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')] = spend;
+      m.channelSpend.forEach((ch) => {
+        data[ch.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')] = ch.spend;
       });
       return data;
     });
@@ -64,7 +63,7 @@ export function MultiMonthCharts() {
   // Get unique channel names for stacking
   const channelNames = useMemo(() => {
     if (months.length === 0) return [];
-    return months[0].channels.map((ch) => 
+    return months[0].channelSpend.map((ch) => 
       ch.name.replace(/^(SEO|Paid|Affiliate|Influencer)\s*-\s*/, '')
     );
   }, [months]);
