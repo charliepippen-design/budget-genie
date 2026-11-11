@@ -258,7 +258,7 @@ function runToolCall(call: AIToolCall, store: Store): Record<string, unknown> {
   if (call.name === 'update_brief') {
     const brief = mergeBrief(store.brief ?? DEFAULT_BRIEF, call.args);
     const plan = generatePlan(brief);
-    store.applyGeneratedPlan(plan);
+    store.applyGeneratedPlan(plan, { fromAi: true });
     return {
       ok: true,
       brief,
