@@ -5,17 +5,18 @@ import { TrendingUp, Rocket, Crown, Zap } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
-import { MIN_BUDGET_CAP, useBlendedMetrics } from '@/hooks/use-media-plan-store';
+import { MIN_BUDGET_CAP, useBlendedMetrics, usePlanResult } from '@/hooks/use-media-plan-store';
 import { ForecastCard } from './ForecastCard';
 import { LossBanner } from './LossBanner';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
 
 export const BudgetHero = () => {
-  const { totalBudget, channels, beginBudgetDrag, endBudgetDrag, isBudgetDragging } =
+  const { totalBudget, beginBudgetDrag, endBudgetDrag, isBudgetDragging } =
     useProjectStore();
   const { updateBudget } = useBudgetEngine();
   const { symbol } = useCurrency();
   const blendedMetrics = useBlendedMetrics();
+  const { totals } = usePlanResult();
   const { theme } = useTheme();
   const isDark = theme === 'dark' || theme === 'contrast';
   const [localBudget, setLocalBudget] = useState(totalBudget);
@@ -28,12 +29,7 @@ export const BudgetHero = () => {
   });
 
   // Fixed fees must fit in the budget; never below the store's floor.
-  const minBudget = Math.max(
-    MIN_BUDGET_CAP,
-    channels
-      .filter((c) => c.isActive !== false && c.tier === 'fixed')
-      .reduce((sum, c) => sum + (c.typeConfig.price || 0), 0)
-  );
+  const minBudget = Math.max(MIN_BUDGET_CAP, totals.fixedTierSpend);
 
   useEffect(() => {
     setLocalBudget(totalBudget);

@@ -306,7 +306,7 @@ export function buildCsvContent(
         scenario.scenario,
         scenario.projectedLtvPerUser.toFixed(4),
         scenario.projectedCohortValue.toFixed(4),
-        scenario.ltvToCac.toFixed(4),
+        scenario.ltvToCac === null ? 'n/a' : scenario.ltvToCac.toFixed(4),
       ]
         .map((cell) => `"${cell}"`)
         .join(',')
@@ -347,8 +347,8 @@ export function buildCsvContent(
               scenario.scenario,
               scenario.baselineProjectedCohortValue.toFixed(4),
               scenario.adjustedProjectedCohortValue.toFixed(4),
-              scenario.baselineLtvToCac.toFixed(4),
-              scenario.adjustedLtvToCac.toFixed(4),
+              scenario.baselineLtvToCac === null ? 'n/a' : scenario.baselineLtvToCac.toFixed(4),
+              scenario.adjustedLtvToCac === null ? 'n/a' : scenario.adjustedLtvToCac.toFixed(4),
               scenario.baselineRoiPct.toFixed(4),
               scenario.adjustedRoiPct.toFixed(4),
             ]
@@ -459,7 +459,7 @@ export async function exportToExcel(
         Scenario: s.scenario,
         LtvPerUser: Number(s.projectedLtvPerUser.toFixed(4)),
         CohortValue: Number(s.projectedCohortValue.toFixed(4)),
-        LtvToCac: Number(s.ltvToCac.toFixed(4)),
+        LtvToCac: s.ltvToCac === null ? null : Number(s.ltvToCac.toFixed(4)),
       });
     });
 
@@ -540,8 +540,8 @@ export async function exportToExcel(
           Scenario: s.scenario,
           BaselineCohort: Number(s.baselineProjectedCohortValue.toFixed(4)),
           AdjustedCohort: Number(s.adjustedProjectedCohortValue.toFixed(4)),
-          BaselineLtv: Number(s.baselineLtvToCac.toFixed(4)),
-          AdjustedLtv: Number(s.adjustedLtvToCac.toFixed(4)),
+          BaselineLtv: s.baselineLtvToCac === null ? null : Number(s.baselineLtvToCac.toFixed(4)),
+          AdjustedLtv: s.adjustedLtvToCac === null ? null : Number(s.adjustedLtvToCac.toFixed(4)),
           BaselineRoi: Number(s.baselineRoiPct.toFixed(4)),
           AdjustedRoi: Number(s.adjustedRoiPct.toFixed(4)),
         });

@@ -17,9 +17,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useMediaPlanStore, useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
+import { useShallow } from 'zustand/react/shallow';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { StrategicSummary } from '@/components/StrategicSummary';
-import { getEfficiencyAlerts } from '@/lib/planning-insights';
+import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -44,8 +45,15 @@ const OutputContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
-  const channels = useChannelsWithMetrics();
-  const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore();
+  const { alerts: alertsResult, channelInsights } = usePlanResult();
+  const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
+    useShallow((s) => ({
+      totalBudget: s.totalBudget,
+      globalMultipliers: s.globalMultipliers,
+      activeGeos: s.activeGeos,
+      projectName: s.projectName,
+    }))
+  );
   const { format, code } = useCurrency();
 
   const $ = (n: number) => format(n);
@@ -73,12 +81,15 @@ const OutputContent = () => {
     [active]
   );
 
-  const weakestChannel = useMemo(() => active.find((c) => c.metrics.roas < 1) ?? null, [active]);
+  const weakestChannel = useMemo(
+    () => active.find((c) => c.id === alertsResult.weakestChannelId) ?? null,
+    [active, alertsResult.weakestChannelId]
+  );
 
   const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
 
   const pieData = useMemo(
-    () => active.map((c) => ({ name: c.name, value: c.metrics.spend })),
+    () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
     [active]
   );
 
@@ -365,8 +376,8 @@ const OutputContent = () => {
                   <Tooltip
                     content={({ active: isActive, payload }) => {
                       if (!isActive || !payload?.length) return null;
-                      const d = payload[0].payload as { name: string; value: number };
-                      const pct = totalSpend > 0 ? ((d.value / totalSpend) * 100).toFixed(1) : '0';
+                      const d = payload[0].payload as { id: string; name: string; value: number };
+                      const pct = totalSpend > 0 ? (channelInsights[d.id]?.spendSharePct ?? 0).toFixed(1) : '0';
                       return (
                         <div className="bg-card border border-border rounded-lg p-2 text-sm shadow-md">
                           <p className="font-medium text-foreground">{d.name}</p>
@@ -391,7 +402,7 @@ const OutputContent = () => {
             {/* Allocation list */}
             <div>
               {sortedPieData.map((row) => {
-                const pct = totalSpend > 0 ? ((row.value / totalSpend) * 100).toFixed(1) : '0';
+                const pct = totalSpend > 0 ? (channelInsights[row.id]?.spendSharePct ?? 0).toFixed(1) : '0';
                 return (
                   <div
                     key={row.name}
@@ -485,7 +496,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[0].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[0].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">If conditions worsen by 15%</p>
             </div>
@@ -507,7 +518,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[1].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[1].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">Expected outcome</p>
             </div>
@@ -529,7 +540,7 @@ const OutputContent = () => {
               </p>
               <p className="text-sm text-muted-foreground mt-3">LTV:CAC</p>
               <p className="text-lg font-semibold text-foreground">
-                {scenarioEnvelope[2].ltvToCac.toFixed(2)}x
+                {formatLtvToCac(scenarioEnvelope[2].ltvToCac)}
               </p>
               <p className="text-xs text-muted-foreground mt-4">If conditions improve by 15%</p>
             </div>

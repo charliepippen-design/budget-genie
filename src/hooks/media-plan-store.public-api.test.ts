@@ -95,6 +95,8 @@ describe('use-media-plan-store public API', () => {
       'useFtdVelocityMetrics',
       'useGeoMarketProfile',
       'useMediaPlanStore',
+      'usePlanResult',
+      'usePlanSnapshot',
     ]);
   });
 });

@@ -4,7 +4,7 @@ export interface ScenarioPoint {
   scenario: 'Bear' | 'Base' | 'Bull';
   projectedLtvPerUser: number;
   projectedCohortValue: number;
-  ltvToCac: number;
+  ltvToCac: number | null;
 }
 
 export interface AggregateMetrics {

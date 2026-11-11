@@ -21,7 +21,8 @@ export interface LtvCurvePoint {
   monthlyLtvPerUser: number;
   cohortValue: number;
   netCohortValue: number;
-  ltvToCac: number;
+  /** null when the plan has no CPA (no conversions or no spend). */
+  ltvToCac: number | null;
   cpaLine: number;
 }
 
@@ -187,14 +188,14 @@ export function buildLtvCurve(
       monthlyLtvPerUser: Math.max(0, cumulative - previous || baseline.monthly[idx] || 0),
       cohortValue,
       netCohortValue: cohortValue - plan.totalSpend,
-      ltvToCac: safeCpa > 0 ? cumulative / safeCpa : 0,
+      ltvToCac: safeCpa > 0 ? cumulative / safeCpa : null,
       cpaLine: safeCpa,
     };
   });
 
   return {
     points,
-    paybackMonth: points.find((point) => point.ltvToCac >= 1)?.month ?? null,
+    paybackMonth: points.find((point) => point.ltvToCac !== null && point.ltvToCac >= 1)?.month ?? null,
     monthlyExpansion: baseline.expansion,
   };
 }
