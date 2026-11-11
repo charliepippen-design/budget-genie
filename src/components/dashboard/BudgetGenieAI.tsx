@@ -1,4 +1,5 @@
 import { PlannerChat } from '../planner/PlannerChat';
+import { AiCommandBar } from '../planner/AiCommandBar';
 import { useState, useCallback, Suspense } from 'react';
 import {
   CalendarRange,
@@ -278,6 +279,7 @@ export const BudgetGenieAI = () => {
             <main className="min-h-0 flex-1 overflow-y-auto !p-0">
               <div className="mx-auto max-w-[1600px] space-y-6 p-4 pb-20">
                 <TabsContent value="overview" className="mt-0 space-y-6">
+                  <AiCommandBar />
                   <div id="hero-charts-anchor">
                     <PlanCanvas onOpenChannels={() => selectTab('channels')} />
                   </div>
