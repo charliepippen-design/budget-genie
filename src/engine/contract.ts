@@ -21,7 +21,14 @@ import type { Vertical } from '@/lib/vertical-presets';
 import type { PlanEconomics } from '@/lib/plan-economics';
 import type { RoasPair } from '@/lib/roas-pair';
 import type { LtvCurvePoint } from '@/lib/ltv-model';
-import type { EfficiencyAlert, MetricIntegrityIssue, ScenarioEnvelopePoint } from '@/lib/planning-insights';
+import type {
+  BudgetUtilizationPoint,
+  ChannelGroup,
+  EfficiencyAlert,
+  MetricIntegrityIssue,
+  ScenarioEnvelopePoint,
+} from '@/lib/planning-insights';
+import type { IgamingRevenueMonthValues } from '@/lib/igaming-revenue-model';
 
 // ========== INPUT ==========
 
@@ -61,6 +68,31 @@ export interface EngineTotals extends BlendedMetrics {
   overBudgetBy: number;
   /** Budget left unspent (0 or more). */
   unallocated: number;
+  /** Sum of active prices on channels in the fixed tier only (the budget slider's floor). */
+  fixedTierSpend: number;
+  /** Sum of every channel's `spendSharePct`: 100 when anything is spent, else 0. */
+  spendShareTotalPct: number;
+}
+
+/** Per-channel figures shown next to a channel, keyed by channel id in `EngineResult.channelInsights`. */
+export interface EngineChannelInsight {
+  /** Share of total plan spend, 0-100 (0 when nothing is spent). */
+  spendSharePct: number;
+  /** Months of net value per customer needed to repay the CPA; null when it cannot be computed. */
+  paybackMonths: number | null;
+  /** Active and spending above 90% of its saturation ceiling. */
+  nearSaturation: boolean;
+  /** Spend as a % of the saturation ceiling, rounded and capped at 100; null without a ceiling. */
+  saturationPct: number | null;
+}
+
+/** Spend and return grouped by channel family (organic, paid, affiliate, influencer). */
+export interface EngineChannelGroups {
+  spend: Record<ChannelGroup, number>;
+  /** Each group's spend against the budget, with an overspend / underfunded / balanced flag. */
+  utilization: BudgetUtilizationPoint[];
+  /** Spend-weighted return per group over 6 months, eroded by churn: `{ month: 'M1', Organic: 1.2, ... }`. */
+  returnTrend: Array<Record<string, number | string>>;
 }
 
 /** Value of one customer over time and when it pays back its acquisition cost. */
@@ -78,6 +110,14 @@ export interface EngineCustomerValue {
 export interface EngineAlerts {
   efficiency: EfficiencyAlert[];
   integrity: MetricIntegrityIssue[];
+  /** Ids of active, spending channels returning less than they cost (return < 1x), in input order. */
+  belowBreakEven: string[];
+  /** Total spend of the `belowBreakEven` channels. */
+  wastedSpend: number;
+  /** The first `belowBreakEven` channel; null when every channel breaks even. */
+  weakestChannelId: string | null;
+  /** Ids of channels with `nearSaturation`, in input order. */
+  nearSaturation: string[];
 }
 
 export interface EngineResult {
@@ -93,6 +133,14 @@ export interface EngineResult {
   /** Bear / Base / Bull cohort scenarios. */
   scenarios: ScenarioEnvelopePoint[];
   alerts: EngineAlerts;
+  /** Per-channel figures keyed by channel id (every input channel has an entry). */
+  channelInsights: Record<string, EngineChannelInsight>;
+  groups: EngineChannelGroups;
+  /**
+   * One month of the conversion-value model (activity, gross and net revenue, contribution) for
+   * this month's conversions and spend; null when the industry has no such model (today: all but iGaming).
+   */
+  revenueModelMonth: IgamingRevenueMonthValues | null;
 }
 
 // ========== ENGINE ==========
