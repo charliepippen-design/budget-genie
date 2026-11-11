@@ -14,7 +14,7 @@ export const BudgetHero = () => {
   const { totalBudget, beginBudgetDrag, endBudgetDrag, isBudgetDragging } =
     useProjectStore();
   const { updateBudget } = useBudgetEngine();
-  const { symbol } = useCurrency();
+  const { symbol, format } = useCurrency();
   const blendedMetrics = useBlendedMetrics();
   const { totals } = usePlanResult();
   const { theme } = useTheme();
@@ -226,8 +226,8 @@ export const BudgetHero = () => {
                       : 'ring-2 ring-blue-400 bg-blue-50 text-blue-900 border-blue-400')
                 )}
               >
-                {symbol}
-                {amount / 1000}k
+                {/* Round presets read "€25k"; an odd minimum reads like the Min label: "€2,058". */}
+                {amount % 500 === 0 ? `${symbol}${amount / 1000}k` : format(amount)}
               </button>
             ))}
           </div>

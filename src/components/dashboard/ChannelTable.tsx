@@ -12,6 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
+  formatDecimal,
   formatNumber,
   formatPercentage,
   CATEGORY_INFO,
@@ -112,7 +113,7 @@ function EditableCell({
     if (value === null || value === undefined) return 'N/A';
     if (type === 'currency' && formatCurrencyFn) return formatCurrencyFn(value);
     if (type === 'percentage') return `${value.toFixed(2)}%`;
-    return `${prefix}${value.toFixed(2)}${suffix}`;
+    return `${prefix}${formatDecimal(value)}${suffix}`;
   }, [value, type, prefix, suffix, formatCurrencyFn]);
 
   const handleStartEdit = useCallback(() => {

@@ -429,7 +429,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                             isDark ? 'text-slate-200' : 'text-slate-700'
                           )}
                         >
-                          CPA ${geo.baselineCpa}
+                          CPA {format(geo.baselineCpa)}
                         </p>
                         <p
                           className={cn(
@@ -437,7 +437,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                             isDark ? 'text-slate-400' : 'text-slate-500'
                           )}
                         >
-                          LTV ${geo.baselineLtv}
+                          LTV {format(geo.baselineLtv)}
                         </p>
                       </div>
                     </button>
@@ -489,7 +489,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                           : 'border-slate-300 bg-white text-slate-600'
                       )}
                     >
-                      CPA ${effective.cpa} · LTV ${effective.ltv}
+                      CPA {format(effective.cpa)} · LTV {format(effective.ltv)}
                     </span>
                     {geoOverrides[geo.name] ? (
                       <span

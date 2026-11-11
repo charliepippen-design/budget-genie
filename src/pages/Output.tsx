@@ -269,7 +269,7 @@ const OutputContent = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.customerCountLabel}</p>
                   <p className="text-2xl font-bold text-foreground mt-1">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {blendedCpa ? `at ${$(blendedCpa)} each` : 'cost not calculable'}
@@ -593,7 +593,7 @@ const OutputContent = () => {
                         {$(c.metrics.spend)}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
-                        {Math.round(c.metrics.conversions).toLocaleString()}
+                        {Math.round(c.metrics.conversions).toLocaleString('en-US')}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
                         {c.metrics.cpa ? $(c.metrics.cpa) : '—'}
@@ -611,7 +611,7 @@ const OutputContent = () => {
                   <td className="px-4 py-3 text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-right text-foreground">{$(totalSpend)}</td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
                     {blendedCpa ? $(blendedCpa) : '—'}

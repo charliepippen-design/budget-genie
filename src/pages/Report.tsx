@@ -279,7 +279,7 @@ const ReportContent = () => {
                 <Users className="h-5 w-5" />
                 <p className="text-sm">{vc.report.customerCountLabel}</p>
               </div>
-              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString()}</p>
+              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString('en-US')}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {blendedCpa
                   ? `at ${$(blendedCpa)} per ${vc.terms.conversion.toLowerCase()}`
@@ -515,7 +515,7 @@ const ReportContent = () => {
                   </div>
                   <div>{$(c.metrics.spend)}</div>
                   <div>{pct.toFixed(1)}%</div>
-                  <div>{Math.round(c.metrics.conversions).toLocaleString()}</div>
+                  <div>{Math.round(c.metrics.conversions).toLocaleString('en-US')}</div>
                   <div>{c.metrics.cpa ? $(c.metrics.cpa) : 'N/A'}</div>
                   <div className={returnClass}>{c.metrics.roas.toFixed(2)}x</div>
                 </div>
