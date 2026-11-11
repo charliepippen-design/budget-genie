@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { CurrencyProvider, formatMoney } from '@/contexts/CurrencyContext';
 import { IGAMING_SUBVERTICAL_PRESETS } from '@/lib/igaming-revenue-model';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useOnboardingDraftStore, type WizardDraft } from '@/store/useOnboardingDraftStore';
 import { byText, cleanup, click, mount } from '@/test/mount';
 import { OnboardWizard } from './OnboardWizard';
@@ -42,6 +43,7 @@ describe('OnboardWizard', () => {
   beforeEach(() => {
     localStorage.clear();
     useOnboardingDraftStore.getState().reset();
+    useMediaPlanStore.setState({ hasCompletedOnboarding: false });
   });
   afterEach(cleanup);
 
@@ -106,4 +108,51 @@ describe('OnboardWizard', () => {
     for (const ch of channels) expect(ch.metrics.roas).toBeLessThan(15);
     expect(blended.blendedRoas).toBeLessThan(8);
   }, 10000);
+
+  it('shows the Italian AI disclosure only to Italian browsers', async () => {
+    const lang = vi.spyOn(navigator, 'language', 'get');
+    lang.mockReturnValue('en-US');
+    setDraft({ step: 6, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    let el = await render();
+    expect(el.textContent).toContain('AI replies are generated with Google Gemini');
+    expect(el.querySelector('[lang="it"]')).toBeNull();
+    await cleanup();
+
+    lang.mockReturnValue('it-IT');
+    el = await render();
+    expect(el.querySelector('[lang="it"]')?.textContent).toContain('Google Gemini');
+    lang.mockRestore();
+  });
+
+  it('does not describe the AI provider tier as the plan of the customer', async () => {
+    setDraft({ step: 6, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    const el = await render();
+    expect(el.textContent).not.toMatch(/\(free plan\)|\(piano gratuito\)/);
+    expect(el.textContent).toContain('this is not about your MediaPlanner Pro plan');
+  });
+
+  it('asks in an in-app dialog before replacing an existing plan, and Cancel keeps it', async () => {
+    const nativeConfirm = vi.spyOn(window, 'confirm');
+    useMediaPlanStore.setState({ hasCompletedOnboarding: true });
+    setDraft({ step: 6, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    const el = await render();
+    await click(byText(el, 'button', 'Build my plan →'));
+
+    const dialog = document.querySelector('[role="alertdialog"]')!;
+    expect(dialog.textContent).toContain('Replace your current media plan?');
+    expect(byText(dialog, 'button', 'Replace plan')).not.toBeNull();
+    expect(nativeConfirm).not.toHaveBeenCalled();
+
+    await click(byText(dialog, 'button', 'Cancel'));
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull();
+    expect(draft().step).toBe(6);
+    nativeConfirm.mockRestore();
+  });
+
+  it('uses the same arrow on every forward button', async () => {
+    setDraft({ step: 5, budget: 20000, vertical: 'saas', goal: 'maintain' });
+    const el = await render();
+    expect(byText(el, 'button', 'Continue →')).not.toBeNull();
+    expect(el.textContent).not.toContain('->');
+  });
 });

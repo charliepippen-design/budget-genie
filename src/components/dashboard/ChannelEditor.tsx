@@ -213,7 +213,7 @@ export function ChannelEditor({ channel, trigger }: ChannelEditorProps) {
               step={1}
               icon={<Target className="h-4 w-4" />}
               prefix={symbol}
-              suffix="per FTD"
+              suffix={`per ${vc.terms.conversion}`}
               isDark={isDark}
             />
           </motion.div>

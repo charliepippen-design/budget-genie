@@ -44,6 +44,7 @@ import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { narratorPlanFigures } from '@/lib/report-narrator';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { formatRoasPair } from '@/lib/roas-pair';
@@ -159,7 +160,7 @@ const ReportContent = () => {
   const { exporting, run: runExportTask } = useExportRunner();
   const handleExportPdf = () => {
     if (userStatus === 'demo') {
-      toast.error('Exporting requires a Pro Acquisition License.');
+      toast.error('Exporting requires the Pro plan.');
       return;
     }
     void runExportTask('PDF', () =>
@@ -251,7 +252,7 @@ const ReportContent = () => {
                 <Users className="h-5 w-5" />
                 <p className="text-sm">{vc.report.customerCountLabel}</p>
               </div>
-              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString()}</p>
+              <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString('en-US')}</p>
               <p className="mt-2 text-xs text-muted-foreground">
                 {blendedCpa
                   ? `at ${$(blendedCpa)} per ${vc.terms.conversion.toLowerCase()}`
@@ -483,11 +484,11 @@ const ReportContent = () => {
                 >
                   <div>
                     <p className="font-medium text-foreground">{c.name}</p>
-                    <span className="text-xs text-muted-foreground">{c.family}</span>
+                    <span className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</span>
                   </div>
                   <div>{$(c.metrics.spend)}</div>
                   <div>{pct.toFixed(1)}%</div>
-                  <div>{Math.round(c.metrics.conversions).toLocaleString()}</div>
+                  <div>{Math.round(c.metrics.conversions).toLocaleString('en-US')}</div>
                   <div>{c.metrics.cpa ? $(c.metrics.cpa) : 'N/A'}</div>
                   <div className={returnClass}>{c.metrics.roas.toFixed(2)}x</div>
                 </div>

@@ -263,7 +263,13 @@ export function formatNumber(value: number, compact = false): string {
       return `${(value / 1000).toFixed(1)}K`;
     }
   }
-  return new Intl.NumberFormat('de-DE').format(Math.round(value));
+  // Same grouping as formatMoney (en-US): "1,843", never "1.843".
+  return new Intl.NumberFormat('en-US').format(Math.round(value));
+}
+
+/** Two decimals with thousands grouping, for editable prices: "10,000.00". */
+export function formatDecimal(value: number): string {
+  return value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 export function formatPercentage(value: number): string {

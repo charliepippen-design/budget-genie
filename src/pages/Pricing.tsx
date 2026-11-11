@@ -1,5 +1,5 @@
 import { useUser, useAuth } from '@clerk/clerk-react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -15,18 +15,17 @@ export default function Pricing() {
   const [params] = useSearchParams();
   const { isLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const { hasActivePayment } = usePaymentStatus();
+  const { hasActivePayment, effectiveTier } = usePaymentStatus();
   const [processingTier, setProcessingTier] = useState<PaidPlanInfo['tier'] | null>(null);
 
-  // Redirect if already paid or not signed in
+  // Signed-out visitors go to sign-up (deliberate). Signed-in users, paying or not, can see the plans.
   useEffect(() => {
     if (isLoaded && !isSignedIn) {
       navigate('/sign-up');
     }
-    if (isLoaded && isSignedIn && hasActivePayment) {
-      navigate('/app');
-    }
-  }, [isLoaded, isSignedIn, hasActivePayment, navigate]);
+  }, [isLoaded, isSignedIn, navigate]);
+
+  const currentPaidTier = hasActivePayment ? effectiveTier : null;
 
   useEffect(() => {
     if (params.get('checkout') === 'cancelled') toast.info('Checkout cancelled. No charge was made.');
@@ -56,13 +55,18 @@ export default function Pricing() {
         </div>
 
         <div className="grid md:grid-cols-2 gap-8 mb-12">
-          {PAID_PLANS.map((plan, idx) => (
+          {PAID_PLANS.map((plan, idx) => {
+            // A paying customer is never offered the plan they have, or a lower one.
+            // Cards set their own light colours: this page is light whatever the app theme is.
+            const isCurrent = currentPaidTier === plan.tier;
+            const isIncluded = currentPaidTier === 'enterprise' && plan.tier === 'pro';
+            return (
             <Card
               key={plan.tier}
               className={
                 idx === 0
-                  ? 'relative border-2 border-blue-500 shadow-lg'
-                  : 'relative border-2 border-gray-200 hover:border-blue-500 transition-colors'
+                  ? 'relative border-2 border-blue-500 bg-white text-gray-900 shadow-lg'
+                  : 'relative border-2 border-gray-200 bg-white text-gray-900 hover:border-blue-500 transition-colors'
               }
             >
               {idx === 0 && (
@@ -89,16 +93,30 @@ export default function Pricing() {
                 </ul>
                 <Button
                   onClick={() => startCheckout(plan.tier)}
-                  disabled={processingTier !== null}
+                  disabled={processingTier !== null || isCurrent || isIncluded}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6"
                 >
-                  {processingTier === plan.tier ? 'Opening checkout…' : `Get ${plan.name}`}
+                  {isCurrent
+                    ? 'Current plan'
+                    : isIncluded
+                      ? 'Included in your plan'
+                      : processingTier === plan.tier
+                        ? 'Opening checkout…'
+                        : `Get ${plan.name}`}
                 </Button>
               </CardContent>
             </Card>
-          ))}
+            );
+          })}
         </div>
 
+        {currentPaidTier ? (
+          <p className="text-center mb-4">
+            <Link to="/app" className="text-sm font-semibold text-blue-700 underline">
+              Back to my plan
+            </Link>
+          </p>
+        ) : null}
         <p className="text-center text-sm text-gray-700 mb-4">
           Billed monthly. Cancel any time. 14-day money-back guarantee on your first payment.
         </p>

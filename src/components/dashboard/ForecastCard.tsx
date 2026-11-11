@@ -124,7 +124,7 @@ export const ForecastCard = () => {
               )}
             >
               {symbol}
-              {projectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {projectedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
             {ghostProjectedRevenue !== null ? (
               <div
@@ -136,7 +136,7 @@ export const ForecastCard = () => {
                 )}
               >
                 {symbol}
-                {ghostProjectedRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {ghostProjectedRevenue.toLocaleString('en-US', { maximumFractionDigits: 0 })}
               </div>
             ) : null}
           </div>
@@ -181,7 +181,7 @@ export const ForecastCard = () => {
               )}
             >
               {symbol}
-              {blendedCpa?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '--'}
+              {blendedCpa?.toLocaleString('en-US', { maximumFractionDigits: 2 }) ?? '--'}
             </div>
           </div>
 
@@ -270,7 +270,7 @@ export const ForecastCard = () => {
                 isDark ? 'text-white dark:text-white' : 'text-slate-900'
               )}
             >
-              {totalConversions.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {totalConversions.toLocaleString('en-US', { maximumFractionDigits: 0 })}
             </div>
           </div>
         </div>

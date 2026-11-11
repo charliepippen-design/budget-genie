@@ -169,7 +169,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
             </DialogTitle>
             <DialogDescription className="text-slate-300">
               {blockedGeoName ?? 'This market'} is part of the premium acquisition universe. Tier 1
-              and Tier 2 geos are reserved for Pro Acquisition operators.
+              and Tier 2 geos are reserved for the Pro plan.
             </DialogDescription>
           </DialogHeader>
           <div className="rounded-2xl border border-cyan-400/25 bg-cyan-500/10 p-4 text-sm text-slate-200">
@@ -180,7 +180,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
             className="w-full bg-gradient-to-r from-cyan-500 to-blue-600 text-white hover:from-cyan-600 hover:to-blue-700"
             onClick={() => (window.location.href = '/settings')}
           >
-            Upgrade to Pro Acquisition
+            Upgrade to Pro
           </Button>
         </DialogContent>
       </Dialog>
@@ -429,7 +429,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                             isDark ? 'text-slate-200' : 'text-slate-700'
                           )}
                         >
-                          CPA ${geo.baselineCpa}
+                          CPA {format(geo.baselineCpa)}
                         </p>
                         <p
                           className={cn(
@@ -437,7 +437,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                             isDark ? 'text-slate-400' : 'text-slate-500'
                           )}
                         >
-                          LTV ${geo.baselineLtv}
+                          LTV {format(geo.baselineLtv)}
                         </p>
                       </div>
                     </button>
@@ -489,7 +489,7 @@ export function GlobalGeoArbitrageTokenMatrix() {
                           : 'border-slate-300 bg-white text-slate-600'
                       )}
                     >
-                      CPA ${effective.cpa} · LTV ${effective.ltv}
+                      CPA {format(effective.cpa)} · LTV {format(effective.ltv)}
                     </span>
                     {geoOverrides[geo.name] ? (
                       <span

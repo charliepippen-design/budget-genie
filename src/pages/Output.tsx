@@ -25,6 +25,7 @@ import { narratorPlanFigures } from '@/lib/report-narrator';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { BUYING_MODEL_INFO, FAMILY_INFO } from '@/types/channel';
 import { useTheme } from '@/hooks/use-theme';
 import { RoasPair } from '@/components/RoasPair';
 import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
@@ -256,7 +257,7 @@ const OutputContent = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.customerCountLabel}</p>
                   <p className="text-2xl font-bold text-foreground mt-1">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </p>
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {blendedCpa ? `at ${$(blendedCpa)} each` : 'cost not calculable'}
@@ -569,18 +570,18 @@ const OutputContent = () => {
                     <tr key={c.id} className="bg-card border-b border-border">
                       <td className="px-4 py-3">
                         <p className="font-medium text-foreground">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">{c.family}</p>
+                        <p className="text-xs text-muted-foreground">{FAMILY_INFO[c.family]?.name ?? c.family}</p>
                       </td>
                       <td className="px-4 py-3">
                         <span className="bg-muted text-muted-foreground text-xs rounded px-2 py-0.5">
-                          {c.buyingModel}
+                          {BUYING_MODEL_INFO[c.buyingModel]?.name ?? c.buyingModel}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-foreground">
                         {$(c.metrics.spend)}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
-                        {Math.round(c.metrics.conversions).toLocaleString()}
+                        {Math.round(c.metrics.conversions).toLocaleString('en-US')}
                       </td>
                       <td className="px-4 py-3 text-right text-foreground">
                         {c.metrics.cpa ? $(c.metrics.cpa) : '—'}
@@ -598,7 +599,7 @@ const OutputContent = () => {
                   <td className="px-4 py-3 text-muted-foreground">—</td>
                   <td className="px-4 py-3 text-right text-foreground">{$(totalSpend)}</td>
                   <td className="px-4 py-3 text-right text-foreground">
-                    {Math.round(projectedFtds).toLocaleString()}
+                    {Math.round(projectedFtds).toLocaleString('en-US')}
                   </td>
                   <td className="px-4 py-3 text-right text-foreground">
                     {blendedCpa ? $(blendedCpa) : '—'}

@@ -1,4 +1,8 @@
 import { z } from 'zod';
+import { partializeMediaPlan } from '@/lib/media-plan/persistence';
+import type { MediaPlanData } from '@/lib/media-plan/state';
+import { partializeMultiMonth } from '@/lib/multi-month/persistence';
+import type { MultiMonthState } from '@/lib/multi-month/state';
 
 export const SAVED_PROJECTS_KEY = 'igaming_projects';
 export const SAVED_PROJECTS_BACKUP_KEY = 'igaming_projects_backup';
@@ -175,6 +179,33 @@ export function prepareProjectForLoad(
     delete multiMonthState[k];
   }
   return { ok: true, mediaPlanState, multiMonthState };
+}
+
+/** The saved plan data of a workspace as one comparable string (UI flags are not part of it). */
+function workspaceFingerprint(mediaPlan: MediaPlanData, multiMonth: MultiMonthState): string {
+  return JSON.stringify([partializeMediaPlan(mediaPlan), partializeMultiMonth(multiMonth)]);
+}
+
+/**
+ * True when the current workspace is not identical to any saved project, so loading another
+ * project would lose work. Stateless on purpose: it also holds after a page reload.
+ */
+export function hasUnsavedWork(
+  mediaPlan: MediaPlanData,
+  multiMonth: MultiMonthState,
+  projects: SavedProject[]
+): boolean {
+  const current = workspaceFingerprint(mediaPlan, multiMonth);
+  return !projects.some((project) => {
+    const prepared = prepareProjectForLoad(project);
+    return (
+      prepared.ok &&
+      workspaceFingerprint(
+        { ...mediaPlan, ...prepared.mediaPlanState },
+        { ...multiMonth, ...prepared.multiMonthState }
+      ) === current
+    );
+  });
 }
 
 export function exportProjectsJson(list: SavedProject[]): string {
