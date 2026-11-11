@@ -71,6 +71,8 @@ export const StrategicInsightsPanel = () => {
   const activeTiers = useMediaPlanStore((state) => state.activeTiers);
   const activeGeos = useMediaPlanStore((state) => state.activeGeos);
   const geoOverrides = useMediaPlanStore((state) => state.geoOverrides);
+  const onboardingVertical = useMediaPlanStore((state) => state.onboardingVertical);
+  const observedLtv = useMediaPlanStore((state) => state.observedLtv);
   const arbitrage = useMemo(
     () =>
       computeArbitrage({
@@ -80,8 +82,10 @@ export const StrategicInsightsPanel = () => {
         activeTiers,
         activeGeos,
         geoOverrides,
+        onboardingVertical,
+        observedLtv,
       }),
-    [totalBudget, storeChannels, globalMultipliers, activeTiers, activeGeos, geoOverrides]
+    [totalBudget, storeChannels, globalMultipliers, activeTiers, activeGeos, geoOverrides, onboardingVertical, observedLtv]
   );
 
   // Card 3: Market Saturation — real saturation channels

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { computeArbitrage } from '@/lib/insights/arbitrage';
-import { computePlanSnapshot, type ChannelData, type PlanInputs } from '@/hooks/use-media-plan-store';
+import { computePlanSnapshot, type ChannelData } from '@/hooks/use-media-plan-store';
+import type { EngineSource } from '@/engine/input';
 import type { BuyingModel } from '@/types/channel';
 
 function ch(
@@ -32,7 +33,7 @@ const good = (extra: Partial<ChannelData> = {}, ceiling = 0) =>
 const bad = (extra: Partial<ChannelData> = {}) =>
   ch('bad', 'CPM', 60, { ctr: 0.1, conversionRate: 1 }, 20, extra);
 
-function plan(channels: ChannelData[]): PlanInputs {
+function plan(channels: ChannelData[]): EngineSource {
   return {
     totalBudget: 100000,
     channels,
@@ -49,9 +50,11 @@ function plan(channels: ChannelData[]): PlanInputs {
       margin: 0.05,
       bonusRate: 0.3,
     },
-    activeTiers: { tier1: 100, tier2: 0, tier3: 0 } as PlanInputs['activeTiers'],
+    activeTiers: { tier1: 100, tier2: 0, tier3: 0 } as EngineSource['activeTiers'],
     activeGeos: [],
     geoOverrides: {},
+    onboardingVertical: null,
+    observedLtv: { m1: null, m3: null, m6: null },
   };
 }
 

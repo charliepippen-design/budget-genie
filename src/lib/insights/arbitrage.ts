@@ -1,9 +1,8 @@
-import {
-  computePlanSnapshot,
-  type ChannelWithMetrics,
-  type PlanInputs,
-} from '@/hooks/use-media-plan-store';
+import type { ChannelWithMetrics } from '@/hooks/use-media-plan-store';
+import { isFixedCostChannel } from '@/lib/media-plan/plan-snapshot';
 import { planReallocation } from '@/lib/insight-actions';
+import type { EngineSource } from '@/engine/input';
+import { computePlanResult } from '@/engine/use-plan-result';
 
 /** The winner must beat the loser's return on spend by at least this factor to be worth surfacing. */
 const MIN_ROAS_GAP = 1.2;
@@ -23,14 +22,6 @@ export interface ArbitrageResult {
   winnerSharePct: number;
 }
 
-function isFixedFee(channel: ChannelWithMetrics): boolean {
-  return (
-    channel.tier === 'fixed' ||
-    channel.buyingModel === 'FLAT_FEE' ||
-    channel.buyingModel === 'RETAINER'
-  );
-}
-
 /**
  * Finds the best and worst variable-spend channels by return on spend and models the plan
  * with 20% of the worst channel's allocation moved to the best one (the same move the
@@ -38,10 +29,10 @@ function isFixedFee(channel: ChannelWithMetrics): boolean {
  * winner's saturation is respected. Returns null when there is no eligible pair or the
  * modelled move does not add revenue.
  */
-export function computeArbitrage(input: PlanInputs): ArbitrageResult | null {
-  const before = computePlanSnapshot(input);
+export function computeArbitrage(input: EngineSource): ArbitrageResult | null {
+  const before = computePlanResult(input);
   const eligible = before.channels.filter(
-    (c) => c.isActive !== false && !isFixedFee(c) && c.metrics.spend > 0 && c.metrics.roas > 0
+    (c) => c.isActive !== false && !isFixedCostChannel(c) && c.metrics.spend > 0 && c.metrics.roas > 0
   );
   if (eligible.length < 2) return null;
 
@@ -58,14 +49,14 @@ export function computeArbitrage(input: PlanInputs): ArbitrageResult | null {
   );
   if (!allocations) return null;
 
-  const after = computePlanSnapshot({
+  const after = computePlanResult({
     ...input,
     channels: input.channels.map((ch) =>
       allocations[ch.id] !== undefined ? { ...ch, allocationPct: allocations[ch.id] } : ch
     ),
   });
 
-  const revenueDelta = after.blended.projectedRevenue - before.blended.projectedRevenue;
+  const revenueDelta = after.totals.projectedRevenue - before.totals.projectedRevenue;
   if (!(revenueDelta >= MIN_REVENUE_GAIN)) return null;
 
   const eligibleSpend = eligible.reduce((sum, c) => sum + c.metrics.spend, 0);
@@ -79,8 +70,8 @@ export function computeArbitrage(input: PlanInputs): ArbitrageResult | null {
     loser,
     shiftAmount,
     revenueDelta,
-    blendedRoasBefore: before.blended.blendedRoas,
-    blendedRoasAfter: after.blended.blendedRoas,
+    blendedRoasBefore: before.totals.blendedRoas,
+    blendedRoasAfter: after.totals.blendedRoas,
     winnerSharePct: eligibleSpend > 0 ? Math.round((winner.metrics.spend / eligibleSpend) * 100) : 0,
   };
 }
