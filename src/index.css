@@ -43,7 +43,7 @@
     --ring: 48 96% 64%;
 
     --radius: 0.9rem;
-    --base-font-size: 18px;
+    --base-font-size: 16px;
     --heading-scale: 1.04;
     --space-1: 0.375rem;
     --space-2: 0.75rem;
@@ -248,21 +248,20 @@
     font-size: calc(1.45rem * var(--heading-scale));
   }
 
+  /* Text and controls take the size of their container; a size set on a parent must reach them. */
   p,
-  label,
-  button,
-  input,
-  select,
-  textarea {
-    font-size: 1rem;
+  label {
     line-height: 1.6;
   }
 
-  button,
-  input,
-  select,
-  textarea {
-    min-height: 2.75rem;
+  /* Finger-sized targets on touch screens only; pointer devices keep compact controls. */
+  @media (pointer: coarse) {
+    button,
+    input,
+    select,
+    textarea {
+      min-height: 2.75rem;
+    }
   }
 
   button:focus-visible,
@@ -686,7 +685,7 @@
 
 @media (max-width: 768px) {
   :root {
-    --base-font-size: 18px;
+    --base-font-size: 16px;
   }
 
   .dashboard-theme main {

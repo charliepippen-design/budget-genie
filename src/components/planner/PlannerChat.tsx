@@ -169,6 +169,7 @@ export function PlannerChat() {
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const hasBrief = useMediaPlanStore(s => !!s.brief);
+  const hasPlan = useMediaPlanStore(s => !!s.brief || s.hasCompletedOnboarding);
   const planBudget = useMediaPlanStore(s => s.totalBudget);
   const activeChannelCount = useMediaPlanStore(s => s.channels.filter(c => c.isActive !== false).length);
   const { format: formatPlanMoney } = useCurrency();
@@ -305,10 +306,10 @@ export function PlannerChat() {
 
       <div className="flex-1 space-y-3 overflow-y-auto p-4 text-sm">
         <div className="rounded-2xl rounded-tl-none border border-slate-700 bg-slate-800 p-3 text-slate-200">
-          <RichText text={hasBrief ? planWelcome : WELCOME} />
+          <RichText text={hasPlan ? planWelcome : WELCOME} />
         </div>
 
-        {!hasBrief && (
+        {!hasPlan && (
           <div className="flex flex-wrap gap-2">
             {INDUSTRY_PACKS.map(p => (
               <button
