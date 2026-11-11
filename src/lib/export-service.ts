@@ -1,16 +1,12 @@
-import { DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 // jspdf, jspdf-autotable and exceljs are large (~1.5 MB minified together), so they are
 // loaded on demand inside the export functions instead of shipping with the dashboard.
 import type jsPDF from 'jspdf';
 import { BRAND_NAME } from './brand';
 import { ChannelWithMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
-import { BUYING_MODEL_INFO, FAMILY_INFO, calculateUnifiedMetrics } from '@/types/channel';
-import {
-  buildScenarioEnvelope,
-  getEfficiencyAlerts,
-  type ScenarioEnvelopePoint,
-} from '@/lib/planning-insights';
+import { BUYING_MODEL_INFO, FAMILY_INFO } from '@/types/channel';
+import type { ScenarioEnvelopePoint } from '@/lib/planning-insights';
+import type { EngineResult } from '@/engine/contract';
 import { type SandboxExportSnapshot } from '@/store/useSandboxStore';
 
 // ========== TYPES ==========
@@ -61,15 +57,49 @@ function safeNumber(value: number | null | undefined, fallback = 0): number {
   return value;
 }
 
+/** Summary figures of an export, read from the engine result. */
+function summaryMetrics(result: EngineResult): BlendedMetricsData {
+  const { totals } = result;
+  return {
+    totalSpend: totals.totalSpend,
+    totalConversions: totals.totalConversions,
+    blendedCpa: totals.blendedCpa,
+    projectedRevenue: totals.projectedRevenue,
+    blendedRoas: totals.blendedRoas,
+    month1Roas: result.roas.month1,
+  };
+}
+
+/** Efficiency alerts followed by data-integrity issues (listed as medium), as the exports print them. */
+function exportAlerts(result: EngineResult): ExportAlert[] {
+  return [
+    ...result.alerts.efficiency.map((alert) => ({
+      channelName: alert.channelName,
+      reason: alert.reason,
+      severity: alert.severity,
+    })),
+    ...result.alerts.integrity.map((issue) => ({
+      channelName: issue.channelName,
+      reason: issue.issue,
+      severity: 'medium' as const,
+    })),
+  ];
+}
+
 // ========== PDF EXPORT ==========
 
+/**
+ * Every number printed comes from `result`. `channels` narrows the rows (the report page lists
+ * only active, spending channels); it must be a subset of `result.channels`.
+ */
 export async function exportToPdf(
-  channels: ChannelWithMetrics[],
+  result: EngineResult,
   totalBudget: number,
-  blendedMetrics: BlendedMetricsData,
-  options: ExportOptions
+  options: ExportOptions,
+  channels: ChannelWithMetrics[] = result.channels
 ): Promise<void> {
   try {
+    const blendedMetrics = summaryMetrics(result);
     const [{ default: JsPDF }, { default: autoTable }] = await Promise.all([
       import('jspdf'),
       import('jspdf-autotable'),
@@ -184,49 +214,13 @@ export async function exportToPdf(
 // ========== CSV EXPORT ==========
 
 export function exportToCsv(
-  channels: ChannelWithMetrics[],
+  result: EngineResult,
   totalBudget: number,
-  blendedMetrics: BlendedMetricsData,
   options: ExportOptions,
-  scenarioOutputs: ScenarioEnvelopePoint[] = [],
-  efficiencyAlerts: ExportAlert[] = [],
   sandboxSnapshot: SandboxExportSnapshot | null = null
 ): void {
   try {
-    const fallbackScenarios =
-      scenarioOutputs.length > 0
-        ? scenarioOutputs
-        : buildScenarioEnvelope({
-            baseLtvPerUser: blendedMetrics.blendedCpa
-              ? blendedMetrics.blendedCpa * blendedMetrics.blendedRoas
-              : 0,
-            conversions: blendedMetrics.totalConversions,
-            cpa: blendedMetrics.blendedCpa ?? 0,
-            assumptions: {
-              churnRate: DEFAULT_CHURN_RATE,
-              cpaMultiplier: 1,
-              roasMultiplier: 1,
-            },
-          });
-
-    const fallbackAlerts =
-      efficiencyAlerts.length > 0
-        ? efficiencyAlerts
-        : getEfficiencyAlerts(channels).map((alert) => ({
-            channelName: alert.channelName,
-            reason: alert.reason,
-            severity: alert.severity,
-          }));
-
-    const csvContent = buildCsvContent(
-      channels,
-      totalBudget,
-      blendedMetrics,
-      options,
-      fallbackScenarios,
-      fallbackAlerts,
-      sandboxSnapshot
-    );
+    const csvContent = buildCsvFromResult(result, totalBudget, options, sandboxSnapshot);
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
@@ -241,6 +235,24 @@ export function exportToCsv(
     console.error('CSV Export Error:', error);
     throw new Error('Failed to generate CSV. Please try again.');
   }
+}
+
+/** The CSV for an engine result: all channels, its scenarios and its alerts. */
+export function buildCsvFromResult(
+  result: EngineResult,
+  totalBudget: number,
+  options: ExportOptions,
+  sandboxSnapshot: SandboxExportSnapshot | null = null
+): string {
+  return buildCsvContent(
+    result.channels,
+    totalBudget,
+    summaryMetrics(result),
+    options,
+    result.scenarios,
+    exportAlerts(result),
+    sandboxSnapshot
+  );
 }
 
 export function buildCsvContent(
@@ -377,34 +389,15 @@ export function buildCsvContent(
 }
 
 export async function exportToExcel(
-  channels: ChannelWithMetrics[],
+  result: EngineResult,
   totalBudget: number,
-  blendedMetrics: BlendedMetricsData,
-  scenarioOutputs: ScenarioEnvelopePoint[] = [],
-  efficiencyAlerts: ExportAlert[] = [],
   sandboxSnapshot: SandboxExportSnapshot | null = null
 ): Promise<void> {
   try {
-    const scenarios =
-      scenarioOutputs.length > 0
-        ? scenarioOutputs
-        : buildScenarioEnvelope({
-            baseLtvPerUser: blendedMetrics.blendedCpa
-              ? blendedMetrics.blendedCpa * blendedMetrics.blendedRoas
-              : 0,
-            conversions: blendedMetrics.totalConversions,
-            cpa: blendedMetrics.blendedCpa ?? 0,
-            assumptions: { churnRate: DEFAULT_CHURN_RATE, cpaMultiplier: 1, roasMultiplier: 1 },
-          });
-
-    const alerts =
-      efficiencyAlerts.length > 0
-        ? efficiencyAlerts
-        : getEfficiencyAlerts(channels).map((a) => ({
-            channelName: a.channelName,
-            reason: a.reason,
-            severity: a.severity,
-          }));
+    const channels = result.channels;
+    const blendedMetrics = summaryMetrics(result);
+    const scenarios = result.scenarios;
+    const alerts = exportAlerts(result);
 
     const { default: ExcelJS } = await import('exceljs');
     const workbook = new ExcelJS.Workbook();
@@ -428,13 +421,12 @@ export async function exportToExcel(
     ];
     alloc.getRow(1).font = { bold: true };
     // Share of what is actually spent (stored allocation weights don't include fixed fees).
-    const allocSpend = channels.reduce((sum, ch) => sum + safeNumber(ch.metrics.spend), 0);
     channels.forEach((ch) => {
       alloc.addRow({
         Channel: ch.name,
         Family: safeFamilyName(ch.family),
         BuyingModel: safeBuyingModelName(ch.buyingModel),
-        AllocationPct: allocSpend > 0 ? safeNumber(ch.metrics.spend) / allocSpend : 0,
+        AllocationPct: safeNumber(result.channelInsights[ch.id]?.spendSharePct) / 100,
         Spend: Number(safeNumber(ch.metrics.spend).toFixed(4)),
         Impressions: Math.round(safeNumber(ch.metrics.impressions)),
         Clicks: Math.round(safeNumber(ch.metrics.clicks)),
@@ -598,7 +590,7 @@ interface EnterpriseExportPayload {
 }
 
 export function exportEnterpriseConfigJson(
-  channels: ChannelWithMetrics[],
+  result: EngineResult,
   totalBudget: number,
   globalMultipliers: Pick<GlobalMultipliers, 'cpaTarget' | 'roasTarget'>,
   planName = `${BRAND_NAME} Plan`
@@ -610,7 +602,7 @@ export function exportEnterpriseConfigJson(
     total_budget: Number(totalBudget.toFixed(2)),
     target_cpa: globalMultipliers.cpaTarget ?? null,
     target_roas: globalMultipliers.roasTarget ?? null,
-    campaign_allocation: channels.map((channel) => ({
+    campaign_allocation: result.channels.map((channel) => ({
       channel_id: channel.id,
       channel_name: channel.name,
       category: channel.category,

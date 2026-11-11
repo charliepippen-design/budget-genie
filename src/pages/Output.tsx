@@ -20,7 +20,8 @@ import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { StrategicSummary } from '@/components/StrategicSummary';
-import { formatLtvToCac, getEfficiencyAlerts } from '@/lib/planning-insights';
+import { formatLtvToCac } from '@/lib/planning-insights';
+import { narratorPlanFigures } from '@/lib/report-narrator';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
@@ -45,7 +46,8 @@ const OutputContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
-  const { alerts: alertsResult, channelInsights } = usePlanResult();
+  const planResult = usePlanResult();
+  const { alerts: alertsResult, channelInsights } = planResult;
   const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -77,16 +79,12 @@ const OutputContent = () => {
   const isProfit = netPnl >= 0;
 
   const topChannel = useMemo(
-    () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
-    [active]
+    () => active.find((c) => c.id === planResult.strongestChannelId),
+    [active, planResult.strongestChannelId]
   );
 
-  const weakestChannel = useMemo(
-    () => active.find((c) => c.id === alertsResult.weakestChannelId) ?? null,
-    [active, alertsResult.weakestChannelId]
-  );
-
-  const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
+  // Alerts over active, spending channels (the dashboard's list also weighs idle channels).
+  const alerts = alertsResult.efficiencyActive;
 
   const pieData = useMemo(
     () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
@@ -109,18 +107,8 @@ const OutputContent = () => {
   // ─── AI narrative ────────────────────────────────────────────────────────
 
   const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    ...narratorPlanFigures(planResult),
     totalBudget,
-    totalSpend,
-    projectedRevenue,
-    projectedFtds,
-    blendedCpa,
-    blendedRoas,
-    month1Roas: roasPair.month1,
-    paybackMonths,
-    topChannel: topChannel?.name ?? 'Unknown',
-    weakestChannel: weakestChannel?.name ?? null,
-    scenarioBase: scenarioEnvelope[1],
-    alertCount: alerts.length,
     vertical: vc.vertical,
     geos: activeGeos,
     currency: code,

@@ -39,13 +39,9 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
-import {
-  getEfficiencyAlerts,
-  buildRoasTrendData,
-  GROUP_COLORS,
-  formatLtvToCac,
-} from '@/lib/planning-insights';
+import { GROUP_COLORS, formatLtvToCac } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
+import { narratorPlanFigures } from '@/lib/report-narrator';
 import { NarrativePrompt } from '@/components/NarrativePrompt';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { useTheme } from '@/hooks/use-theme';
@@ -66,7 +62,8 @@ const PIE_COLORS = [
 const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
-  const { alerts: alertsResult, channelInsights, groups } = usePlanResult();
+  const planResult = usePlanResult();
+  const { alerts: alertsResult, channelInsights, groups } = planResult;
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -93,8 +90,8 @@ const ReportContent = () => {
   const isProfit = netPnl >= 0;
 
   const topChannel = useMemo(
-    () => [...active].sort((a, b) => b.metrics.roas - a.metrics.roas)[0],
-    [active]
+    () => active.find((c) => c.id === planResult.strongestChannelId),
+    [active, planResult.strongestChannelId]
   );
 
   const weakestChannel = useMemo(
@@ -102,14 +99,12 @@ const ReportContent = () => {
     [active, alertsResult.weakestChannelId]
   );
 
-  const roasTrend = useMemo(
-    () => buildRoasTrendData(active, { churnRate: 0.042, cpaMultiplier: 1, roasMultiplier: 1 }, 6),
-    [active]
-  );
+  const roasTrend = groups.reportReturnTrend;
 
   const groupSpend = groups.spend;
 
-  const alerts = useMemo(() => getEfficiencyAlerts(active), [active]);
+  // Alerts over active, spending channels (the dashboard's list also weighs idle channels).
+  const alerts = alertsResult.efficiencyActive;
 
   const pieData = useMemo(
     () => active.map((c) => ({ id: c.id, name: c.name, value: c.metrics.spend })),
@@ -117,18 +112,8 @@ const ReportContent = () => {
   );
 
   const { narrative, loading: narrativeLoading, error: narrativeError, generate } = useReportNarrative({
+    ...narratorPlanFigures(planResult),
     totalBudget,
-    totalSpend,
-    projectedRevenue,
-    projectedFtds,
-    blendedCpa,
-    blendedRoas,
-    month1Roas: roasPair.month1,
-    paybackMonths,
-    topChannel: topChannel?.name ?? 'Unknown',
-    weakestChannel: weakestChannel?.name ?? null,
-    scenarioBase: scenarioEnvelope[1],
-    alertCount: alerts.length,
     vertical: vc.vertical,
     geos: activeGeos,
     currency: code,
@@ -158,8 +143,8 @@ const ReportContent = () => {
         ? 'text-amber-400'
         : 'text-red-400';
 
-  const revenueVsSpendWidth =
-    totalSpend > 0 ? Math.min(100, (projectedRevenue / totalSpend) * 50) : 0;
+  // Bar scale: a 2x lifetime return fills the track.
+  const revenueVsSpendWidth = Math.min(100, blendedRoas * 50);
 
   const sortedActiveBySpend = useMemo(
     () => [...active].sort((a, b) => b.metrics.spend - a.metrics.spend),
@@ -178,19 +163,7 @@ const ReportContent = () => {
       return;
     }
     void runExportTask('PDF', () =>
-      exportToPdf(
-        active,
-        totalBudget,
-        {
-          totalSpend,
-          totalConversions: projectedFtds,
-          blendedCpa,
-          projectedRevenue,
-          blendedRoas,
-          month1Roas: roasPair.month1,
-        },
-        { currencySymbol: symbol, formatCurrency: format }
-      )
+      exportToPdf(planResult, totalBudget, { currencySymbol: symbol, formatCurrency: format }, active)
     );
   };
 
