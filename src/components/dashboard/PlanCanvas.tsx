@@ -130,110 +130,115 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
             })}
           </div>
 
-          <div
-            className={cn(
-              'hidden grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_3.5rem_5rem_4rem_3.5rem_4.5rem] items-center gap-3 px-1 pb-1 md:grid',
-              headClass
-            )}
-          >
-            <span>Channel</span>
-            <span>Rebalance</span>
-            <span className="text-right">Share</span>
-            <span className="text-right">Spend</span>
-            <span className="text-right">{vc.terms.conversionPlural}</span>
-            <span className="text-right">ROAS</span>
-            <span className="text-right">On / lock</span>
-          </div>
+          {/* Narrow panels scroll the table sideways instead of squeezing its columns. */}
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px]">
+              <div
+                className={cn(
+                  'grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_3.5rem_5rem_4rem_3.5rem_4.5rem] items-center gap-3 px-1 pb-1',
+                  headClass
+                )}
+              >
+                <span>Channel</span>
+                <span>Rebalance</span>
+                <span className="text-right">Share</span>
+                <span className="text-right">Spend</span>
+                <span className="text-right">{vc.terms.conversionPlural}</span>
+                <span className="text-right">ROAS</span>
+                <span className="text-right">On / lock</span>
+              </div>
 
-          <ul className={cn('divide-y', isDark ? 'divide-slate-800' : 'divide-slate-200')}>
-            {channels.map((channel, index) => {
-              const insight = channelInsights[channel.id];
-              const fixed = isFixedCostChannel(channel);
-              const active = channel.isActive !== false;
-              const roas = channel.metrics.roas;
-              const roasClass = !active
-                ? mutedClass
-                : roas < 1
-                  ? 'text-rose-400'
-                  : roasTarget && roas >= roasTarget
-                    ? 'text-emerald-400'
-                    : isDark
-                      ? 'text-slate-200'
-                      : 'text-slate-800';
-              return (
-                <li
-                  key={channel.id}
-                  className={cn(
-                    'grid grid-cols-2 items-center gap-x-3 gap-y-1 px-1 py-2 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_3.5rem_5rem_4rem_3.5rem_4.5rem]',
-                    !active && 'opacity-50'
-                  )}
-                >
-                  <div className="col-span-2 flex min-w-0 items-center gap-2 md:col-span-1">
-                    <span
-                      className="h-2.5 w-2.5 shrink-0 rounded-full"
-                      style={{ backgroundColor: colorOf(index) }}
-                      aria-hidden
-                    />
-                    <span className="truncate text-sm font-medium leading-5" title={channel.name}>
-                      {channel.name}
-                    </span>
-                  </div>
-
-                  <div className="col-span-2 md:col-span-1">
-                    {fixed ? (
-                      <span className={cn('whitespace-nowrap text-xs', mutedClass)}>
-                        Fixed {format(channel.typeConfig.price)}/mo
-                      </span>
-                    ) : (
-                      <Slider
-                        value={[channel.allocationPct]}
-                        min={0}
-                        max={100}
-                        step={0.5}
-                        disabled={!active || channel.locked}
-                        onValueChange={([value]) => setChannelAllocation(channel.id, value)}
-                        aria-label={`${channel.name} share of variable budget`}
-                      />
-                    )}
-                  </div>
-
-                  <span className="text-right text-sm tabular-nums leading-5">
-                    {(insight?.spendSharePct ?? 0).toFixed(1)}%
-                  </span>
-                  <span className="text-right text-sm font-semibold tabular-nums leading-5">
-                    {format(channel.metrics.spend)}
-                  </span>
-                  <span className="text-right text-sm tabular-nums leading-5">
-                    {Math.round(channel.metrics.conversions).toLocaleString('en-US')}
-                  </span>
-                  <span className={cn('text-right text-sm font-semibold tabular-nums leading-5', roasClass)}>
-                    {active ? `${roas.toFixed(2)}x` : 'off'}
-                  </span>
-                  <div className="flex items-center justify-end gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => toggleChannelLock(channel.id)}
-                      disabled={fixed}
-                      aria-label={`${channel.locked ? 'Unlock' : 'Lock'} ${channel.name}`}
-                      title={channel.locked ? 'Locked: other sliders will not change it' : 'Lock this share'}
+              <ul className={cn('divide-y', isDark ? 'divide-slate-800' : 'divide-slate-200')}>
+                {channels.map((channel, index) => {
+                  const insight = channelInsights[channel.id];
+                  const fixed = isFixedCostChannel(channel);
+                  const active = channel.isActive !== false;
+                  const roas = channel.metrics.roas;
+                  const roasClass = !active
+                    ? mutedClass
+                    : roas < 1
+                      ? 'text-rose-400'
+                      : roasTarget && roas >= roasTarget
+                        ? 'text-emerald-400'
+                        : isDark
+                          ? 'text-slate-200'
+                          : 'text-slate-800';
+                  return (
+                    <li
+                      key={channel.id}
                       className={cn(
-                        'min-h-0 rounded p-1 disabled:opacity-30',
-                        channel.locked ? 'text-amber-400' : mutedClass
+                        'grid grid-cols-[minmax(0,1.6fr)_minmax(0,1.4fr)_3.5rem_5rem_4rem_3.5rem_4.5rem] items-center gap-x-3 px-1 py-2',
+                        !active && 'opacity-50'
                       )}
                     >
-                      {channel.locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
-                    </button>
-                    <Switch
-                      checked={active}
-                      onCheckedChange={() => toggleChannelActive(channel.id)}
-                      aria-label={`${active ? 'Turn off' : 'Turn on'} ${channel.name}`}
-                      className="min-h-0"
-                    />
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
+                      <div className="flex min-w-0 items-center gap-2">
+                        <span
+                          className="h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: colorOf(index) }}
+                          aria-hidden
+                        />
+                        <span className="truncate text-sm font-medium leading-5" title={channel.name}>
+                          {channel.name}
+                        </span>
+                      </div>
+
+                      <div>
+                        {fixed ? (
+                          <span className={cn('whitespace-nowrap text-xs', mutedClass)}>
+                            Fixed {format(channel.typeConfig.price)}/mo
+                          </span>
+                        ) : (
+                          <Slider
+                            value={[channel.allocationPct]}
+                            min={0}
+                            max={100}
+                            step={0.5}
+                            disabled={!active || channel.locked}
+                            onValueChange={([value]) => setChannelAllocation(channel.id, value)}
+                            aria-label={`${channel.name} share of variable budget`}
+                          />
+                        )}
+                      </div>
+
+                      <span className="text-right text-sm tabular-nums leading-5">
+                        {(insight?.spendSharePct ?? 0).toFixed(1)}%
+                      </span>
+                      <span className="text-right text-sm font-semibold tabular-nums leading-5">
+                        {format(channel.metrics.spend)}
+                      </span>
+                      <span className="text-right text-sm tabular-nums leading-5">
+                        {Math.round(channel.metrics.conversions).toLocaleString('en-US')}
+                      </span>
+                      <span className={cn('text-right text-sm font-semibold tabular-nums leading-5', roasClass)}>
+                        {active ? `${roas.toFixed(2)}x` : 'off'}
+                      </span>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleChannelLock(channel.id)}
+                          disabled={fixed}
+                          aria-label={`${channel.locked ? 'Unlock' : 'Lock'} ${channel.name}`}
+                          title={channel.locked ? 'Locked: other sliders will not change it' : 'Lock this share'}
+                          className={cn(
+                            'min-h-0 rounded p-1 disabled:opacity-30',
+                            channel.locked ? 'text-amber-400' : mutedClass
+                          )}
+                        >
+                          {channel.locked ? <Lock className="h-3.5 w-3.5" /> : <LockOpen className="h-3.5 w-3.5" />}
+                        </button>
+                        <Switch
+                          checked={active}
+                          onCheckedChange={() => toggleChannelActive(channel.id)}
+                          aria-label={`${active ? 'Turn off' : 'Turn on'} ${channel.name}`}
+                          className="min-h-0"
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
 
           {totals.unallocated > 1 ? (
             <p className="mt-3 text-xs leading-5 text-amber-400">

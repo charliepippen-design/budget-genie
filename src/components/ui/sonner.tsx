@@ -10,6 +10,8 @@ const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
       theme={theme as ToasterProps["theme"]}
+      // Top centre: the bottom-right corner holds the AI chat input.
+      position="top-center"
       className="toaster group"
       toastOptions={{
         classNames: {

@@ -298,7 +298,8 @@ export function PLTable() {
     <div className="space-y-4">
       <Card className="border-border">
         <CardContent className="p-0">
-          <Table>
+          {/* Many columns for iGaming: keep each figure on one line and let the table scroll sideways. */}
+          <Table className="whitespace-nowrap">
             <TableHeader>
               <TableRow>
                 <TableHead>Month</TableHead>
@@ -306,7 +307,10 @@ export function PLTable() {
                 <TableHead className="text-right">Spend</TableHead>
                 {isIgaming ? <TableHead className="text-right">Active Players</TableHead> : null}
                 <TableHead className="text-right">Revenue</TableHead>
+                {isIgaming ? <TableHead className="text-right">GGR</TableHead> : null}
+                {isIgaming ? <TableHead className="text-right">Bonus</TableHead> : null}
                 {isIgaming ? <TableHead className="text-right">NGR</TableHead> : null}
+                {isIgaming ? <TableHead className="text-right">Gross Contribution</TableHead> : null}
                 <TableHead className="text-right">Net P/L</TableHead>
                 <TableHead className="text-right">Cumulative</TableHead>
               </TableRow>
@@ -330,9 +334,25 @@ export function PLTable() {
                     {formatCurrency(month.revenue || 0, true)}
                   </TableCell>
                   {isIgaming ? (
-                    <TableCell className="text-right font-mono">
-                      {formatCurrency(month.revenueModel?.ngr || 0, true)}
-                    </TableCell>
+                    <>
+                      <TableCell className="text-right font-mono text-muted-foreground">
+                        {formatCurrency(month.revenueModel?.ggr || 0, true)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground">
+                        {formatCurrency(month.revenueModel?.bonus || 0, true)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {formatCurrency(month.revenueModel?.ngr || 0, true)}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          'text-right font-mono',
+                          (month.revenueModel?.grossContribution || 0) >= 0 ? 'text-emerald-500' : 'text-destructive'
+                        )}
+                      >
+                        {formatCurrency(month.revenueModel?.grossContribution || 0, true)}
+                      </TableCell>
+                    </>
                   ) : null}
                   <TableCell
                     className={cn(
@@ -401,95 +421,6 @@ export function PLTable() {
                     />
                   ) : null
                 )}
-                {isIgaming ? (
-                  <>
-                    <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell className="pl-4 font-medium">Active Players</TableCell>
-                      <TableCell />
-                      <TableCell colSpan={6} className="p-0">
-                        <div className="grid grid-cols-12 gap-2 px-4 py-3">
-                          {planMetrics.map((month) => (
-                            <div
-                              key={`${month.id}-active-players`}
-                              className="text-right font-mono text-sm text-muted-foreground"
-                            >
-                              {formatNumber(month.revenueModel?.activePlayers || 0)}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell className="pl-4 font-medium">GGR</TableCell>
-                      <TableCell />
-                      <TableCell colSpan={6} className="p-0">
-                        <div className="grid grid-cols-12 gap-2 px-4 py-3">
-                          {planMetrics.map((month) => (
-                            <div
-                              key={`${month.id}-ggr`}
-                              className="text-right font-mono text-sm text-muted-foreground"
-                            >
-                              {formatCurrency(month.revenueModel?.ggr || 0, true)}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell className="pl-4 font-medium">Bonus</TableCell>
-                      <TableCell />
-                      <TableCell colSpan={6} className="p-0">
-                        <div className="grid grid-cols-12 gap-2 px-4 py-3">
-                          {planMetrics.map((month) => (
-                            <div
-                              key={`${month.id}-bonus`}
-                              className="text-right font-mono text-sm text-muted-foreground"
-                            >
-                              {formatCurrency(month.revenueModel?.bonus || 0, true)}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell className="pl-4 font-medium">NGR</TableCell>
-                      <TableCell />
-                      <TableCell colSpan={6} className="p-0">
-                        <div className="grid grid-cols-12 gap-2 px-4 py-3">
-                          {planMetrics.map((month) => (
-                            <div
-                              key={`${month.id}-ngr`}
-                              className="text-right font-mono text-sm text-muted-foreground"
-                            >
-                              {formatCurrency(month.revenueModel?.ngr || 0, true)}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    <TableRow className="bg-muted/10 hover:bg-muted/10">
-                      <TableCell className="pl-4 font-medium">Gross Contribution</TableCell>
-                      <TableCell />
-                      <TableCell colSpan={6} className="p-0">
-                        <div className="grid grid-cols-12 gap-2 px-4 py-3">
-                          {planMetrics.map((month) => (
-                            <div
-                              key={`${month.id}-gross-contribution`}
-                              className={cn(
-                                'text-right font-mono text-sm',
-                                (month.revenueModel?.grossContribution || 0) >= 0
-                                  ? 'text-emerald-500'
-                                  : 'text-destructive'
-                              )}
-                            >
-                              {formatCurrency(month.revenueModel?.grossContribution || 0, true)}
-                            </div>
-                          ))}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  </>
-                ) : null}
                 {/* Summary Row */}
                 <TableRow
                   className={cn(
