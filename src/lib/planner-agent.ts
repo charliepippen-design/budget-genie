@@ -1,11 +1,12 @@
-import { computePlanSnapshot, useMediaPlanStore, type ChannelData } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { isFixedCostChannel } from '@/lib/media-plan/plan-snapshot';
+import { computePlanResult } from '@/engine/use-plan-result';
 import { DEFAULT_BRIEF, generatePlan, type PlanBrief } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, getIndustryPack, type ChannelTag, type IndustryId, type Objective, type RiskProfile } from '@/lib/industries';
 import type { AIToolCall } from '@/lib/ai-client';
 import { PRE_APPLY_BACKUP_KEY, planFingerprint, snapshotPlanBeforeApply } from '@/lib/crash-recovery';
 import { selectMarketSplit } from '@/hooks/use-media-plan-store';
 import { normalizeMarketCode } from '@/lib/geo-market-data';
-import { computePlanHealth } from '@/lib/plan-health';
 import { isIgamingVertical } from '@/lib/igaming-revenue-model';
 
 // Bridge between the AI conversation and the deterministic engine:
@@ -15,12 +16,9 @@ type Store = ReturnType<typeof useMediaPlanStore.getState>;
 
 const round = (n: number | null | undefined, d = 0) => (n == null || !isFinite(n) ? null : Number(n.toFixed(d)));
 
-const isFixed = (ch: ChannelData) => ch.tier === 'fixed' || ch.buyingModel === 'FLAT_FEE' || ch.buyingModel === 'RETAINER';
-
 export function summarizePlan(state: Store = useMediaPlanStore.getState()) {
-  const { channels, blended: b } = computePlanSnapshot(state);
-  const budget = state.totalBudget || 1;
-  const health = computePlanHealth(b, state.onboardingVertical, state.globalMultipliers);
+  // Every number below is read from the engine result; this function only rounds and names them.
+  const { channels, totals: b, economics, channelInsights } = computePlanResult(state);
   return {
     totalBudget: state.totalBudget,
     markets: state.activeGeos.length ? state.activeGeos : state.activeTiers,
@@ -29,7 +27,7 @@ export function summarizePlan(state: Store = useMediaPlanStore.getState()) {
       name: c.name,
       model: c.buyingModel,
       spend: round(c.metrics.spend),
-      sharePct: round((c.metrics.spend / budget) * 100, 1),
+      sharePct: round(channelInsights[c.id]?.budgetSharePct, 1),
       conversions: round(c.metrics.conversions, 1),
       cpa: round(c.metrics.cpa),
       roas: round(c.metrics.roas, 2),
@@ -42,14 +40,15 @@ export function summarizePlan(state: Store = useMediaPlanStore.getState()) {
       costPerConversion: round(b.blendedCpa),
       grossValue: round(b.projectedRevenue),
       roas: round(b.blendedRoas, 2),
+      sharePct: b.budgetShareTotalPct,
     },
     // Same engine check as the dashboard LossBanner; the reply must lead with it.
     profitability: {
       source: 'engine' as const,
-      losesMoney: health.losesMoney,
-      monthlyContribution: round(health.monthlyContribution) ?? 0,
-      breakEvenCpa: round(health.breakEvenCpa),
-      blendedCpa: round(health.blendedCpa),
+      losesMoney: economics.losesMoney,
+      monthlyContribution: round(economics.netValuePerMonth) ?? 0,
+      breakEvenCpa: round(economics.breakEvenCpa),
+      blendedCpa: round(economics.blendedCpa),
       netValueBasis: isIgamingVertical(state.onboardingVertical) ? ('NGR' as const) : ('revenue' as const),
     },
     warnings: state.planWarnings,
@@ -135,12 +134,11 @@ function mergeBrief(current: PlanBrief, args: Record<string, unknown>): PlanBrie
 export function setChannelShare(channelId: string, pct: number) {
   const state = useMediaPlanStore.getState();
   const target = state.channels.find(c => c.id === channelId);
-  if (!target || isFixed(target)) return false;
+  if (!target || isFixedCostChannel(target)) return false;
 
-  const budget = state.totalBudget || 1;
-  const fixedPct = state.channels.filter(c => c.isActive !== false && isFixed(c)).reduce((s, c) => s + ((c.typeConfig?.price || 0) / budget) * 100, 0);
+  const fixedPct = computePlanResult(state).totals.fixedBudgetSharePct;
   const variableTotal = Math.max(0, 100 - fixedPct);
-  const variable = state.channels.filter(c => c.isActive !== false && !isFixed(c) && c.id !== channelId);
+  const variable = state.channels.filter(c => c.isActive !== false && !isFixedCostChannel(c) && c.id !== channelId);
   const lockedPct = variable.filter(c => c.locked).reduce((s, c) => s + c.allocationPct, 0);
   const newTarget = Math.max(0, Math.min(pct, variableTotal - lockedPct));
   const others = variable.filter(c => !c.locked);
@@ -224,7 +222,7 @@ export interface PlanDiffSide {
 }
 
 function diffSide(state: Store): PlanDiffSide {
-  const { blended } = computePlanSnapshot(state);
+  const { totals: blended } = computePlanResult(state);
   const split = selectMarketSplit(state);
   return {
     totalBudget: state.totalBudget,

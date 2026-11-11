@@ -121,7 +121,11 @@ export function ToolCard({ name, response }: { name: string; response: Record<st
   const listed = [...plan.channels]
     .filter(c => c.active && (c.spend ?? 0) > 0)
     .sort((a, b) => (b.spend ?? 0) - (a.spend ?? 0));
-  const totalShare = Math.round(listed.reduce((t, c) => t + (c.sharePct ?? 0), 0) * 10) / 10;
+  // Totals are the engine's, saved with the card. Cards saved before `blended.sharePct` existed add up their own rows.
+  const totalShare =
+    typeof plan.blended?.sharePct === 'number'
+      ? plan.blended.sharePct
+      : Math.round(listed.reduce((t, c) => t + (c.sharePct ?? 0), 0) * 10) / 10;
   const totalSpend = typeof plan.blended?.spend === 'number' ? plan.blended.spend : listed.reduce((t, c) => t + (c.spend ?? 0), 0);
   return (
     <div className="mx-2 rounded-lg border border-indigo-500/30 bg-indigo-950/40 p-3 text-xs text-slate-300">
