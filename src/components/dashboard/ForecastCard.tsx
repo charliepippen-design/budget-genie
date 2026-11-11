@@ -1,17 +1,14 @@
 import React from 'react';
-import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { Target, TrendingUp, Users, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL, computeRoasPair } from '@/lib/roas-pair';
+import { LIFETIME_ROAS_LABEL, MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 
 export const ForecastCard = () => {
-  const blended = useBlendedMetrics();
-  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = blended;
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
-  const roasPair = computeRoasPair(blended, vertical, multipliers);
+  const { totals, roas: roasPair } = usePlanResult();
+  const { projectedRevenue, blendedCpa, blendedRoas, totalConversions } = totals;
   const {
     isBudgetDragging,
     budgetDragBaselineRevenue,

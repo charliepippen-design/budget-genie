@@ -1,6 +1,6 @@
 import type { BlendedMetrics, GlobalMultipliers } from '@/hooks/use-media-plan-store';
 import type { Vertical } from '@/lib/vertical-presets';
-import { computePlanEconomics } from '@/lib/plan-economics';
+import { computePlanEconomics, type PlanEconomics } from '@/lib/plan-economics';
 
 export interface PlanHealth {
   losesMoney: boolean;
@@ -13,6 +13,17 @@ export interface PlanHealth {
   cohortNetValue?: number;
 }
 
+/** Plan health read from the engine's P&L (`EngineResult.economics`): what screens should use. */
+export function planHealthFromEconomics(e: PlanEconomics): PlanHealth {
+  return {
+    losesMoney: e.losesMoney,
+    monthlyContribution: e.netValuePerMonth,
+    breakEvenCpa: e.breakEvenCpa,
+    blendedCpa: e.blendedCpa,
+    cohortNetValue: e.computable ? e.netValueCohort : undefined,
+  };
+}
+
 /**
  * Plan health for the dashboard banner: a view over computePlanEconomics, the single
  * source of the plan's P&L (see it for the period definitions).
@@ -23,12 +34,5 @@ export function computePlanHealth(
   vertical: Vertical | null | undefined,
   multipliers: GlobalMultipliers
 ): PlanHealth {
-  const e = computePlanEconomics(blended, vertical, multipliers);
-  return {
-    losesMoney: e.losesMoney,
-    monthlyContribution: e.netValuePerMonth,
-    breakEvenCpa: e.breakEvenCpa,
-    blendedCpa: e.blendedCpa,
-    cohortNetValue: e.computable ? e.netValueCohort : undefined,
-  };
+  return planHealthFromEconomics(computePlanEconomics(blended, vertical, multipliers));
 }
