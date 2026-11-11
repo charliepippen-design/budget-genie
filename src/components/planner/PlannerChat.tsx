@@ -9,6 +9,7 @@ import { useAI, aiErrorKind, aiErrorMessage, getUiLang, isFreeTierLimit, newTurn
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan, type PlanDiffSide } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
+import { usePlannerPromptStore } from '@/store/usePlannerPromptStore';
 import { UndoAiChangeButton } from './UndoAiChangeButton';
 import { PlanDiff } from './PlanDiff';
 
@@ -171,6 +172,7 @@ export function PlannerChat() {
   const callAI = useAI();
   const uiLang = getUiLang();
   const endRef = useRef<HTMLDivElement>(null);
+  const hasPendingPrompt = usePlannerPromptStore(s => s.queue.length > 0);
 
   // Phones: the panel is full-screen, so start hidden and let the user open it.
   useEffect(() => {
@@ -235,6 +237,18 @@ export function PlannerChat() {
       setBusy(false);
     }
   };
+
+  // Prompts sent from elsewhere (the AI command bar): open the chat and send them as typed
+  // messages, one at a time. While a reply is running they wait in the store.
+  useEffect(() => {
+    if (!hasPendingPrompt || busy) return;
+    const prompt = usePlannerPromptStore.getState().take();
+    if (!prompt) return;
+    setOpen(true);
+    void send(prompt);
+    // `send` is rebuilt on every render; the queue and `busy` decide when this runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasPendingPrompt, busy]);
 
   // Works without AI: builds a sensible default plan for the industry straight away.
   const quickStart = (industry: IndustryId) => {
