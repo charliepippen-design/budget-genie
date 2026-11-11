@@ -114,7 +114,7 @@ export const BudgetGenieAI = () => {
     async (formatType: 'pdf' | 'csv' | 'xlsx' | 'json') => {
       if (userStatus === 'demo') {
         toast.error(
-          'Deployment Blocked. Exporting optimized CPA and ROAS targets requires a Pro Acquisition License.'
+          'Deployment Blocked. Exporting optimized CPA and ROAS targets requires the Pro plan.'
         );
         return;
       }

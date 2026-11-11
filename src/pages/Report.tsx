@@ -174,7 +174,7 @@ const ReportContent = () => {
   const { exporting, run: runExportTask } = useExportRunner();
   const handleExportPdf = () => {
     if (userStatus === 'demo') {
-      toast.error('Exporting requires a Pro Acquisition License.');
+      toast.error('Exporting requires the Pro plan.');
       return;
     }
     void runExportTask('PDF', () =>

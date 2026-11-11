@@ -47,3 +47,34 @@ describe('Settings billing debug card', () => {
     expect(el.textContent).toContain('Billing Sync Status');
   });
 });
+
+describe('Settings plan section', () => {
+  const buttons = (el: HTMLElement) =>
+    [...el.querySelectorAll('article button')].map(
+      (b) => `${b.textContent}${(b as HTMLButtonElement).disabled ? ' (disabled)' : ''}`
+    );
+
+  it('offers a top-plan customer no upgrade and no way to downgrade locally', async () => {
+    clerk.publicMetadata = { payment_status: true, subscription_tier: 'enterprise' };
+    const el = await renderSettings();
+    expect(el.textContent).toContain('Current plan: Enterprise');
+    expect(buttons(el)).toEqual([
+      'Included in Enterprise (disabled)',
+      'Included in Enterprise (disabled)',
+      'Current plan (disabled)',
+    ]);
+    expect(el.textContent).not.toMatch(/Continue Free|Manage Plan|Upgrade to/);
+  });
+
+  it('offers a Pro customer only the Enterprise upgrade', async () => {
+    clerk.publicMetadata = { payment_status: true, subscription_tier: 'pro' };
+    const el = await renderSettings();
+    expect(buttons(el)).toEqual(['Included in Pro (disabled)', 'Current plan (disabled)', 'Upgrade to Enterprise']);
+  });
+
+  it('shows a free user their plan and both upgrades', async () => {
+    const el = await renderSettings();
+    expect(el.textContent).toContain('Current plan: Free');
+    expect(buttons(el)).toEqual(['Current plan (disabled)', 'Upgrade to Pro', 'Upgrade to Enterprise']);
+  });
+});

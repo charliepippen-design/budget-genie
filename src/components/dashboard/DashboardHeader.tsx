@@ -109,7 +109,7 @@ export function DashboardHeader({
                 Deployment Blocked
               </DialogTitle>
               <DialogDescription className="text-slate-300">
-                Exporting optimized CPA and ROAS targets requires a Pro Acquisition License.
+                Exporting optimized CPA and ROAS targets requires the Pro plan.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-2xl border border-rose-500/20 bg-rose-500/10 p-4 text-sm text-slate-200">

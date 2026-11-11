@@ -57,6 +57,7 @@ const PRICING_TIERS: Array<PlanInfo & { highlighted?: boolean }> = [
   FREE_PLAN,
   ...PAID_PLANS.map((plan, idx) => ({ ...plan, highlighted: idx === 0 })),
 ];
+const TIER_RANK: Record<SubscriptionTier, number> = { free: 0, pro: 1, enterprise: 2 };
 
 export default function Settings() {
   const navigate = useNavigate();
@@ -85,6 +86,9 @@ export default function Settings() {
   const setSubscriptionTier = useMediaPlanStore((state) => state.setSubscriptionTier);
   const { hasActivePayment, isSuperUser, effectiveTier } = usePaymentStatus();
   const pendingCheckoutKey = 'billing_pending_checkout';
+  // The plan the account really has (Clerk metadata), not the local store copy.
+  const currentTier = effectiveTier;
+  const currentPlanName = PRICING_TIERS.find((plan) => plan.tier === currentTier)?.name ?? 'Free';
 
   const trackNowPaymentsEvent = useCallback(
     (
@@ -278,33 +282,15 @@ export default function Settings() {
     tier: SubscriptionTier,
     checkoutMode: CheckoutMode = ENABLE_STRIPE_CHECKOUT ? 'card' : 'crypto'
   ) => {
-    setSelectedUpgradeTier(tier === 'free' ? 'pro' : tier);
+    // Only real upgrades open checkout: never the plan the user already has, or a lower one.
+    if (TIER_RANK[tier] <= TIER_RANK[currentTier]) return;
+    setSelectedUpgradeTier(tier);
     setUpgradeCheckoutMode(ENABLE_STRIPE_CHECKOUT ? checkoutMode : 'crypto');
     setIsUpgradeModalOpen(true);
   };
 
-  const handleTierCheckout = (tier: SubscriptionTier) => {
-    if (tier === 'free') {
-      setSubscriptionTier('free');
-      toast.success('Switched to Solo Arbitrage tier.');
-      setIsUpgradeModalOpen(false);
-      return;
-    }
-
-    setSubscriptionTier(tier);
-    toast.success(
-      tier === 'enterprise'
-        ? 'Enterprise Operator activated (demo checkout).'
-        : 'Pro Acquisition activated (demo checkout).'
-    );
-    setIsUpgradeModalOpen(false);
-  };
-
   const handleStripeCheckout = async (tier: SubscriptionTier) => {
-    if (tier === 'free') {
-      handleTierCheckout('free');
-      return;
-    }
+    if (tier === 'free') return;
 
     try {
       setIsProcessingCheckout(true);
@@ -332,10 +318,7 @@ export default function Settings() {
   };
 
   const handleCryptoCheckout = async (tier: SubscriptionTier) => {
-    if (tier === 'free') {
-      handleTierCheckout('free');
-      return;
-    }
+    if (tier === 'free') return;
 
     trackNowPaymentsEvent('open', 'upgrade_modal', tier);
     window.open(NOWPAYMENTS_CHECKOUT_URL, '_blank', 'noopener,noreferrer');
@@ -563,7 +546,7 @@ export default function Settings() {
                 <CreditCard className="h-5 w-5 text-cyan-300" />
                 <CardTitle className="text-xl text-white">Subscription Plan</CardTitle>
                 <Badge variant="outline" className="border-slate-600 text-slate-300">
-                  Current: {subscriptionTier.toUpperCase()}
+                  Current plan: {currentPlanName}
                 </Badge>
               </div>
               <CardDescription className="text-slate-400">
@@ -574,7 +557,8 @@ export default function Settings() {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                 {PRICING_TIERS.map((tier) => {
-                  const isCurrent = tier.tier === subscriptionTier;
+                  const isCurrent = tier.tier === currentTier;
+                  const isUpgrade = TIER_RANK[tier.tier] > TIER_RANK[currentTier];
 
                   return (
                     <article
@@ -614,13 +598,13 @@ export default function Settings() {
                       </ul>
 
                       <div className="mt-6">
-                        {tier.tier === 'free' ? (
+                        {!isUpgrade ? (
                           <Button
                             variant="outline"
-                            className="w-full border-slate-600 text-slate-200 hover:bg-slate-800"
-                            onClick={() => handleTierCheckout('free')}
+                            disabled
+                            className="w-full border-slate-600 text-slate-200"
                           >
-                            Continue Free
+                            {isCurrent ? 'Current plan' : `Included in ${currentPlanName}`}
                           </Button>
                         ) : (
                           <>
@@ -638,11 +622,9 @@ export default function Settings() {
                                 )
                               }
                             >
-                              {isCurrent
-                                ? 'Manage Plan'
-                                : ENABLE_STRIPE_CHECKOUT || !SHOW_CRYPTO_CHECKOUT
-                                  ? `Upgrade to ${tier.name}`
-                                  : `Upgrade with Crypto`}
+                              {ENABLE_STRIPE_CHECKOUT || !SHOW_CRYPTO_CHECKOUT
+                                ? `Upgrade to ${tier.name}`
+                                : `Upgrade with Crypto`}
                             </Button>
                             {ENABLE_STRIPE_CHECKOUT && SHOW_CRYPTO_CHECKOUT ? (
                               <Button
