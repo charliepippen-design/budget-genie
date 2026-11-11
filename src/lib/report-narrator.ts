@@ -2,6 +2,7 @@ import { aiErrorKind, generateJSON, isFreeTierLimit } from '@/lib/ai-client';
 import { z } from 'zod';
 import { CURRENCIES, formatMoney, type CurrencyCode } from '@/contexts/CurrencyContext';
 import { formatLtvToCac } from '@/lib/planning-insights';
+import type { EngineResult } from '@/engine/contract';
 
 export interface ReportNarratorInput {
   totalBudget: number;
@@ -21,7 +22,7 @@ export interface ReportNarratorInput {
   vertical: string | null;
   geos: string[];
   currency?: string; // ISO code the user plans in
-  /** Engine verdict on whether the plan makes or loses money (from computePlanHealth). */
+  /** Engine verdict on whether the plan makes or loses money (from `EngineResult.economics`). */
   profitability?: {
     losesMoney: boolean;
     monthlyContribution: number;
@@ -30,6 +31,40 @@ export interface ReportNarratorInput {
   };
   /** Vertical-specific name for projectedRevenue, e.g. 'Projected Player Value (lifetime)'. */
   revenueLabel?: string;
+}
+
+/** The plan figures of the prompt, read from the engine result. The caller adds budget, markets and currency. */
+export function narratorPlanFigures(
+  result: EngineResult
+): Pick<
+  ReportNarratorInput,
+  | 'totalSpend'
+  | 'projectedRevenue'
+  | 'projectedFtds'
+  | 'blendedCpa'
+  | 'blendedRoas'
+  | 'month1Roas'
+  | 'paybackMonths'
+  | 'topChannel'
+  | 'weakestChannel'
+  | 'scenarioBase'
+  | 'alertCount'
+> {
+  const { totals, alerts } = result;
+  const nameOf = (id: string | null) => result.channels.find((c) => c.id === id)?.name;
+  return {
+    totalSpend: totals.totalSpend,
+    projectedRevenue: totals.projectedRevenue,
+    projectedFtds: totals.totalConversions,
+    blendedCpa: totals.blendedCpa,
+    blendedRoas: totals.blendedRoas,
+    month1Roas: result.roas.month1,
+    paybackMonths: result.customerValue.paybackMonth,
+    topChannel: nameOf(result.strongestChannelId) ?? 'Unknown',
+    weakestChannel: nameOf(alerts.weakestChannelId) ?? null,
+    scenarioBase: result.scenarios[1],
+    alertCount: alerts.efficiencyActive.length,
+  };
 }
 
 const NarrativeSchema = z.object({

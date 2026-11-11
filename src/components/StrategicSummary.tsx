@@ -1,13 +1,11 @@
-import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
-import { computePlanHealth } from '@/lib/plan-health';
+import { usePlanResult } from '@/hooks/use-media-plan-store';
+import { planHealthFromEconomics } from '@/lib/plan-health';
 import { buildStrategySummary, type StrategySummaryInput } from '@/lib/strategy-summary';
 
 /** Engine-based fallback for the Output "Strategic Approach" section. Not AI-generated. */
 export function StrategicSummary(props: StrategySummaryInput) {
-  const blended = useBlendedMetrics();
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  const multipliers = useMediaPlanStore((s) => s.globalMultipliers);
-  const health = props.health ?? computePlanHealth(blended, vertical, multipliers);
+  const { economics } = usePlanResult();
+  const health = props.health ?? planHealthFromEconomics(economics);
   return (
     <>
       <div className="border-l-4 border-primary pl-6 py-2">

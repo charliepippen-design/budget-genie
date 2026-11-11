@@ -1,6 +1,5 @@
-import { buildPlanScenarios, DEFAULT_CHURN_RATE } from '@/lib/ltv-model';
 import { PlannerChat } from '../planner/PlannerChat';
-import { useState, useMemo, useCallback, Suspense } from 'react';
+import { useState, useCallback, Suspense } from 'react';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
@@ -17,7 +16,6 @@ import { ProgressionPatternSelector } from '../multi-month/ProgressionPatternSel
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BudgetPresetKey } from '@/lib/mediaplan-data';
 import { ChartSectionSkeleton, ScenarioListSkeleton } from '@/components/common/AppSkeletons';
-import { useChannelsWithMetrics } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useTheme } from '@/hooks/use-theme';
 import { toast } from 'sonner';
@@ -32,11 +30,7 @@ import {
 } from '@/lib/export-service';
 import { useSandboxStore } from '@/store/useSandboxStore';
 import { cn } from '@/lib/utils';
-import {
-  getEfficiencyAlerts,
-  getMetricIntegrityIssues,
-} from '@/lib/planning-insights';
-import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useExportRunner } from '@/hooks/use-export-runner';
 
 const BudgetWizard = lazyWithReload(() =>
@@ -61,7 +55,8 @@ export const BudgetGenieAI = () => {
   // 1. VIEW MODEL (The Brain)
   // Connects to store, handles math, provides stable data
   const vm = useBudgetGenieViewModel();
-  const channels = useChannelsWithMetrics();
+  // Exports print the engine result, so they show the same numbers as the dashboard.
+  const planResult = usePlanResult();
   const { symbol, format } = useCurrency();
   const { theme } = useTheme();
   const { globalMultipliers, userStatus } = useMediaPlanStore();
@@ -77,36 +72,6 @@ export const BudgetGenieAI = () => {
   const [preset, setPreset] = useState<BudgetPresetKey>('custom');
   const [isBudgetWizardOpen, setIsBudgetWizardOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
-
-  // Same scenario model as the LTV lab and /report, so exports show the same numbers.
-  const playerValue = useMediaPlanStore((s) => s.globalMultipliers.playerValue);
-  const observedLtv = useMediaPlanStore((s) => s.observedLtv);
-  const scenarioOutputs = useMemo(
-    () =>
-      buildPlanScenarios(vm.blendedMetrics, {
-        playerValue,
-        blendedRoas: vm.blendedMetrics.blendedRoas,
-        churnRate: DEFAULT_CHURN_RATE,
-        observedLtv,
-      }),
-    [observedLtv, playerValue, vm.blendedMetrics]
-  );
-
-  const efficiencyAlerts = useMemo(() => {
-    const modelAlerts = getEfficiencyAlerts(channels).map((alert) => ({
-      channelName: alert.channelName,
-      reason: alert.reason,
-      severity: alert.severity,
-    }));
-
-    const integrityAlerts = getMetricIntegrityIssues(channels).map((issue) => ({
-      channelName: issue.channelName,
-      reason: issue.issue,
-      severity: 'medium' as const,
-    }));
-
-    return [...modelAlerts, ...integrityAlerts];
-  }, [channels]);
 
   const { exporting, run: runExportTask } = useExportRunner();
 
@@ -127,26 +92,18 @@ export const BudgetGenieAI = () => {
       switch (formatType) {
         case 'pdf':
           await runExportTask('PDF', () =>
-            exportToPdf(channels, vm.totalBudget, vm.blendedMetrics, exportOptions)
+            exportToPdf(planResult, vm.totalBudget, exportOptions)
           );
           return;
         case 'csv':
           await runExportTask('CSV', () =>
-            exportToCsv(
-              channels,
-              vm.totalBudget,
-              vm.blendedMetrics,
-              exportOptions,
-              scenarioOutputs,
-              efficiencyAlerts,
-              sandboxSnapshot
-            )
+            exportToCsv(planResult, vm.totalBudget, exportOptions, sandboxSnapshot)
           );
           return;
         case 'json':
           await runExportTask('JSON config', () =>
             exportEnterpriseConfigJson(
-              channels,
+              planResult,
               vm.totalBudget,
               {
                 cpaTarget: globalMultipliers.cpaTarget,
@@ -158,30 +115,20 @@ export const BudgetGenieAI = () => {
           return;
         case 'xlsx':
           await runExportTask('Excel', () =>
-            exportToExcel(
-              channels,
-              vm.totalBudget,
-              vm.blendedMetrics,
-              scenarioOutputs,
-              efficiencyAlerts,
-              sandboxSnapshot
-            )
+            exportToExcel(planResult, vm.totalBudget, sandboxSnapshot)
           );
           return;
       }
     },
     [
-      channels,
-      efficiencyAlerts,
       format,
       globalMultipliers.cpaTarget,
       globalMultipliers.roasTarget,
+      planResult,
       runExportTask,
       sandboxSnapshot,
-      scenarioOutputs,
       symbol,
       userStatus,
-      vm.blendedMetrics,
       vm.projectName,
       vm.totalBudget,
     ]
