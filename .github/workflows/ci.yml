@@ -9,7 +9,7 @@ on:
 jobs:
   check:
     name: Lint, type-check, test, build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
 
     steps:
       - name: Checkout
@@ -44,7 +44,7 @@ jobs:
           VITE_SUPABASE_ANON_KEY: stub
   e2e-prod:
     name: E2E against the production build
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,6 +56,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install chromium
       - name: Prod-build e2e
         run: npm run test:e2e:prod
