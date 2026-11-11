@@ -22,14 +22,11 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from '@/components/ui/accordion';
-import { ChannelWithMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
+import { ChannelWithMetrics, usePlanResult } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useMultiMonthMetrics } from '@/hooks/use-multi-month-store';
 import {
-  buildBudgetUtilization,
   buildChannelStackData,
-  buildGroupSpendTotals,
-  buildRoasTrendData,
   getChannelGroup,
   GROUP_COLORS,
   GROUP_LABELS,
@@ -80,7 +77,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
   const { months: multiMonthMetrics } = useMultiMonthMetrics();
   const [viewMode, setViewMode] = useState<ViewMode>('category');
   const [groupView, setGroupView] = useState<ChannelGroup | 'all'>('all');
-  const totalBudget = useMediaPlanStore((state) => state.totalBudget);
+  const { groups } = usePlanResult();
 
   const chartAxisColor = theme === 'dark' ? '#94a3b8' : '#475569';
   const chartGridColor = theme === 'dark' ? 'rgba(100,116,139,0.25)' : 'rgba(148,163,184,0.3)';
@@ -156,11 +153,8 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
     [channels]
   );
 
-  const groupTotals = useMemo(() => buildGroupSpendTotals(channels), [channels]);
-  const budgetUtilization = useMemo(
-    () => buildBudgetUtilization(channels, totalBudget),
-    [channels, totalBudget]
-  );
+  const groupTotals = groups.spend;
+  const budgetUtilization = groups.utilization;
 
   const categoryStackData = useMemo(
     () => [
@@ -182,15 +176,7 @@ export function ChartSection({ channels, categoryTotals }: ChartSectionProps) {
 
   const channelStackData = useMemo(() => buildChannelStackData(visibleChannels), [visibleChannels]);
 
-  const roasTrendData = useMemo(
-    () =>
-      buildRoasTrendData(channels, {
-        churnRate: 0.04,
-        cpaMultiplier: 1,
-        roasMultiplier: 1,
-      }),
-    [channels]
-  );
+  const roasTrendData = groups.returnTrend;
 
   const planHealthData = useMemo(
     () =>
