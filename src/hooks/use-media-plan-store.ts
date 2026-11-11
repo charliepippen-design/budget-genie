@@ -49,6 +49,7 @@ import {
   DEFAULT_MULTIPLIERS,
   createInitialChannels,
 } from '@/lib/media-plan/defaults';
+import { discardPreApplyBackup } from '@/lib/crash-recovery';
 import { calculateChannelMetricsWithGeo, getGeoMarketProfile } from '@/lib/media-plan/channel-metrics';
 import { isFixedCostChannel, computePlanSnapshot, computeCategoryTotals } from '@/lib/media-plan/plan-snapshot';
 
@@ -167,8 +168,8 @@ export interface MediaPlanState {
   brief: PlanBrief | null;
   planRationale: ChannelRationale[];
   planWarnings: string[];
-  /** `snapshot: false` when the caller already took the pre-apply snapshot for this change. */
-  applyGeneratedPlan: (plan: GeneratedPlan) => void;
+  /** `fromAi: true` only for AI tool applies, which keep their undo snapshot; any other caller drops it. */
+  applyGeneratedPlan: (plan: GeneratedPlan, opts?: { fromAi?: boolean }) => void;
 
   // Actions - Budget
   setTotalBudget: (value: number) => void;
@@ -266,9 +267,10 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       planRationale: [],
       planWarnings: [],
 
-      applyGeneratedPlan: (plan) => {
+      applyGeneratedPlan: (plan, opts) => {
         // No undo snapshot here: the wizard and onboarding use this too. AI tool applies
-        // snapshot themselves (planner-agent).
+        // snapshot themselves (planner-agent); any other rebuild makes that snapshot stale.
+        if (!opts?.fromAi) discardPreApplyBackup();
         set((state) => ({
           brief: plan.brief,
           totalBudget: Math.max(MIN_BUDGET_CAP, Math.min(GLOBAL_BUDGET_CAP, plan.totalBudget)),
@@ -690,6 +692,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       loadPreset: (name) => {
+        discardPreApplyBackup();
         set((state) => {
           const preset = state.presets.find((p) => p.name === name);
           if (!preset) return state;
@@ -713,6 +716,7 @@ export const useMediaPlanStore = create<MediaPlanState>()(
       },
 
       resetAll: () => {
+        discardPreApplyBackup();
         // "Reset to Zero" - User Request
         // We keep the channels structure so they don't have to re-add everything,
         // but we zero out the budget and targets.
