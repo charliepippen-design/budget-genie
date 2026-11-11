@@ -51,7 +51,7 @@ test('a stale Report chunk (HTML served for the old asset) shows a recoverable e
 
   await back.click();
   await expect(page).toHaveURL(/\/app$/);
-  await expect(page.getByText('Smart Strategies')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({ timeout: 20_000 });
   expect(await storedBudget(page)).toBe(BUDGET);
 });
 
@@ -60,7 +60,7 @@ test('a malformed AI reply keeps the dashboard alive', async ({ page }) => {
   await mockGateway(page, { text: { not: 'a string' }, toolCalls: 'nope', raw: 5 });
 
   await page.goto('/app');
-  await expect(page.getByText('Smart Strategies')).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible({ timeout: 20_000 });
 
   const input = page.getByPlaceholder(/Forex broker/);
   await expect(input).toBeVisible({ timeout: 10_000 });
@@ -71,7 +71,7 @@ test('a malformed AI reply keeps the dashboard alive', async ({ page }) => {
   await expect(page.getByText('CRASH DETECTED')).toHaveCount(0);
   await expect(page.getByText('Something went wrong')).toHaveCount(0);
   await expect(page.getByText('This section hit an error')).toHaveCount(0);
-  await expect(page.getByText('Smart Strategies')).toBeVisible();
+  await expect(page.getByRole('tab', { name: 'Overview' })).toBeVisible();
   expect(await storedBudget(page)).toBe(BUDGET);
 });
 
