@@ -1,6 +1,14 @@
 import { PlannerChat } from '../planner/PlannerChat';
 import { useState, useCallback, Suspense } from 'react';
-import { CalendarRange, FlaskConical, GitCompare, Globe2, LayoutDashboard, Table2 } from 'lucide-react';
+import {
+  CalendarRange,
+  FlaskConical,
+  GitCompare,
+  Globe2,
+  LayoutDashboard,
+  Settings2,
+  Table2,
+} from 'lucide-react';
 import { SectionErrorBoundary } from '@/components/common/SectionErrorBoundary';
 import { lazyWithReload } from '@/lib/lazy-with-reload';
 import { useBudgetGenieViewModel } from '@/hooks/use-budget-genie-view-model';
@@ -8,7 +16,7 @@ import { SettingsConsole } from './SettingsConsole';
 import { DashboardHeader } from './DashboardHeader';
 import { EfficiencyAlertBanner } from './EfficiencyAlertBanner';
 import { OverBudgetBanner } from './OverBudgetBanner';
-import { BudgetHero } from './BudgetHero';
+import { PlanCanvas } from './PlanCanvas';
 import { PlanKpiBar } from './PlanKpiBar';
 import { ChannelTable } from './ChannelTable';
 import { MonthConfigPanel } from '../multi-month/MonthConfigPanel';
@@ -85,10 +93,9 @@ export const BudgetGenieAI = () => {
 
   // 2. UI STATE (The Skin)
   // Purely presentational state
-  // On phones/tablets the settings drawer covers the dashboard, so start closed there.
-  const [isSidebarOpen, setIsSidebarOpen] = useState(
-    () => typeof window === 'undefined' || window.innerWidth >= 1024
-  );
+  // Assumptions drawer (targets, multipliers, channel list). Closed by default: the workspace
+  // tabs hold the everyday controls, so the plan gets the width.
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [tab, setTab] = useState<WorkspaceTab>(readSavedTab);
   const selectTab = useCallback((value: string) => {
     setTab(value as WorkspaceTab);
@@ -196,8 +203,7 @@ export const BudgetGenieAI = () => {
           className={cn(
             'fixed inset-y-0 left-0 z-50 w-80 backdrop-blur-xl border-r transform transition-transform duration-300 ease-in-out shadow-2xl',
             isDark ? 'bg-slate-950/95 border-indigo-500/10' : 'bg-white/95 border-slate-200',
-            isSidebarOpen ? 'translate-x-0' : '-translate-x-full',
-            'lg:relative lg:translate-x-0'
+            isSidebarOpen ? 'translate-x-0 lg:relative' : '-translate-x-full'
           )}
         >
           <div className="h-full overflow-y-auto custom-scrollbar">
@@ -229,10 +235,27 @@ export const BudgetGenieAI = () => {
           </div>
 
           <Tabs value={tab} onValueChange={selectTab} className="flex min-h-0 flex-1 flex-col">
-            <div className="px-4 pt-3">
+            <div className="flex items-center gap-2 px-4 pt-3">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen((open) => !open)}
+                aria-pressed={isSidebarOpen}
+                title="Targets, multipliers and the channel list"
+                className={cn(
+                  'hidden h-[46px] min-h-0 shrink-0 items-center gap-2 rounded-md border px-3 text-sm font-medium transition-colors lg:flex',
+                  isSidebarOpen
+                    ? 'border-indigo-500 bg-indigo-500/15 text-indigo-300'
+                    : isDark
+                      ? 'border-slate-800 bg-slate-900 text-slate-300 hover:border-slate-600'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
+                )}
+              >
+                <Settings2 className="h-4 w-4" />
+                Assumptions
+              </button>
               <TabsList
                 className={cn(
-                  'h-auto w-full justify-start gap-1 overflow-x-auto border p-1',
+                  'h-auto min-w-0 flex-1 justify-start gap-1 overflow-x-auto border p-1',
                   isDark ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'
                 )}
               >
@@ -256,7 +279,7 @@ export const BudgetGenieAI = () => {
               <div className="mx-auto max-w-[1600px] space-y-6 p-4 pb-20">
                 <TabsContent value="overview" className="mt-0 space-y-6">
                   <div id="hero-charts-anchor">
-                    <BudgetHero />
+                    <PlanCanvas onOpenChannels={() => selectTab('channels')} />
                   </div>
                   <div id="primary-charts-anchor">
                     <Suspense fallback={<ChartSectionSkeleton />}>
