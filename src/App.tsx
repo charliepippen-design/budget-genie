@@ -22,6 +22,11 @@ import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
 import { SubscriptionAccessSync } from '@/components/common/SubscriptionAccessSync';
 import { CloudSyncBridge } from '@/components/common/CloudSyncBridge';
+import { selectEngineFromStorage } from '@/engine/registry';
+
+// Dev/QA switch, read once at startup: localStorage['mediaplan-engine'] = 'response-curve' runs
+// the app on that engine. Without the key the default engine is used. There is no UI for it.
+selectEngineFromStorage();
 
 const Landing = lazyWithReload(() => import('./pages/Landing'), 'Landing');
 const Index = lazyWithReload(() => import('./pages/Index'), 'Index');

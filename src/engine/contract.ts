@@ -31,6 +31,7 @@ import type {
 import type { IgamingRevenueMonthValues } from '@/lib/igaming-revenue-model';
 import type { TimelineInput, TimelineResult } from './timeline';
 import type { WhatIfInput, WhatIfResult } from './what-if';
+import type { OptimiseOptions, OptimiseResult } from './optimise';
 
 // ========== INPUT ==========
 
@@ -138,6 +139,42 @@ export interface EngineAlerts {
   efficiencyActive: EfficiencyAlert[];
 }
 
+/** A figure as a range: the engine believes the value is below `p10` with 10% probability, below `p50` with 50%, below `p90` with 90%. */
+export interface EngineRange {
+  p10: number;
+  p50: number;
+  p90: number;
+}
+
+/** The uncertain figures of a channel or of the whole plan, each as a range. */
+export interface EngineRangeSet {
+  conversions: EngineRange;
+  /** Lifetime value of the conversions. */
+  revenue: EngineRange;
+  /** Spend / conversions (p10 is the cheap end); null without conversions. */
+  costPerConversion: EngineRange | null;
+  /** Revenue / spend. */
+  roas: EngineRange;
+}
+
+/** A month as a range (p10 is the early end); null means "not within the engine's value horizon". */
+export interface EngineMonthRange {
+  p10: number | null;
+  p50: number | null;
+  p90: number | null;
+}
+
+/** How uncertain the plan's numbers are. Only engines that model uncertainty fill it. */
+export interface EngineRanges {
+  totals: EngineRangeSet;
+  /** Keyed by channel id (every input channel has an entry; inactive channels are zeroed). */
+  channels: Record<string, EngineRangeSet>;
+  /** Month in which cumulative value per customer covers the cost per conversion. */
+  paybackMonth: EngineMonthRange;
+  /** Plain-English statements of what the ranges assume, for screens and exports to show. */
+  assumptions: string[];
+}
+
 export interface EngineResult {
   /** Which engine produced the numbers, so screens and exports can say so. */
   engine: { id: string; version: string };
@@ -161,6 +198,8 @@ export interface EngineResult {
   revenueModelMonth: IgamingRevenueMonthValues | null;
   /** The active, spending channel with the highest return (first in input order on a tie); null when none. */
   strongestChannelId: string | null;
+  /** Ranges (P10 / P50 / P90) around the figures above; undefined when the engine gives point estimates only. */
+  ranges?: EngineRanges;
 }
 
 // ========== ENGINE ==========
@@ -174,4 +213,6 @@ export interface PlanEngine {
   computeTimeline(input: EngineInput, timeline: TimelineInput): TimelineResult;
   /** The plan under the customer-value lab's assumptions and sandbox (see what-if.ts). Pure, like `compute`. */
   computeWhatIf(input: EngineInput, whatIf: WhatIfInput): WhatIfResult;
+  /** Re-splits the budget across channels for a goal (see optimise.ts). Pure; optional. */
+  optimise?(input: EngineInput, options: OptimiseOptions): OptimiseResult;
 }

@@ -12,8 +12,9 @@ import {
   YAxis,
 } from 'recharts';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { RangeLine } from '@/components/plan/RangeLine';
 import { CURRENCIES, formatMoney } from '@/contexts/CurrencyContext';
-import { computePlanResult, type EngineResult } from '@/engine';
+import { computePlanResult, type EngineRange, type EngineResult } from '@/engine';
 import { useTheme } from '@/hooks/use-theme';
 import { getVerticalConfig } from '@/hooks/use-vertical-config';
 import { BRAND_NAME } from '@/lib/brand';
@@ -184,7 +185,7 @@ function PlanDocument({ plan, result }: { plan: SharedPlanData; result: EngineRe
   const vc = getVerticalConfig(plan.vertical);
   const money = (value: number) => formatMoney(value, plan.currency);
   const symbol = CURRENCIES[plan.currency].symbol;
-  const { totals, economics, roas, customerValue, scenarios, channelInsights } = result;
+  const { totals, economics, roas, customerValue, scenarios, channelInsights, ranges } = result;
 
   const channels = useMemo(
     () => result.channels.filter((channel) => channel.isActive !== false && channel.metrics.spend > 0),
@@ -200,16 +201,42 @@ function PlanDocument({ plan, result }: { plan: SharedPlanData; result: EngineRe
     : prepared.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
   const net = economics.computable ? economics.netValuePerMonth : null;
-  const tiles: Array<{ label: string; value: string; hint?: string; tone?: 'good' | 'bad' }> = [
+  const times = (value: number) => `${value.toFixed(2)}x`;
+  // `range` is the engine's likely range for the figure, shown under it; absent with point estimates.
+  const tiles: Array<{
+    label: string;
+    value: string;
+    hint?: string;
+    tone?: 'good' | 'bad';
+    range?: EngineRange | null;
+    rangeFormat?: (value: number) => string;
+  }> = [
     { label: 'Budget / month', value: money(plan.mediaPlanState.totalBudget) },
-    { label: vc.terms.revenueMetric, value: money(totals.projectedRevenue) },
-    { label: vc.terms.costPerConversion, value: totals.blendedCpa === null ? 'n/a' : money(totals.blendedCpa) },
+    {
+      label: vc.terms.revenueMetric,
+      value: money(totals.projectedRevenue),
+      range: ranges?.totals.revenue,
+      rangeFormat: money,
+    },
+    {
+      label: vc.terms.costPerConversion,
+      value: totals.blendedCpa === null ? 'n/a' : money(totals.blendedCpa),
+      range: totals.blendedCpa === null ? null : ranges?.totals.costPerConversion,
+      rangeFormat: money,
+    },
     {
       label: 'Lifetime ROAS',
-      value: `${roas.lifetime.toFixed(2)}x`,
-      hint: `${MONTH1_ROAS_LABEL} ${roas.month1 === null ? 'n/a' : `${roas.month1.toFixed(2)}x`}`,
+      value: times(roas.lifetime),
+      hint: `${MONTH1_ROAS_LABEL} ${roas.month1 === null ? 'n/a' : times(roas.month1)}`,
+      range: ranges?.totals.roas,
+      rangeFormat: times,
     },
-    { label: vc.terms.conversionPlural, value: whole(totals.totalConversions) },
+    {
+      label: vc.terms.conversionPlural,
+      value: whole(totals.totalConversions),
+      range: ranges?.totals.conversions,
+      rangeFormat: whole,
+    },
     {
       label: 'Net / month',
       value: net === null ? 'n/a' : money(net),
@@ -246,6 +273,9 @@ function PlanDocument({ plan, result }: { plan: SharedPlanData; result: EngineRe
             >
               {tile.value}
             </p>
+            {tile.rangeFormat ? (
+              <RangeLine range={tile.range} format={tile.rangeFormat} className="text-[11px] text-slate-400" />
+            ) : null}
             {tile.hint ? <p className="text-[11px] leading-4 text-slate-400">{tile.hint}</p> : null}
           </div>
         ))}

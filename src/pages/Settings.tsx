@@ -24,6 +24,7 @@ import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { AIConnectionCard } from '@/components/settings/AIConnectionCard';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { EngineSwitch } from '@/components/settings/EngineSwitch';
 import { useSignOut } from '@/hooks/use-sign-out';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
@@ -535,6 +536,8 @@ export default function Settings() {
             </CardContent>
           </Card>
 
+          {/* Dev / QA engine switch: renders nothing in a production build. */}
+          <EngineSwitch />
           <AIConnectionCard className="md:col-span-2" />
 
           {/* Internal billing debug card: never shown to customers. */}

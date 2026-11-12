@@ -39,6 +39,7 @@ import { Badge } from '@/components/ui/badge';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
+import { RangeLine } from '@/components/plan/RangeLine';
 import { GROUP_COLORS, formatLtvToCac } from '@/lib/planning-insights';
 import { useReportNarrative } from '@/hooks/use-report-narrative';
 import { narratorPlanFigures } from '@/lib/report-narrator';
@@ -55,7 +56,7 @@ const ReportContent = () => {
   const navigate = useNavigate();
   const vc = useVerticalConfig();
   const planResult = usePlanResult();
-  const { alerts: alertsResult, channelInsights, groups } = planResult;
+  const { alerts: alertsResult, channelInsights, groups, ranges } = planResult;
   const { totalBudget, globalMultipliers, activeGeos } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -235,6 +236,7 @@ const ReportContent = () => {
                 <p className="text-sm">{vc.report.revenueLabel}</p>
               </div>
               <p className="text-4xl font-bold text-green-400">{$(projectedRevenue)}</p>
+              <RangeLine range={ranges?.totals.revenue} format={$} className="mt-1 text-xs text-muted-foreground" />
               <RoasPair pair={roasPair} className="mt-2 text-xs text-muted-foreground" />
             </div>
 
@@ -244,6 +246,11 @@ const ReportContent = () => {
                 <p className="text-sm">{vc.report.customerCountLabel}</p>
               </div>
               <p className="text-4xl font-bold">{Math.round(projectedFtds).toLocaleString('en-US')}</p>
+              <RangeLine
+                range={ranges?.totals.conversions}
+                format={(n) => Math.round(n).toLocaleString('en-US')}
+                className="mt-1 text-xs text-muted-foreground"
+              />
               <p className="mt-2 text-xs text-muted-foreground">
                 {blendedCpa
                   ? `at ${$(blendedCpa)} per ${vc.terms.conversion.toLowerCase()}`

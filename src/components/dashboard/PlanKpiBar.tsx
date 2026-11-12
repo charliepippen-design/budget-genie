@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Pencil } from 'lucide-react';
+import { RangeLine } from '@/components/plan/RangeLine';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import {
@@ -10,6 +11,7 @@ import {
 } from '@/hooks/use-media-plan-store';
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import type { EngineRange } from '@/engine/contract';
 import { MONTH1_ROAS_LABEL } from '@/lib/roas-pair';
 import { cn } from '@/lib/utils';
 
@@ -17,7 +19,7 @@ const groupThousands = (value: number) => Math.round(value).toLocaleString('en-U
 
 /** The plan's headline numbers, always visible above the workspace tabs. The budget is editable in place. */
 export function PlanKpiBar() {
-  const { totals, economics, roas } = usePlanResult();
+  const { totals, economics, roas, ranges } = usePlanResult();
   const totalBudget = useMediaPlanStore((s) => s.totalBudget);
   const { updateBudget } = useBudgetEngine();
   const { format, symbol } = useCurrency();
@@ -44,18 +46,41 @@ export function PlanKpiBar() {
   };
 
   const net = economics.computable ? economics.netValuePerMonth : null;
-  const tiles: Array<{ label: string; value: string; hint?: string; tone?: 'good' | 'bad' }> = [
-    { label: vc.terms.revenueMetric, value: format(totals.projectedRevenue) },
+  const times = (value: number) => `${value.toFixed(2)}x`;
+  // `range` is the engine's likely range for the figure, shown under it; absent with point estimates.
+  const tiles: Array<{
+    label: string;
+    value: string;
+    hint?: string;
+    tone?: 'good' | 'bad';
+    range?: EngineRange | null;
+    rangeFormat?: (value: number) => string;
+  }> = [
+    {
+      label: vc.terms.revenueMetric,
+      value: format(totals.projectedRevenue),
+      range: ranges?.totals.revenue,
+      rangeFormat: format,
+    },
     {
       label: vc.terms.costPerConversion,
       value: totals.blendedCpa === null ? 'n/a' : format(totals.blendedCpa),
+      range: totals.blendedCpa === null ? null : ranges?.totals.costPerConversion,
+      rangeFormat: format,
     },
     {
       label: 'Lifetime ROAS',
-      value: `${roas.lifetime.toFixed(2)}x`,
-      hint: `${MONTH1_ROAS_LABEL} ${roas.month1 === null ? 'n/a' : `${roas.month1.toFixed(2)}x`}`,
+      value: times(roas.lifetime),
+      hint: `${MONTH1_ROAS_LABEL} ${roas.month1 === null ? 'n/a' : times(roas.month1)}`,
+      range: ranges?.totals.roas,
+      rangeFormat: times,
     },
-    { label: vc.terms.conversionPlural, value: groupThousands(totals.totalConversions) },
+    {
+      label: vc.terms.conversionPlural,
+      value: groupThousands(totals.totalConversions),
+      range: ranges?.totals.conversions,
+      rangeFormat: groupThousands,
+    },
     {
       label: 'Net / month',
       value: net === null ? 'n/a' : format(net),
@@ -117,6 +142,7 @@ export function PlanKpiBar() {
           >
             {tile.value}
           </p>
+          {tile.rangeFormat ? <RangeLine range={tile.range} format={tile.rangeFormat} /> : null}
           {tile.hint ? (
             <p className="truncate text-[10px] leading-4 text-slate-500">
               {tile.hint}

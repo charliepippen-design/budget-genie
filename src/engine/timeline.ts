@@ -11,6 +11,7 @@ import type {
   OptimizationGoal,
   ProgressionPattern,
 } from '@/lib/multi-month/types';
+import type { EngineRange } from './contract';
 
 // ========== INPUT ==========
 
@@ -195,4 +196,6 @@ export interface TimelineResult {
   patternBudgets: number[];
   /** The channel mix a newly generated month starts from: the single-month plan's live channels. */
   baseChannels: TimelineChannel[];
+  /** Ranges (P10 / P50 / P90) around the active timeline's period totals; undefined for point-estimate engines. */
+  ranges?: { conversions: EngineRange; revenue: EngineRange; netProfit: EngineRange; assumptions: string[] };
 }
