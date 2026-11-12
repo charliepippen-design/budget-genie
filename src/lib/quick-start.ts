@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import type { CurrencyCode } from '@/contexts/CurrencyContext';
 import { computePlanResult } from '@/engine';
-import { aiErrorMessage, generateJSON, isFreeTierLimit } from '@/lib/ai-client';
+import { aiErrorMessage, generateJSON, isSharedTrialLimit, isUserKeyError } from '@/lib/ai-client';
 import { getOnboardingMarkets, normalizeMarketCode } from '@/lib/geo-market-data';
 import { getIndustryPack, INDUSTRY_IDS, INDUSTRY_PACKS, industryToVertical, type IndustryId } from '@/lib/industries';
 import { DEFAULT_MULTIPLIERS } from '@/lib/media-plan/defaults';
@@ -138,7 +138,7 @@ Use null for anything the text does not say.`;
 
 export type QuickFillResult =
   | { ok: true; patch: Partial<QuickStartForm>; filled: QuickStartField[]; skippedMarkets: string[] }
-  | { ok: false; message: string };
+  | { ok: false; message: string; keyAction?: 'connect' | 'check' };
 
 export const QUICK_FILL_FALLBACK = 'Pick the basics below instead: the plan does not need the AI.';
 
@@ -190,10 +190,10 @@ export async function fillBriefWithAI(
     return result;
   } catch (err) {
     console.error('Quick start AI fill failed.', err);
-    const reason = isFreeTierLimit(err)
-      ? aiErrorMessage(err, 'You have used the free AI requests for now.')
-      : 'The AI is not available right now.';
-    return { ok: false, message: `${reason} ${QUICK_FILL_FALLBACK}` };
+    // A spent shared trial or a failing own key has a fix the user can make: say it and link to it.
+    const keyAction = isSharedTrialLimit(err) ? 'connect' : isUserKeyError(err) ? 'check' : undefined;
+    const reason = keyAction ? aiErrorMessage(err) : 'The AI is not available right now.';
+    return { ok: false, message: `${reason} ${QUICK_FILL_FALLBACK}`, ...(keyAction ? { keyAction } : {}) };
   }
 }
 

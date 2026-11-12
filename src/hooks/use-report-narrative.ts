@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { aiErrorKind, aiErrorMessage, isFreeTierLimit } from '@/lib/ai-client';
+import { aiErrorKind, aiErrorMessage, isFreeTierLimit, isSharedTrialLimit, isUserKeyError } from '@/lib/ai-client';
 import { getCachedNarrative, hashNarratorInput, setCachedNarrative } from '@/lib/narrative-cache';
 import {
   generateReportNarrative,
@@ -12,6 +12,10 @@ import { useVerticalConfig } from '@/hooks/use-vertical-config';
 export interface NarrativeError {
   message: string;
   limit: boolean;
+  /** The shared trial ran out: offer the user's own Gemini key. */
+  connectKey?: boolean;
+  /** The user's own Gemini key failed: point at the settings card. */
+  fixKey?: boolean;
 }
 
 /**
@@ -74,6 +78,8 @@ export function useReportNarrative(base: ReportNarratorInput) {
             ? aiErrorMessage(err)
             : 'Could not write the AI summary. Please try again.',
           limit: isFreeTierLimit(err),
+          ...(isSharedTrialLimit(err) ? { connectKey: true } : {}),
+          ...(isUserKeyError(err) ? { fixKey: true } : {}),
         });
       }
     } finally {

@@ -2,10 +2,11 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Bot, Loader2, MessageSquare, RotateCcw, Send, Sparkles, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
+import { AIDisclosureNote } from '@/components/common/AIDisclosureNote';
+import { AI_CONNECTION_HREF, maskUserAIKey, useUserAIKey } from '@/lib/user-ai-key';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { useCurrency } from '@/contexts/CurrencyContext';
-import { useAI, aiErrorKind, aiErrorMessage, getUiLang, isFreeTierLimit, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
+import { useAI, aiErrorKind, aiErrorMessage, getUiLang, isFreeTierLimit, isSharedTrialLimit, isUserKeyError, newTurnId, type AgentMessage, type AIPart, type AIToolCall } from '@/lib/ai-client';
 import { applyPlannerToolCall, buildPlannerContext, summarizePlan, type PlanDiffSide } from '@/lib/planner-agent';
 import { generatePlan } from '@/lib/plan-generator';
 import { INDUSTRY_PACKS, type IndustryId } from '@/lib/industries';
@@ -20,7 +21,8 @@ type ChatItem =
   | { kind: 'user'; text: string }
   | { kind: 'assistant'; text: string; raw?: AIPart[] }
   | { kind: 'tool'; id?: string; name: string; response: Record<string, unknown> }
-  | { kind: 'error'; text: string; upgrade?: boolean; retry?: boolean };
+  // connectKey: the shared trial ran out. fixKey: the user's own Gemini key failed.
+  | { kind: 'error'; text: string; upgrade?: boolean; retry?: boolean; connectKey?: boolean; fixKey?: boolean };
 
 const STORAGE_KEY = 'mediaplan-planner-chat-v1';
 const MAX_TOOL_ROUNDS = 4;
@@ -177,6 +179,7 @@ export function PlannerChat() {
   const planWelcome = `Your plan is on screen: **${formatPlanMoney(planBudget)}/month** across **${activeChannelCount} channels**. Tell me what to change: move budget between channels, add or drop one, change markets or the goal. I adjust the plan; the engine recalculates every number.`;
   const callAI = useAI();
   const uiLang = getUiLang();
+  const userKey = useUserAIKey();
   const endRef = useRef<HTMLDivElement>(null);
   const hasPendingPrompt = usePlannerPromptStore(s => s.queue.length > 0);
 
@@ -236,6 +239,8 @@ export function PlannerChat() {
           kind: 'error',
           text: aiErrorMessage(err),
           upgrade: isFreeTierLimit(err),
+          connectKey: isSharedTrialLimit(err),
+          fixKey: isUserKeyError(err),
           retry: aiErrorKind(err) !== 'free_tier_limit' && !/sign in/i.test(aiErrorMessage(err)),
         },
       ]);
@@ -335,11 +340,43 @@ export function PlannerChat() {
             ) : null;
           }
           if (it.kind === 'tool') return <ToolCard key={i} name={it.name} response={it.response} />;
+          if (it.connectKey) {
+            // Not a failure to fix but a limit to get past: the way forward is the user's own key.
+            return (
+              <div key={i} data-testid="byok-prompt" className="space-y-3 rounded-2xl bg-slate-900 p-4 text-sm text-slate-200">
+                <p>{it.text}</p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <a
+                    href={AI_CONNECTION_HREF}
+                    className="inline-flex h-8 items-center rounded-full bg-indigo-600 px-4 text-xs font-semibold hover:bg-indigo-500"
+                  >
+                    Connect your key
+                  </a>
+                  {(it.retry || userKey) && i === items.length - 1 && (
+                    <button
+                      type="button"
+                      onClick={retry}
+                      disabled={busy}
+                      className="text-xs font-semibold text-slate-200 underline underline-offset-2 disabled:opacity-50"
+                    >
+                      {userKey ? 'Retry with your key' : 'Retry'}
+                    </button>
+                  )}
+                  {it.upgrade && (
+                    <a href="/pricing" className="text-xs text-slate-400 underline underline-offset-2">See plans</a>
+                  )}
+                </div>
+              </div>
+            );
+          }
           return (
             <div key={i} className="rounded-lg border border-red-500/30 bg-red-950/30 p-3 text-xs text-red-300">
               ⚠ {it.text}
               {it.upgrade && (
                 <a href="/pricing" className="ml-2 font-semibold text-indigo-300 underline">See plans</a>
+              )}
+              {it.fixKey && (
+                <a href={AI_CONNECTION_HREF} className="ml-2 font-semibold text-indigo-300 underline">Check your key</a>
               )}
               {/sign in/i.test(it.text) && (
                 <a href="/auth" className="ml-2 font-semibold text-indigo-300 underline">Sign in</a>
@@ -392,12 +429,19 @@ export function PlannerChat() {
         </Button>
       </form>
       <div className="space-y-1 px-3 pb-3 text-slate-500">
-        <p className="text-[11px] leading-snug">{AI_DISCLOSURE_SHORT}</p>
-        {uiLang === 'it' && (
-          <p lang="it" className="text-[11px] leading-snug">
-            {AI_DISCLOSURE_SHORT_IT}
-          </p>
-        )}
+        <p data-testid="ai-connection-link" className="text-[11px] leading-snug text-slate-400">
+          {userKey ? (
+            <>
+              Using your Gemini key <span className="font-mono tabular-nums">{maskUserAIKey(userKey)}</span>.
+            </>
+          ) : (
+            'Using the shared AI trial.'
+          )}{' '}
+          <a href={AI_CONNECTION_HREF} className="font-semibold text-slate-200 underline underline-offset-2">
+            {userKey ? 'Manage' : 'Connect your own key'}
+          </a>
+        </p>
+        <AIDisclosureNote className="text-[11px] leading-snug" />
       </div>
     </aside>
   );
