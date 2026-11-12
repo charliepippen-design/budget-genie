@@ -1,4 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+// Several tests compare against an exhaustive search, which takes seconds on CI runners.
+vi.setConfig({ testTimeout: 60_000 });
 import type { ChannelCategory } from '@/lib/mediaplan-data';
 import { DEFAULT_MULTIPLIERS_FALLBACK } from '@/lib/media-plan/plan-snapshot';
 import type { ChannelData } from '@/lib/media-plan/types';
@@ -150,7 +153,7 @@ describe('optimiser: optimal against brute force on small plans', () => {
     expect(free.after.costPerConversion!).toBeGreaterThan(60);
     expect(free.after.conversions).toBeGreaterThan(result.after.conversions);
     expect(result.unspent).toBeGreaterThan(0);
-  });
+  }, 60_000); // exhaustive search over the grid: slow on CI runners
 
   it('equalises marginal returns: the last unit buys the same in every channel it funds', () => {
     const input = planOf(30_000, [SEARCH, SOCIAL, PARTNERS]);
