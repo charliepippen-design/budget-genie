@@ -4,8 +4,9 @@
 
 export const USER_KEY_HEADER = "x-user-ai-key";
 
-// Google API keys: "AIza" + 35 URL-safe characters (39 in total).
-const USER_KEY_RE = /^AIza[0-9A-Za-z_-]{35}$/;
+// Google has more than one key format ("AIza…", "AQ.…"), so the shape is not checked: any value
+// without spaces or control characters goes to Google, which decides. The cap bounds the header size.
+const USER_KEY_RE = /^[!-~]{1,512}$/;
 
 export type UserKeyResult = { ok: true; key: string | null } | { ok: false; message: string };
 
@@ -14,11 +15,11 @@ export function readUserKey(req: Request): UserKeyResult {
   const raw = req.headers.get(USER_KEY_HEADER);
   if (raw === null) return { ok: true, key: null };
   const key = raw.trim();
-  // The regex fixes the length, so an oversized header never gets past this line.
+  // The regex caps the length, so an oversized header never gets past this line.
   if (!USER_KEY_RE.test(key)) {
     return {
       ok: false,
-      message: "That does not look like a Gemini API key. It starts with \"AIza\" and is 39 characters long.",
+      message: "That does not look like a Gemini API key. Paste the whole key, with no spaces.",
     };
   }
   return { ok: true, key };

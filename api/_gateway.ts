@@ -40,6 +40,10 @@ const json = (body: unknown, status = 200) =>
 // ---------- Gemini ----------
 // Matches the "try again in a minute" wording of the busy message.
 const BUSY_RETRY_SECONDS = 60;
+// Time limits for Google. The function itself is cut at 60 s (vercel.json), so every call must end sooner.
+const CALL_TIMEOUT_MS = 25_000; // one call to one model
+const TOTAL_BUDGET_MS = 52_000; // all models and retries of one request
+const MIN_CALL_MS = 3_000; // less than this left: not worth starting another call
 // Google's wording for a key it does not accept (HTTP 400, reason API_KEY_INVALID).
 const INVALID_KEY_RE = /API_KEY_INVALID|API key not valid|API key expired/i;
 
@@ -55,17 +59,36 @@ async function callGemini(body: Record<string, unknown>, userKey: string | null 
   let retryAfter: number | undefined;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
   let attempted = 0;
+  let outOfTime = false;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   for (const model of geminiModels()) {
+    if (outOfTime) break;
     // The exhaustion memo describes the shared key only: a user key neither reads nor writes it.
     if (!own && isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
     attempted++;
     for (let attempt = 0; attempt < 2; attempt++) {
       const startedAt = Date.now();
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": key },
-        body: JSON.stringify(body),
-      });
+      // Never wait on Google past the function's own limit: a hung call would end as a bare 504.
+      const waitMs = Math.min(CALL_TIMEOUT_MS, deadline - startedAt);
+      if (waitMs < MIN_CALL_MS) {
+        outOfTime = true;
+        break;
+      }
+      let res: Response;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": key },
+          body: JSON.stringify(body),
+          signal: AbortSignal.timeout(waitMs),
+        });
+      } catch (err) {
+        // No answer in time (or the connection failed): the next model may still answer.
+        const reason = err instanceof Error && err.name === "TimeoutError" ? "timeout" : "network";
+        console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: reason, attempt, ...(own ? { key: "user" } : {}) });
+        errors.push(`${model}: ${reason}`);
+        break;
+      }
       console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt, ...(own ? { key: "user" } : {}) });
       if (res.ok) {
         const data = await res.json();

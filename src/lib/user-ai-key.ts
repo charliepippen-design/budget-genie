@@ -10,8 +10,9 @@ export const AI_STUDIO_KEY_URL = 'https://aistudio.google.com/apikey';
 /** Where the "AI connection" card lives; AI error prompts link here. */
 export const AI_CONNECTION_HREF = '/settings#ai-connection';
 
-// Same shape the gateway accepts (api/_user-key.ts): "AIza" + 35 URL-safe characters.
-const KEY_RE = /^AIza[0-9A-Za-z_-]{35}$/;
+// Same rule as the gateway (api/_user-key.ts): no spaces or control characters, at most 512
+// characters. Google has more than one key format, so the real test call decides if a key is valid.
+const KEY_RE = /^[!-~]{1,512}$/;
 
 export const isUserAIKeyShape = (value: string): boolean => KEY_RE.test(value.trim());
 

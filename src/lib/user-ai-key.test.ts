@@ -28,13 +28,22 @@ describe('user AI key storage', () => {
   });
 
   it('refuses a value of the wrong shape and ignores one already in storage', () => {
-    for (const bad of ['', 'AIzaShort', `${KEY}x`, `BIza${KEY.slice(4)}`, `AIza${'a b'.repeat(12)}`]) {
+    for (const bad of ['', '   ', `AIza${'a b'.repeat(12)}`, `${KEY}
+${KEY}`, 'chiave-é', 'a'.repeat(513)]) {
       expect(isUserAIKeyShape(bad)).toBe(false);
       expect(setUserAIKey(bad)).toBe(false);
     }
     expect(localStorage.getItem(USER_AI_KEY_STORAGE)).toBeNull();
-    localStorage.setItem(USER_AI_KEY_STORAGE, 'not-a-key');
+    localStorage.setItem(USER_AI_KEY_STORAGE, 'not a key');
     expect(getUserAIKey()).toBeNull();
+  });
+
+  it('accepts any Google key format: the test call decides, not the shape', () => {
+    for (const good of [KEY, `AQ.${'Ab1_-'.repeat(11)}`, `  ${KEY}  `]) {
+      expect(isUserAIKeyShape(good)).toBe(true);
+      expect(setUserAIKey(good)).toBe(true);
+      expect(getUserAIKey()).toBe(good.trim());
+    }
   });
 
   it('never throws when storage is unavailable', () => {

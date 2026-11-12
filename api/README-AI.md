@@ -33,7 +33,7 @@ Gemini calls send `generationConfig.thinkingConfig.thinkingLevel` so each round 
 
 The shared `GEMINI_API_KEY` is a small trial: one free-tier quota for all users. A signed-in user can instead send their own Google Gemini API key with each request (created at https://aistudio.google.com/apikey; it has its own quota, and billing on it is between the user and Google).
 
-**Request header:** `x-user-ai-key: <key>` (optional). Shape: `AIza` + 35 URL-safe characters. Anything else is refused with `400 user_key_malformed`; the gateway never falls back to the shared key for a request that carried a header.
+**Request header:** `x-user-ai-key: <key>` (optional). Shape: printable characters with no spaces, at most 512 (Google has more than one key format, e.g. `AIza…` and `AQ.…`, so Google decides if the key is valid). Anything else is refused with `400 user_key_malformed`; the gateway never falls back to the shared key for a request that carried a header.
 
 | | Shared key (no header) | User key (header) |
 |---|---|---|

@@ -82,11 +82,8 @@ describe('which key is sent to Google', () => {
 describe('header validation', () => {
   it.each([
     ['empty', ''],
-    ['too short', 'AIzaShort'],
-    ['one character too long', `${USER_KEY}x`],
     ['oversized', `AIza${'a'.repeat(5000)}`],
-    ['wrong prefix', `BIza${'Ab1_-'.repeat(7)}`],
-    ['not URL-safe', `AIza${'Ab1/+'.repeat(7)}`],
+    ['a space inside', `AIza${'Ab1 _'.repeat(7)}`],
     ['two values', `${USER_KEY}, ${USER_KEY}`],
   ])('refuses a malformed key (%s) with 400 and makes no upstream call', async (_name, value) => {
     const fetchMock = vi.fn(async () => ok());
@@ -104,7 +101,39 @@ describe('header validation', () => {
     const req = (key?: string) => new Request('http://x', { headers: key === undefined ? {} : { [USER_KEY_HEADER]: key } });
     expect(readUserKey(req())).toEqual({ ok: true, key: null });
     expect(readUserKey(req(USER_KEY))).toEqual({ ok: true, key: USER_KEY });
-    expect(readUserKey(req('nope')).ok).toBe(false);
+    expect(readUserKey(req('no pe')).ok).toBe(false);
+  });
+
+  it('accepts the newer Google key format ("AQ." prefix, longer) and sends it to Google', async () => {
+    const newer = `AQ.${'Ab1_-'.repeat(11)}`;
+    const fetchMock = vi.fn(async () => ok());
+    vi.stubGlobal('fetch', fetchMock);
+    expect((await jsonTask(newer)).status).toBe(200);
+    expect(sentKeys(fetchMock)).toEqual([newer]);
+  });
+});
+
+describe('Google does not answer', () => {
+  it('moves to the fallback model when a call times out, without retrying the hung model', async () => {
+    const timeout = Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' });
+    const fetchMock = vi.fn().mockImplementationOnce(async () => { throw timeout; }).mockImplementation(async () => ok());
+    vi.stubGlobal('fetch', fetchMock);
+    const res = await jsonTask(USER_KEY);
+    expect(res.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls[0]).not.toBe(urls[1]);
+    expect((fetchMock.mock.calls[0][1] as RequestInit).signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('answers "busy" with a retry hint when every model times out, and never logs the key', async () => {
+    const timeout = Object.assign(new Error('The operation timed out'), { name: 'TimeoutError' });
+    vi.stubGlobal('fetch', vi.fn(async () => { throw timeout; }));
+    const res = await jsonTask(USER_KEY);
+    expect(res.status).toBe(503);
+    const data = await res.json();
+    expect(data.code).toBe('AI_BUSY');
+    expect(JSON.stringify(logs)).not.toContain(USER_KEY);
   });
 });
 
