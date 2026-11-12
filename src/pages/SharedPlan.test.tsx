@@ -3,7 +3,8 @@ import { Helmet } from 'react-helmet';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { formatMoney } from '@/contexts/CurrencyContext';
 import { ThemeContext } from '@/contexts/theme-context';
-import { computePlanResult } from '@/engine';
+import { computePlanResult, placeholderEngine, responseCurveEngine, setEngine } from '@/engine';
+import { formatRange } from '@/lib/plan-ranges';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { buildSharePayload } from '@/lib/share-link';
 import { byText, cleanup, click, mount, tick } from '@/test/mount';
@@ -46,6 +47,7 @@ describe('SharedPlan', () => {
   beforeEach(() => localStorage.clear());
   afterEach(async () => {
     await cleanup();
+    setEngine(placeholderEngine);
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -102,6 +104,32 @@ describe('SharedPlan', () => {
     const made = byText(el, 'a', 'MediaPlanner Pro') as HTMLAnchorElement;
     expect(made.getAttribute('href')).toBe('/');
     expect(Helmet.peek().metaTags).toContainEqual({ name: 'robots', content: 'noindex' });
+    // The standard engine gives point estimates: no range under any figure.
+    expect(el.querySelectorAll('[data-testid="range-line"]')).toHaveLength(0);
+  });
+
+  it('shows the likely range under the headline figures when the engine gives ranges', async () => {
+    setEngine(responseCurveEngine);
+    vi.stubGlobal('fetch', vi.fn(async () => json(snapshot)));
+    const el = await renderShared();
+    await tick();
+
+    const { ranges } = computePlanResult(snapshot.mediaPlanState as typeof payload.mediaPlanState);
+    const gbp = (v: number) => formatMoney(v, 'GBP');
+    const lines = Object.fromEntries(
+      [...el.querySelectorAll('section[aria-label="Plan summary"] > div')].map((tile) => [
+        tile.children[0].textContent,
+        tile.querySelector('[data-testid="range-line"]')?.textContent ?? null,
+      ])
+    );
+    expect(lines).toEqual({
+      'Budget / month': null,
+      'Projected Revenue': formatRange(ranges!.totals.revenue, gbp),
+      'Cost per Order': formatRange(ranges!.totals.costPerConversion!, gbp),
+      'Lifetime ROAS': formatRange(ranges!.totals.roas, (v) => `${v.toFixed(2)}x`),
+      Orders: formatRange(ranges!.totals.conversions, (v) => Math.round(v).toLocaleString('en-US')),
+      'Net / month': null,
+    });
   });
 
   it('writes nothing to localStorage and leaves the visitor own plan untouched', async () => {

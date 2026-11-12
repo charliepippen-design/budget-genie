@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
 import { useShallow } from 'zustand/react/shallow';
 import { useMediaPlanStore, usePlanResult } from '@/hooks/use-media-plan-store';
+import { RangeLine } from '@/components/plan/RangeLine';
 import { StrategicSummary } from '@/components/StrategicSummary';
 import { formatLtvToCac } from '@/lib/planning-insights';
 import { narratorPlanFigures } from '@/lib/report-narrator';
@@ -42,7 +43,7 @@ const OutputContent = () => {
   const vc = useVerticalConfig();
   const { theme, cycleTheme } = useTheme();
   const planResult = usePlanResult();
-  const { alerts: alertsResult, channelInsights } = planResult;
+  const { alerts: alertsResult, channelInsights, ranges } = planResult;
   const { totalBudget, globalMultipliers, activeGeos, projectName } = useMediaPlanStore(
     useShallow((s) => ({
       totalBudget: s.totalBudget,
@@ -257,6 +258,7 @@ const OutputContent = () => {
                 <div>
                   <p className="text-xs text-muted-foreground">{vc.report.revenueLabel}</p>
                   <p className="text-2xl font-bold text-foreground mt-1">{$(projectedRevenue)}</p>
+                  <RangeLine range={ranges?.totals.revenue} format={$} className="text-xs text-muted-foreground" />
                   <RoasPair pair={roasPair} className="text-xs text-muted-foreground mt-0.5" />
                 </div>
               </div>
@@ -269,6 +271,11 @@ const OutputContent = () => {
                   <p className="text-2xl font-bold text-foreground mt-1">
                     {Math.round(projectedFtds).toLocaleString('en-US')}
                   </p>
+                  <RangeLine
+                    range={ranges?.totals.conversions}
+                    format={(n) => Math.round(n).toLocaleString('en-US')}
+                    className="text-xs text-muted-foreground"
+                  />
                   <p className="text-xs text-muted-foreground mt-0.5">
                     {blendedCpa ? `at ${$(blendedCpa)} each` : 'cost not calculable'}
                   </p>
