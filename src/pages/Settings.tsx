@@ -23,6 +23,7 @@ import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-stor
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/common/BrandLogo';
+import { EngineSwitch } from '@/components/settings/EngineSwitch';
 import { useSignOut } from '@/hooks/use-sign-out';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
@@ -533,6 +534,9 @@ export default function Settings() {
               </div>
             </CardContent>
           </Card>
+
+          {/* Dev / QA engine switch: renders nothing in a production build. */}
+          <EngineSwitch />
 
           {/* Internal billing debug card: never shown to customers. */}
           {import.meta.env.DEV ? (
