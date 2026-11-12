@@ -35,6 +35,15 @@
       ]
     },
     {
+      "source": "/p/(.*)",
+      "headers": [
+        {
+          "key": "X-Robots-Tag",
+          "value": "noindex"
+        }
+      ]
+    },
+    {
       "source": "/sw.js",
       "headers": [
         {

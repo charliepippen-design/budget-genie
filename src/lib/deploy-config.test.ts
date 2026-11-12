@@ -33,6 +33,8 @@ describe('vercel.json', () => {
       value: 'public, max-age=31536000, immutable',
     });
     expect(header('/sw.js').value).toBe('no-cache, no-store, must-revalidate');
+    // Shared plan pages are private links: never indexed.
+    expect(header('/p/(.*)')).toEqual({ key: 'X-Robots-Tag', value: 'noindex' });
     expect(header('/((?!api/|assets/).*)').value).toBe('no-cache, must-revalidate');
   });
 

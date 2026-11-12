@@ -254,12 +254,12 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
         <p
           role="status"
           data-testid="cloud-sync-status"
-          className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-5 text-slate-400"
+          className="mt-3 flex items-start gap-2 text-xs leading-5 text-slate-400"
         >
           <span
             aria-hidden
             className={cn(
-              'h-1.5 w-1.5 shrink-0 rounded-full',
+              'mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full',
               cloud.status === 'synced'
                 ? 'bg-emerald-400'
                 : cloud.status === 'unavailable'
@@ -267,16 +267,18 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
                   : 'bg-slate-500'
             )}
           />
-          <span className="min-w-0">{cloud.label}</span>
-          {cloud.status === 'unavailable' ? (
-            <button
-              type="button"
-              onClick={() => void syncProjects()}
-              className="min-h-0 font-semibold text-indigo-400 underline-offset-2 hover:underline"
-            >
-              Retry
-            </button>
-          ) : null}
+          <span className="min-w-0">
+            {cloud.label}
+            {cloud.status === 'unavailable' ? (
+              <button
+                type="button"
+                onClick={() => void syncProjects()}
+                className="ml-2 min-h-0 font-semibold text-indigo-400 underline-offset-2 hover:underline"
+              >
+                Retry
+              </button>
+            ) : null}
+          </span>
         </p>
 
         <div className="mt-8 space-y-6">

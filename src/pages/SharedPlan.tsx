@@ -27,7 +27,7 @@ const CHANNEL_COLORS = ['#ffffff', '#cfcfcf', '#a6a6a6', '#808080', '#5e5e5e', '
 const CHANNEL_COLORS_LIGHT = ['#1c1c1c', '#444444', '#5e5e5e', '#808080', '#a6a6a6', '#cfcfcf'];
 
 const compact = (value: number) =>
-  Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(value >= 100000 ? 0 : 1)}k` : `${Math.round(value)}`;
+  Math.abs(value) >= 1000 ? `${Number((value / 1000).toFixed(value >= 100000 ? 0 : 1))}k` : `${Math.round(value)}`;
 const whole = (value: number) => Math.round(value).toLocaleString('en-US');
 
 type Load =
@@ -41,6 +41,16 @@ const CARD = 'rounded-2xl bg-slate-900 p-4 sm:p-6';
 
 function Frame({ title, children }: { title: string; children: ReactNode }) {
   const { theme } = useTheme();
+  // index.html ships "index, follow"; Helmet only adds a second tag, so the static one is switched too.
+  useEffect(() => {
+    const tag = document.querySelector<HTMLMetaElement>('meta[name="robots"]:not([data-react-helmet])');
+    if (!tag) return;
+    const previous = tag.content;
+    tag.content = 'noindex';
+    return () => {
+      tag.content = previous;
+    };
+  }, []);
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
       <Helmet>
@@ -60,13 +70,14 @@ function Frame({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
+// A div with the main role: the app's global `main` padding would push the content off the page grid.
 function Message({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center py-16 text-center">
+    <div role="main" className="flex flex-1 flex-col items-center justify-center py-16 text-center">
       <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
       <p className="mt-2 max-w-sm text-sm leading-6 text-slate-400">{body}</p>
       <div className="mt-6 flex flex-wrap justify-center gap-3">{action}</div>
-    </main>
+    </div>
   );
 }
 
@@ -83,7 +94,7 @@ const HomeLink = ({ primary = false }: { primary?: boolean }) => (
 function Skeleton() {
   const block = 'animate-pulse rounded-2xl bg-slate-900';
   return (
-    <main className="flex-1 pt-10" aria-busy="true" aria-label="Loading shared plan" data-testid="shared-plan-loading">
+    <div role="main" className="flex-1 pt-10" aria-busy="true" aria-label="Loading shared plan" data-testid="shared-plan-loading">
       <div className={cn(block, 'h-4 w-24')} />
       <div className={cn(block, 'mt-3 h-10 w-2/3')} />
       <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-3">
@@ -93,7 +104,7 @@ function Skeleton() {
       </div>
       <div className={cn(block, 'mt-4 h-64')} />
       <div className={cn(block, 'mt-4 h-72')} />
-    </main>
+    </div>
   );
 }
 
@@ -214,7 +225,7 @@ function PlanDocument({ plan, result }: { plan: SharedPlanData; result: EngineRe
   const roasClass = (value: number) => (value < 1 ? 'text-rose-400' : undefined);
 
   return (
-    <main className="flex-1 pt-8 sm:pt-12" data-testid="shared-plan">
+    <div role="main" className="flex-1 pt-8 sm:pt-12" data-testid="shared-plan">
       <p className={HEAD}>Media plan</p>
       <h1 className="mt-1 break-words text-3xl font-semibold leading-tight tracking-tight sm:text-4xl">{plan.name}</h1>
       <p className="mt-2 text-sm leading-6 text-slate-400">
@@ -424,6 +435,6 @@ function PlanDocument({ plan, result }: { plan: SharedPlanData; result: EngineRe
           </Link>
         </p>
       </footer>
-    </main>
+    </div>
   );
 }
