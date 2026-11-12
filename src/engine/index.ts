@@ -32,6 +32,8 @@ export type {
   OptimiseResult,
 } from './optimise';
 export { computePlanResult, selectEngineInput, usePlanResult } from './use-plan-result';
+export { computeOptimisedMix, type OptimisedMix, type OptimisedMixChange } from './optimised-mix';
+export { selectProjectionBand } from './projection-band';
 export type {
   TimelineChannel,
   TimelineComparison,
