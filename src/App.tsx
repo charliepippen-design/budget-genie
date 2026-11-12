@@ -21,6 +21,7 @@ import { useStoreSync } from './hooks/use-store-sync';
 import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
 import { SubscriptionAccessSync } from '@/components/common/SubscriptionAccessSync';
+import { CloudSyncBridge } from '@/components/common/CloudSyncBridge';
 
 const Landing = lazyWithReload(() => import('./pages/Landing'), 'Landing');
 const Index = lazyWithReload(() => import('./pages/Index'), 'Index');
@@ -89,6 +90,7 @@ const AppShell = () => {
           <KeyboardManager />
           <SubscriptionAccessSync />
           <AITokenBridge />
+          <CloudSyncBridge />
           <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>

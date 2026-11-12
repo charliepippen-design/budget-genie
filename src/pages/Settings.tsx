@@ -27,6 +27,7 @@ import { useSignOut } from '@/hooks/use-sign-out';
 import { createCheckoutSession } from '@/lib/billing';
 import { usePaymentStatus } from '@/hooks/use-payment-status';
 import { SHOW_CRYPTO_CHECKOUT } from '@/lib/feature-flags';
+import { syncProjects, useCloudSync } from '@/hooks/use-cloud-sync';
 
 const NOWPAYMENTS_CHECKOUT_URL = 'https://nowpayments.io/payment/?iid=4321051348&source=button';
 const NOWPAYMENTS_BUTTON_SRC = 'https://nowpayments.io/images/embeds/payment-button-white.svg';
@@ -68,6 +69,7 @@ export default function Settings() {
   const signOut = useSignOut();
   const email = clerkUser?.primaryEmailAddress?.emailAddress ?? null;
   const [projectCount, setProjectCount] = useState<number | null>(null);
+  const cloud = useCloudSync();
   const [loading, setLoading] = useState(true);
   const [isProcessingCheckout, setIsProcessingCheckout] = useState(false);
   const [metadataTier, setMetadataTier] = useState<SubscriptionTier | null>(null);
@@ -172,6 +174,18 @@ export default function Settings() {
     }
     fetchData();
   }, [setSubscriptionTier, syncBillingTierFromMetadata]);
+
+  // A sync can bring in projects from another device: count again when it changed this browser.
+  useEffect(() => {
+    if (cloud.localRevision === 0) return;
+    try {
+      const stored = localStorage.getItem('igaming_projects');
+      const validated = stored ? ProjectListForCountSchema.safeParse(JSON.parse(stored)) : null;
+      setProjectCount(validated?.success ? validated.data.length : 0);
+    } catch {
+      // Keep the count already shown.
+    }
+  }, [cloud.localRevision]);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -454,12 +468,39 @@ export default function Settings() {
               </div>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-[#1c1c1c] border border-slate-800">
+              <div
+                data-testid="storage-status"
+                className="flex items-center justify-between gap-3 p-3 rounded-lg bg-[#1c1c1c] border border-slate-800"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="h-2 w-2 rounded-full bg-amber-400"></div>
+                  <div
+                    className={cn(
+                      'h-2 w-2 rounded-full',
+                      cloud.status === 'synced'
+                        ? 'bg-emerald-400'
+                        : cloud.status === 'syncing' || cloud.status === 'saving'
+                          ? 'bg-slate-400'
+                          : 'bg-amber-400'
+                    )}
+                  ></div>
                   <span className="text-sm font-medium text-slate-300">Storage</span>
                 </div>
-                <span className="text-xs text-amber-300 font-mono">THIS BROWSER ONLY</span>
+                <span
+                  className={cn(
+                    'text-right text-xs font-mono',
+                    cloud.status === 'synced'
+                      ? 'text-emerald-300'
+                      : cloud.status === 'syncing' || cloud.status === 'saving'
+                        ? 'text-slate-300'
+                        : 'text-amber-300'
+                  )}
+                >
+                  {cloud.status === 'synced'
+                    ? 'SYNCED TO YOUR ACCOUNT'
+                    : cloud.status === 'syncing' || cloud.status === 'saving'
+                      ? 'SYNCING…'
+                      : 'THIS BROWSER ONLY'}
+                </span>
               </div>
 
               <div className="space-y-2">
@@ -472,7 +513,22 @@ export default function Settings() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 text-right">
-                  Saved in this browser. Export a JSON config to keep a copy.
+                  {cloud.label}
+                  {cloud.status === 'unavailable' || cloud.status === 'signed-out'
+                    ? '. Export a JSON config to keep a copy.'
+                    : null}
+                  {cloud.status === 'unavailable' ? (
+                    <>
+                      {' '}
+                      <button
+                        type="button"
+                        onClick={() => void syncProjects()}
+                        className="min-h-0 font-semibold text-indigo-400 underline-offset-2 hover:underline"
+                      >
+                        Retry
+                      </button>
+                    </>
+                  ) : null}
                 </p>
               </div>
             </CardContent>
