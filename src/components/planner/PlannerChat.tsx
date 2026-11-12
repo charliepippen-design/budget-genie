@@ -428,7 +428,8 @@ export function PlannerChat() {
           <Send className="h-4 w-4" />
         </Button>
       </form>
-      <div className="space-y-1 px-3 pb-3 text-slate-500">
+      {/* Phones: room for the floating Settings button (BudgetGenieAI), which sits over this corner. */}
+      <div className="space-y-1 px-3 pb-16 text-slate-500 md:pb-3">
         <p data-testid="ai-connection-link" className="text-[11px] leading-snug text-slate-400">
           {userKey ? (
             <>

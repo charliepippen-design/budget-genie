@@ -85,7 +85,7 @@ export function AIConnectionCard({ className }: { className?: string }) {
       id="ai-connection"
       aria-labelledby="ai-connection-title"
       data-testid="ai-connection"
-      className={cn('scroll-mt-6 rounded-2xl bg-slate-900 p-6', className)}
+      className={cn('scroll-mt-6 rounded-2xl bg-[#2a2a2a] p-6', className)}
     >
       <div className="flex items-center gap-2">
         <KeyRound className="h-5 w-5 text-slate-400" aria-hidden />
@@ -125,7 +125,7 @@ export function AIConnectionCard({ className }: { className?: string }) {
               setFeedback(null);
             }}
             placeholder="AIza…"
-            className="h-10 w-full min-w-0 rounded-full border border-slate-700 bg-slate-950 px-4 font-mono text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
+            className="h-10 w-full min-w-0 rounded-full border border-slate-700 bg-[#1c1c1c] px-4 font-mono text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
           />
           <div className="flex flex-wrap gap-2">
             <button
@@ -163,7 +163,7 @@ export function AIConnectionCard({ className }: { className?: string }) {
           <ol className="mt-3 space-y-2 text-sm text-slate-300">
             {STEPS.map((step, i) => (
               <li key={i} className="flex gap-3">
-                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[11px] font-semibold tabular-nums text-slate-200">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1c1c1c] text-[11px] font-semibold tabular-nums text-slate-200">
                   {i + 1}
                 </span>
                 <span>{step}</span>
