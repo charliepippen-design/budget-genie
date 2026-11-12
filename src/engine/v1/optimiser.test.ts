@@ -140,14 +140,16 @@ describe('optimiser: optimal against brute force on small plans', () => {
     const result = optimiseAllocation(input, { goal: 'conversions', constraints });
     const feasible = (spend: number[], cpa: number | null) =>
       spend[0] <= 0.3 * input.budget + 1e-6 && spend[1] >= 0.2 * input.budget - 1e-6 && cpa !== null && cpa <= 60;
-    const best = bruteForce(input, 'conversions', 120, feasible);
+    // 60 steps is about 40k plans; 120 was about 300k and starved the test worker on CI.
+    const best = bruteForce(input, 'conversions', 60, feasible);
 
     expect(result.feasible).toBe(true);
     expect(result.spend.search).toBeLessThanOrEqual(0.3 * input.budget + 1e-6);
     expect(result.spend.social).toBeGreaterThanOrEqual(0.2 * input.budget - 1e-6);
     expect(result.after.costPerConversion!).toBeLessThanOrEqual(60 * (1 + 1e-6));
     expect(result.after.conversions).toBeGreaterThanOrEqual(best - 1e-9);
-    expect((result.after.conversions - best) / best).toBeLessThan(5e-3);
+    // The grid is coarser here (steps of 1/60 of the budget), so its best point sits a little further below the optimum.
+    expect((result.after.conversions - best) / best).toBeLessThan(1.5e-2);
     // The ceiling binds: without it the plan would buy more conversions at a higher cost.
     const free = optimiseAllocation(input, { goal: 'conversions', constraints: { ...constraints, maxCostPerConversion: null } });
     expect(free.after.costPerConversion!).toBeGreaterThan(60);
