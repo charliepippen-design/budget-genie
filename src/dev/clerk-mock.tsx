@@ -45,7 +45,8 @@ export const useAuth = () => ({
   isLoaded: true,
   isSignedIn: !mockSignedOut,
   userId: mockSignedOut ? null : user.id,
-  getToken: async () => null,
+  // Our API routes need a bearer token; the dev stand-ins accept any value.
+  getToken: async () => (mockSignedOut ? null : 'qa-mock-token'),
   signOut: async () => undefined,
 });
 
