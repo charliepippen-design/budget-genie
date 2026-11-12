@@ -5,12 +5,32 @@ export type {
   EngineCustomerValue,
   EngineInput,
   EngineMarkets,
+  EngineMonthRange,
+  EngineRange,
+  EngineRanges,
+  EngineRangeSet,
   EngineResult,
   EngineTotals,
   PlanEngine,
 } from './contract';
 export { placeholderEngine } from './placeholder-engine';
-export { getEngine, setEngine, subscribeEngine } from './registry';
+export { responseCurveEngine } from './v1';
+export {
+  ENGINE_STORAGE_KEY,
+  engines,
+  getEngine,
+  selectEngineFromStorage,
+  setEngine,
+  setEngineById,
+  subscribeEngine,
+} from './registry';
+export type {
+  OptimiseConstraints,
+  OptimiseGoal,
+  OptimiseOptions,
+  OptimiseOutcome,
+  OptimiseResult,
+} from './optimise';
 export { computePlanResult, selectEngineInput, usePlanResult } from './use-plan-result';
 export type {
   TimelineChannel,
