@@ -66,7 +66,7 @@ async function callGemini(body: Record<string, unknown>, userKey: string | null 
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify(body),
       });
-      console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt, key: own ? "user" : "shared" });
+      console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt, ...(own ? { key: "user" } : {}) });
       if (res.ok) {
         const data = await res.json();
         return { parts: data?.candidates?.[0]?.content?.parts ?? [] };

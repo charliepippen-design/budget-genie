@@ -1,8 +1,10 @@
 import { useCallback, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
+import { getUserAIKey, USER_AI_KEY_HEADER } from '@/lib/user-ai-key';
 
 // Browser side of the AI gateway (api/ai-gateway.ts, a Vercel Function).
-// No LLM key ever reaches the browser: requests go through our own server.
+// The site's shared LLM key never reaches the browser: requests go through our own server.
+// A user who connected their own Gemini key (src/lib/user-ai-key.ts) sends it with each request.
 
 export type AIPart = Record<string, unknown>;
 
@@ -25,9 +27,24 @@ export interface AIResponse {
 
 type AITask = 'planner' | 'json';
 
-export type AIErrorKind = 'busy' | 'rate_limited' | 'unavailable' | 'free_tier_limit' | 'generic';
+export type AIErrorKind =
+  | 'busy'
+  | 'rate_limited'
+  | 'unavailable'
+  | 'free_tier_limit'
+  | 'user_key_invalid'
+  | 'user_key_quota'
+  | 'user_key_model'
+  | 'generic';
 
-/** Error from the gateway; `code` is FREE_TIER_LIMIT or USAGE_UNAVAILABLE for free-tier cap responses. */
+/** Shown wherever the shared key runs out; pair it with a link to AI_CONNECTION_HREF. */
+export const SHARED_TRIAL_LIMIT_MESSAGE =
+  'The shared AI trial has reached its limit. Connect your own free Gemini key to keep going.';
+
+/**
+ * Error from the gateway; `code` is FREE_TIER_LIMIT or USAGE_UNAVAILABLE for free-tier cap responses,
+ * user_key_* when the user's own Gemini key was refused by the gateway or by Google.
+ */
 export class AIError extends Error {
   constructor(
     message: string,
@@ -41,6 +58,9 @@ export class AIError extends Error {
 
   get kind(): AIErrorKind {
     if (this.code === 'FREE_TIER_LIMIT') return 'free_tier_limit';
+    if (this.code === 'user_key_invalid' || this.code === 'user_key_malformed') return 'user_key_invalid';
+    if (this.code === 'user_key_quota') return 'user_key_quota';
+    if (this.code === 'user_key_model') return 'user_key_model';
     if (this.code === 'AI_BUSY') return 'busy';
     if (this.code === 'AI_RATE_LIMITED' || this.status === 429) return 'rate_limited';
     if (this.status === 503) return 'unavailable';
@@ -49,6 +69,17 @@ export class AIError extends Error {
 }
 
 export const isFreeTierLimit = (err: unknown): boolean => err instanceof AIError && err.code === 'FREE_TIER_LIMIT';
+
+/**
+ * The shared key ran out: this user's monthly trial (FREE_TIER_LIMIT) or the site-wide quota
+ * (AI_RATE_LIMITED). Never returned for a request that carried the user's own key.
+ */
+export const isSharedTrialLimit = (err: unknown): boolean =>
+  err instanceof AIError && (err.code === 'FREE_TIER_LIMIT' || err.code === 'AI_RATE_LIMITED');
+
+/** The user's own Gemini key failed (invalid, out of quota, or no access to the model). */
+export const isUserKeyError = (err: unknown): boolean =>
+  err instanceof AIError && typeof err.code === 'string' && err.code.startsWith('user_key_');
 
 export const aiErrorKind = (err: unknown): AIErrorKind => (err instanceof AIError ? err.kind : 'generic');
 
@@ -62,9 +93,17 @@ export function parseRetryAfter(header: string | null | undefined, bodyValue?: u
 export function aiErrorMessage(err: unknown, fallback = 'Something went wrong.'): string {
   const own = err instanceof Error && err.message ? err.message : fallback;
   if (!(err instanceof AIError)) return own;
+  if (isSharedTrialLimit(err)) return SHARED_TRIAL_LIMIT_MESSAGE;
   const wait = err.retryAfterSeconds;
   const secs = wait === 1 ? '1 second' : `${wait} seconds`;
   switch (err.kind) {
+    case 'user_key_quota':
+      return wait
+        ? `Your Gemini key has reached its Google quota. Try again in ${secs}, or enable billing on your Google account for more.`
+        : own;
+    case 'user_key_invalid':
+    case 'user_key_model':
+      return own; // fixed gateway texts, safe to show
     case 'busy':
       return wait ? `The AI is busy, try again in ${secs}.` : 'The AI is busy, try again in a moment.';
     case 'rate_limited':
@@ -129,7 +168,16 @@ export function normalizeAIResponse(data: unknown): AIResponse {
   };
 }
 
-export async function callAI(task: AITask, body: Record<string, unknown>, userToken?: string | null): Promise<AIResponse> {
+/**
+ * `opts.userKey` overrides the saved Gemini key for this call ("Test and save" tries a candidate
+ * before storing it). The key goes to our own gateway only, as a header.
+ */
+export async function callAI(
+  task: AITask,
+  body: Record<string, unknown>,
+  userToken?: string | null,
+  opts: { userKey?: string } = {}
+): Promise<AIResponse> {
   let token = userToken ?? null;
   if (token === null && registeredGetToken) {
     try {
@@ -139,6 +187,8 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
     }
   }
 
+  const userKey = opts.userKey ?? getUserAIKey();
+
   let res: Response;
   try {
     res = await fetch('/api/ai-gateway', {
@@ -146,6 +196,7 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(userKey ? { [USER_AI_KEY_HEADER]: userKey } : {}),
       },
       body: JSON.stringify({ turnId: newTurnId(), task, ...body }),
     });
@@ -155,8 +206,10 @@ export async function callAI(task: AITask, body: Record<string, unknown>, userTo
 
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // The gateway never echoes the key; strip it anyway so it cannot reach the screen or the console.
+    const message = typeof data?.error === 'string' && data.error ? data.error : `AI request failed (${res.status})`;
     throw new AIError(
-      data?.error || `AI request failed (${res.status})`,
+      userKey ? message.split(userKey).join('[your key]') : message,
       data?.code,
       res.status,
       parseRetryAfter(res.headers?.get?.('Retry-After'), data?.retryAfterSeconds)

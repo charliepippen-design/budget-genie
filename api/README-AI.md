@@ -57,7 +57,7 @@ The shared `GEMINI_API_KEY` is a small trial: one free-tier quota for all users.
 **Security properties** (tests in `src/lib/ai-byok-gateway.test.ts`):
 
 - The key lives in the request only. Nothing writes it to a store, a usage record or a cache; there is no server-side copy.
-- It is never logged: `ai_gemini_timing` records `key: "user" | "shared"`, never the value. Google's error text is passed through `redactKey` before it is logged, and with a user key the catch-all logs a redacted string instead of the error object. A test captures every console call across all error paths, with an upstream that echoes the key, and searches the output for it.
+- It is never logged: `ai_gemini_timing` adds `key: "user"` for these calls, never the value. Google's error text is passed through `redactKey` before it is logged, and with a user key the catch-all logs a redacted string instead of the error object. A test captures every console call across all error paths, with an upstream that echoes the key, and searches the output for it.
 - It is never returned: error bodies are fixed texts, and the same test searches response bodies and headers.
 - It is sent to Google in the `x-goog-api-key` header, never in a URL.
 - Same-origin only, as before: the gateway sets no CORS headers, so a browser on another origin cannot send the custom header (the preflight fails).
