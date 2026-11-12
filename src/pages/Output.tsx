@@ -32,16 +32,7 @@ import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { BRAND_NAME } from '@/lib/brand';
 
-const PIE_COLORS = [
-  '#b998df',
-  '#8b5cf6',
-  '#06b6d4',
-  '#10b981',
-  '#f59e0b',
-  '#ef4444',
-  '#ec4899',
-  '#84cc16',
-];
+const PIE_COLORS = ['#ffffff', '#d4d4d4', '#a6a6a6', '#808080', '#5e5e5e', '#444444', '#b998df', '#8767b8'];
 
 const OutputContent = () => {
   const navigate = useNavigate();

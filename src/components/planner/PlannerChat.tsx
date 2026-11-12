@@ -287,7 +287,7 @@ export function PlannerChat() {
   }
 
   return (
-    <aside className="fixed inset-0 z-50 flex flex-col bg-slate-950 md:static md:z-auto md:w-[400px] md:shrink-0 md:border-l md:border-slate-800">
+    <aside className="fixed inset-0 z-50 flex flex-col bg-slate-950 md:static md:z-auto md:m-2 md:w-[392px] md:shrink-0 md:overflow-hidden md:rounded-2xl">
       <header className="flex items-center gap-2 border-b border-slate-800 p-4">
         <div className="rounded-lg bg-indigo-600 p-1.5"><Bot className="h-4 w-4 text-white" /></div>
         <div className="flex-1">

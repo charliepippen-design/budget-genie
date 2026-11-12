@@ -50,10 +50,10 @@ export const GROUP_LABELS: Record<ChannelGroup, string> = {
 };
 
 export const GROUP_COLORS: Record<ChannelGroup, string> = {
-  organic: '#22c55e',
-  paid: '#3b82f6',
-  affiliate: '#f59e0b',
-  influencer: '#ec4899',
+  organic: '#d4d4d4',
+  paid: '#8f8f8f',
+  affiliate: '#5e5e5e',
+  influencer: '#b998df',
 };
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
