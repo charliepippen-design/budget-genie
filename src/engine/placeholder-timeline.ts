@@ -25,7 +25,7 @@ import type {
 type RevenueModel = Parameters<typeof calculatePlanMetrics>[2];
 
 /** The budget patterns the optimiser tries. */
-const OPTIMISATION_PATTERNS: TimelinePattern[] = [
+export const OPTIMISATION_PATTERNS: TimelinePattern[] = [
   'linear',
   'exponential',
   'aggressive-launch',
@@ -102,7 +102,7 @@ function compareValues(
   return { diff, diffPct, winner };
 }
 
-function comparePlans(scenarioId: string, planA: TimelinePlan, planB: TimelinePlan): TimelineComparison {
+export function comparePlans(scenarioId: string, planA: TimelinePlan, planB: TimelinePlan): TimelineComparison {
   const a = planA.totals;
   const b = planB.totals;
   const row = (
@@ -157,7 +157,7 @@ function comparePlans(scenarioId: string, planA: TimelinePlan, planB: TimelinePl
   };
 }
 
-function optimisationScore(goal: TimelineInput['optimisationGoal'], totals: TimelineTotals): number {
+export function optimisationScore(goal: TimelineInput['optimisationGoal'], totals: TimelineTotals): number {
   switch (goal) {
     case 'maximize-roas':
       return totals.roas * 100;

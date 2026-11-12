@@ -15,6 +15,7 @@ import type {
   ScenarioPoint,
   ScenarioRoiPoint,
 } from '@/lib/what-if/types';
+import type { EngineMonthRange, EngineRangeSet } from './contract';
 
 // ========== INPUT ==========
 
@@ -114,4 +115,6 @@ export interface WhatIfResult {
   summary: SandboxSummarySignals;
   /** The numbers exports and the AI context embed (the summary sentence is added by the UI). */
   exportSnapshot: Omit<SandboxExportSnapshot, 'summaryText'>;
+  /** Ranges (P10 / P50 / P90) for the active plan under the lab's assumptions; undefined for point-estimate engines. */
+  ranges?: { totals: EngineRangeSet; paybackMonth: EngineMonthRange; assumptions: string[] };
 }
