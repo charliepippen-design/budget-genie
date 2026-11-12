@@ -119,6 +119,17 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
         tone: payback === null ? ('bad' as const) : ('good' as const),
         caution: null,
       };
+  const paybackBadge = (
+    <span
+      title={ranges ? RANGE_HINT : undefined}
+      className={cn(
+        'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+        paybackLabel.tone === 'bad' ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'
+      )}
+    >
+      {paybackLabel.text}
+    </span>
+  );
   const whole = (value: number) => Math.round(value).toLocaleString('en-US');
   const times = (value: number) => `${value.toFixed(2)}x`;
   const channelsLink = (
@@ -335,22 +346,16 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
               <TrendingUp className="h-4 w-4 text-emerald-400" aria-hidden />
               <h2 className="text-base font-semibold leading-6">12-month projection</h2>
             </div>
-            <div className="flex flex-wrap items-center justify-end gap-1.5">
-              <span
-                title={ranges ? RANGE_HINT : undefined}
-                className={cn(
-                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                  paybackLabel.tone === 'bad' ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'
-                )}
-              >
-                {paybackLabel.text}
-              </span>
-              {paybackLabel.caution ? (
+            {paybackLabel.caution ? (
+              <div className="flex flex-wrap items-center justify-end gap-1.5">
+                {paybackBadge}
                 <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
                   {paybackLabel.caution}
                 </span>
-              ) : null}
-            </div>
+              </div>
+            ) : (
+              paybackBadge
+            )}
           </div>
           <p className={cn('mb-2 text-xs leading-5', mutedClass)}>
             Cumulative value of the customers this month's budget acquires, against what they cost.
