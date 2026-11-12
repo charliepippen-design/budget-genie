@@ -401,8 +401,12 @@ Focus on ROAS, cost per conversion, and budget efficiency.
 
 const DEFAULT_CONFIG: VerticalConfig = VERTICAL_CONFIGS.other;
 
+/** The wording for a vertical without reading the store (shared plans carry their own vertical). */
+export function getVerticalConfig(vertical: string | null | undefined): VerticalConfig {
+  if (!vertical || !Object.prototype.hasOwnProperty.call(VERTICAL_CONFIGS, vertical)) return DEFAULT_CONFIG;
+  return VERTICAL_CONFIGS[vertical as Vertical];
+}
+
 export function useVerticalConfig(): VerticalConfig {
-  const vertical = useMediaPlanStore((s) => s.onboardingVertical);
-  if (!vertical || !VERTICAL_CONFIGS[vertical]) return DEFAULT_CONFIG;
-  return VERTICAL_CONFIGS[vertical];
+  return getVerticalConfig(useMediaPlanStore((s) => s.onboardingVertical));
 }

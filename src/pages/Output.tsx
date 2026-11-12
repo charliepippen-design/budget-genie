@@ -14,6 +14,8 @@ import {
   CheckCircle,
   Sparkles,
   Printer,
+  Link2,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCurrency } from '@/contexts/CurrencyContext';
@@ -31,6 +33,7 @@ import { RoasPair } from '@/components/RoasPair';
 import { LIFETIME_ROAS_LABEL } from '@/lib/roas-pair';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { BRAND_NAME } from '@/lib/brand';
+import { shareCurrentPlan } from '@/lib/share-link';
 
 const PIE_COLORS = ['#ffffff', '#d4d4d4', '#a6a6a6', '#808080', '#5e5e5e', '#444444', '#b998df', '#8767b8'];
 
@@ -49,6 +52,13 @@ const OutputContent = () => {
     }))
   );
   const { format, code } = useCurrency();
+  const [isSharing, setIsSharing] = useState(false);
+  const shareLink = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    await shareCurrentPlan(useMediaPlanStore.getState(), code);
+    setIsSharing(false);
+  };
 
   const $ = (n: number) => format(n);
 
@@ -193,8 +203,17 @@ const OutputContent = () => {
               <Printer className="w-4 h-4" />
               Print
             </Button>
-            {/* "Copy Link" share button hidden until real share links exist (see dev/SHARE-LINK-DESIGN.md):
-                it copied window.location.href, which shows the recipient their own local plan. */}
+            {/* Copies a link to a read-only snapshot of this plan (/p/<id>), never this page's own URL. */}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-2 text-muted-foreground hover:text-foreground"
+              disabled={isSharing}
+              onClick={() => void shareLink()}
+            >
+              {isSharing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Link2 className="w-4 h-4" />}
+              Share link
+            </Button>
           </div>
         </div>
       </nav>

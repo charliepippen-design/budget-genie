@@ -21,6 +21,7 @@ import { useStoreSync } from './hooks/use-store-sync';
 import { useHistoryRecorder } from '@/hooks/use-history';
 import { KeyboardManager } from '@/components/common/KeyboardManager';
 import { SubscriptionAccessSync } from '@/components/common/SubscriptionAccessSync';
+import { CloudSyncBridge } from '@/components/common/CloudSyncBridge';
 
 const Landing = lazyWithReload(() => import('./pages/Landing'), 'Landing');
 const Index = lazyWithReload(() => import('./pages/Index'), 'Index');
@@ -32,6 +33,7 @@ const Onboard = lazyWithReload(() => import('./pages/Onboard'), 'Onboard');
 const Report = lazyWithReload(() => import('./pages/Report'), 'Report');
 const Output = lazyWithReload(() => import('./pages/Output'), 'Output');
 const Legal = lazyWithReload(() => import('./pages/Legal'), 'Legal');
+const SharedPlan = lazyWithReload(() => import('./pages/SharedPlan'), 'SharedPlan');
 
 // Each route gets its own boundary, reset on navigation, so one broken page never blanks the app.
 const RouteBoundary = ({ name, children }: { name: string; children: ReactNode }) => {
@@ -89,6 +91,7 @@ const AppShell = () => {
           <KeyboardManager />
           <SubscriptionAccessSync />
           <AITokenBridge />
+          <CloudSyncBridge />
           <CurrencyProvider>
               <Suspense fallback={<RouteLoadingSkeleton />}>
                 <Routes>
@@ -99,6 +102,8 @@ const AppShell = () => {
                   <Route path="/terms" element={<RouteBoundary name="route:/terms"><Legal doc="terms" /></RouteBoundary>} />
                   <Route path="/refund-policy" element={<RouteBoundary name="route:/refund-policy"><Legal doc="refund" /></RouteBoundary>} />
                   <Route path="/privacy" element={<RouteBoundary name="route:/privacy"><Legal doc="privacy" /></RouteBoundary>} />
+                  {/* Public, read-only view of a shared plan: no sign-in. */}
+                  <Route path="/p/:id" element={<RouteBoundary name="route:/p"><SharedPlan /></RouteBoundary>} />
                   <Route path="/app" element={<RouteBoundary name="route:/app"><ProtectedRoute>
                         <Index />
                       </ProtectedRoute></RouteBoundary>} />

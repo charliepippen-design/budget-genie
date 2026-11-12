@@ -30,6 +30,8 @@ import {
   hasUnsavedWork,
   type SavedProject as Project,
 } from '@/lib/saved-projects';
+import { recordDeletion } from '@/lib/cloud-projects';
+import { scheduleProjectsSync, syncProjects, useCloudSync } from '@/hooks/use-cloud-sync';
 
 interface ProjectManagerProps {
   isDark?: boolean;
@@ -42,6 +44,8 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
   const [newProjectName, setNewProjectName] = useState('');
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
   const [confirmRequest, setConfirmRequest] = useState<ConfirmRequest | null>(null);
+  const cloud = useCloudSync();
+  const [, setClock] = useState(0);
 
   // Always read storage fresh: this component is mounted twice (header + dashboard), and a
   // list cached at mount made one copy overwrite projects saved from the other.
@@ -64,9 +68,25 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
     return true;
   };
 
+  // Opening the list syncs with the account; a sync that changed storage re-reads the list.
   useEffect(() => {
-    if (open) setProjects(readProjects().projects);
+    if (open) {
+      setProjects(readProjects().projects);
+      void syncProjects();
+    }
     setIsLoadingProjects(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (open) setProjects(loadSavedProjects().projects);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only a finished sync triggers this
+  }, [cloud.localRevision]);
+
+  // Keeps "just now" / "3 min ago" in the status line current while the list is open.
+  useEffect(() => {
+    if (!open) return;
+    const id = setInterval(() => setClock((n) => n + 1), 30000);
+    return () => clearInterval(id);
   }, [open]);
 
   const saveProject = (overwriteConfirmed = false) => {
@@ -104,7 +124,8 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
 
     if (!writeProjects([newProject, ...current.filter((p) => p.id !== newProject.id)])) return;
     setNewProjectName('');
-    toast.success(existing ? 'Project updated' : 'Project saved in this browser');
+    scheduleProjectsSync();
+    toast.success(existing ? 'Project updated' : 'Project saved');
   };
 
   const loadProject = (project: Project, replaceConfirmed = false) => {
@@ -168,6 +189,7 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
     }
     const { merged, added, duplicates } = mergeProjects(current, parsed.incoming);
     if (added > 0 && !writeProjects(merged)) return;
+    if (added > 0) scheduleProjectsSync();
     const extras = [
       duplicates ? `${duplicates} already here` : '',
       parsed.skipped ? `${parsed.skipped} damaged and skipped` : '',
@@ -195,7 +217,11 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
       toast.error('Deleting is turned off because your existing projects could not be backed up.');
       return;
     }
-    if (writeProjects(current.filter((p) => p.id !== id))) toast.info('Project deleted');
+    if (!writeProjects(current.filter((p) => p.id !== id))) return;
+    // The tombstone makes the next sync delete it from the account and from other devices too.
+    recordDeletion(id);
+    scheduleProjectsSync();
+    toast.info('Project deleted');
   };
 
   return (
@@ -224,6 +250,36 @@ export function ProjectManager({ isDark = true, triggerClassName }: ProjectManag
             Save your current workspace state or load a previous session.
           </SheetDescription>
         </SheetHeader>
+
+        <p
+          role="status"
+          data-testid="cloud-sync-status"
+          className="mt-3 flex items-start gap-2 text-xs leading-5 text-slate-400"
+        >
+          <span
+            aria-hidden
+            className={cn(
+              'mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full',
+              cloud.status === 'synced'
+                ? 'bg-emerald-400'
+                : cloud.status === 'unavailable'
+                  ? 'bg-amber-400'
+                  : 'bg-slate-500'
+            )}
+          />
+          <span className="min-w-0">
+            {cloud.label}
+            {cloud.status === 'unavailable' ? (
+              <button
+                type="button"
+                onClick={() => void syncProjects()}
+                className="ml-2 min-h-0 font-semibold text-indigo-400 underline-offset-2 hover:underline"
+              >
+                Retry
+              </button>
+            ) : null}
+          </span>
+        </p>
 
         <div className="mt-8 space-y-6">
           {/* Save Section */}

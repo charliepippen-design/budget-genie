@@ -15,6 +15,7 @@ import {
   Sparkles,
   Loader2,
   Upload,
+  Link2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useBlendedMetrics, useMediaPlanStore } from '@/hooks/use-media-plan-store';
@@ -41,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
+import { shareCurrentPlan } from '@/lib/share-link';
 
 interface DashboardHeaderProps {
   onExport: (format: 'pdf' | 'csv' | 'xlsx' | 'json') => void;
@@ -62,7 +64,14 @@ export function DashboardHeader({
   const vc = useVerticalConfig();
   const userStatus = useMediaPlanStore((state) => state.userStatus);
   const brief = useMediaPlanStore((state) => state.brief);
-  const { format } = useCurrency();
+  const { format, code: currencyCode } = useCurrency();
+  const [isSharing, setIsSharing] = useState(false);
+  const shareLink = async () => {
+    if (isSharing) return;
+    setIsSharing(true);
+    await shareCurrentPlan(useMediaPlanStore.getState(), currencyCode);
+    setIsSharing(false);
+  };
   const { theme, cycleTheme } = useTheme();
   const navigate = useNavigate();
   const [isExportHostageModalOpen, setIsExportHostageModalOpen] = useState(false);
@@ -210,6 +219,11 @@ export function DashboardHeader({
                   <DropdownMenuItem onClick={() => onExport('xlsx')} className={menuItemClass}>
                     <Download className="h-4 w-4" />
                     Export as Excel (.xlsx)
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void shareLink()} disabled={isSharing} className={menuItemClass}>
+                    <Link2 className="h-4 w-4" />
+                    Share link
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
