@@ -1,3 +1,4 @@
+import { useState, useSyncExternalStore, type ReactNode } from 'react';
 import { Lock, LockOpen, SlidersHorizontal, TrendingUp } from 'lucide-react';
 import {
   Area,
@@ -9,9 +10,15 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
+import { OptimiseMixDialog } from '@/components/plan/OptimiseMixDialog';
+import { RangeAssumptionsDialog } from '@/components/plan/RangeAssumptionsDialog';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
+import { Tooltip as Hint, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useCurrency } from '@/contexts/CurrencyContext';
+import type { EngineRange } from '@/engine/contract';
+import { selectProjectionBand } from '@/engine/projection-band';
+import { getEngine, subscribeEngine } from '@/engine/registry';
 import { useBudgetEngine } from '@/hooks/use-budget-engine';
 import {
   GLOBAL_BUDGET_CAP,
@@ -22,6 +29,7 @@ import {
 import { useTheme } from '@/hooks/use-theme';
 import { useVerticalConfig } from '@/hooks/use-vertical-config';
 import { isFixedCostChannel } from '@/lib/media-plan/plan-snapshot';
+import { RANGE_HINT, formatRange, paybackRangeLabel } from '@/lib/plan-ranges';
 import { formatLtvToCac } from '@/lib/planning-insights';
 import { cn } from '@/lib/utils';
 import { LossBanner } from './LossBanner';
@@ -33,12 +41,44 @@ const BUDGET_STEPS = [-20, -10, 10, 20, 50];
 const compact = (value: number) =>
   Math.abs(value) >= 1000 ? `${(value / 1000).toFixed(value >= 100000 ? 0 : 1)}k` : `${Math.round(value)}`;
 
+/** A table figure that shows its likely range on hover or focus; plain text when the engine gives none. */
+function RangedFigure({
+  range,
+  format,
+  className,
+  children,
+}: {
+  range: EngineRange | null | undefined;
+  format: (value: number) => string;
+  className: string;
+  children: string;
+}) {
+  if (!range) return <span className={className}>{children}</span>;
+  const likely = `Likely ${formatRange(range, format)}`;
+  return (
+    <TooltipProvider delayDuration={100}>
+      <Hint>
+        <TooltipTrigger asChild>
+          <span tabIndex={0} data-range={likely} className={cn(className, 'cursor-help')}>
+            {children}
+          </span>
+        </TooltipTrigger>
+        <TooltipContent className="px-2.5 py-1 text-xs tabular-nums">{likely}</TooltipContent>
+      </Hint>
+    </TooltipProvider>
+  );
+}
+
 /**
  * The plan at a glance, editable in place: channel mix with live sliders on one side, the
  * 12-month projection on the other. Every figure comes from the engine result.
  */
 export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
-  const { channels, channelInsights, totals, customerValue, scenarios, alerts } = usePlanResult();
+  const result = usePlanResult();
+  const { channels, channelInsights, totals, customerValue, scenarios, alerts, ranges } = result;
+  const engine = useSyncExternalStore(subscribeEngine, getEngine, getEngine);
+  const [optimiseOpen, setOptimiseOpen] = useState(false);
+  const [assumptionsOpen, setAssumptionsOpen] = useState(false);
   const totalBudget = useMediaPlanStore((s) => s.totalBudget);
   const roasTarget = useMediaPlanStore((s) => s.globalMultipliers.roasTarget);
   const setChannelAllocation = useMediaPlanStore((s) => s.setChannelAllocation);
@@ -64,11 +104,32 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
     updateBudget(Math.min(GLOBAL_BUDGET_CAP, Math.max(floor, next)));
   };
 
-  const projection = customerValue.curve.map((point) => ({
+  // With ranges, each month also carries the likely band around the value curve.
+  const band = selectProjectionBand(result);
+  const projection = customerValue.curve.map((point, index) => ({
     month: point.label,
     value: Math.round(point.cohortValue),
+    ...(band ? { band: [Math.round(band[index].p10), Math.round(band[index].p90)] } : {}),
   }));
   const payback = customerValue.paybackMonth;
+  const paybackLabel = ranges
+    ? paybackRangeLabel(ranges.paybackMonth)
+    : {
+        text: payback === null ? 'No payback within 12 months' : `Pays back in month ${payback}`,
+        tone: payback === null ? ('bad' as const) : ('good' as const),
+        caution: null,
+      };
+  const whole = (value: number) => Math.round(value).toLocaleString('en-US');
+  const times = (value: number) => `${value.toFixed(2)}x`;
+  const channelsLink = (
+    <button
+      type="button"
+      onClick={onOpenChannels}
+      className="min-h-0 text-xs font-semibold text-indigo-400 underline-offset-2 hover:underline"
+    >
+      Prices and funnel rates →
+    </button>
+  );
 
   return (
     <div className="space-y-4">
@@ -99,13 +160,25 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                 </span>
               ) : null}
             </div>
-            <button
-              type="button"
-              onClick={onOpenChannels}
-              className="min-h-0 text-xs font-semibold text-indigo-400 underline-offset-2 hover:underline"
-            >
-              Prices and funnel rates →
-            </button>
+            {engine.optimise ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setOptimiseOpen(true)}
+                  className={cn(
+                    'min-h-0 rounded-full border px-3 py-1 text-xs font-semibold transition-colors',
+                    isDark
+                      ? 'border-slate-700 text-slate-200 hover:border-indigo-500 hover:bg-indigo-500/10'
+                      : 'border-slate-300 text-slate-700 hover:border-indigo-500 hover:bg-indigo-50'
+                  )}
+                >
+                  Optimise mix
+                </button>
+                {channelsLink}
+              </div>
+            ) : (
+              channelsLink
+            )}
           </div>
 
           {/* Share of spend, one segment per channel */}
@@ -206,12 +279,20 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                       <span className="text-right text-sm font-semibold tabular-nums leading-5">
                         {format(channel.metrics.spend)}
                       </span>
-                      <span className="text-right text-sm tabular-nums leading-5">
-                        {Math.round(channel.metrics.conversions).toLocaleString('en-US')}
-                      </span>
-                      <span className={cn('text-right text-sm font-semibold tabular-nums leading-5', roasClass)}>
-                        {active ? `${roas.toFixed(2)}x` : 'off'}
-                      </span>
+                      <RangedFigure
+                        range={active ? ranges?.channels[channel.id]?.conversions : null}
+                        format={whole}
+                        className="text-right text-sm tabular-nums leading-5"
+                      >
+                        {whole(channel.metrics.conversions)}
+                      </RangedFigure>
+                      <RangedFigure
+                        range={active ? ranges?.channels[channel.id]?.roas : null}
+                        format={times}
+                        className={cn('text-right text-sm font-semibold tabular-nums leading-5', roasClass)}
+                      >
+                        {active ? times(roas) : 'off'}
+                      </RangedFigure>
                       <div className="flex items-center justify-end gap-1.5">
                         <button
                           type="button"
@@ -254,17 +335,38 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
               <TrendingUp className="h-4 w-4 text-emerald-400" aria-hidden />
               <h2 className="text-base font-semibold leading-6">12-month projection</h2>
             </div>
-            <span
-              className={cn(
-                'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                payback === null ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'
-              )}
-            >
-              {payback === null ? 'No payback within 12 months' : `Pays back in month ${payback}`}
-            </span>
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
+              <span
+                title={ranges ? RANGE_HINT : undefined}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                  paybackLabel.tone === 'bad' ? 'bg-rose-500/15 text-rose-400' : 'bg-emerald-500/15 text-emerald-400'
+                )}
+              >
+                {paybackLabel.text}
+              </span>
+              {paybackLabel.caution ? (
+                <span className="rounded-full bg-amber-500/15 px-2.5 py-0.5 text-xs font-semibold text-amber-400">
+                  {paybackLabel.caution}
+                </span>
+              ) : null}
+            </div>
           </div>
           <p className={cn('mb-2 text-xs leading-5', mutedClass)}>
             Cumulative value of the customers this month's budget acquires, against what they cost.
+            {ranges ? (
+              <>
+                {' '}
+                The shaded band is the likely range.{' '}
+                <button
+                  type="button"
+                  onClick={() => setAssumptionsOpen(true)}
+                  className="min-h-0 font-semibold text-indigo-400 underline-offset-2 hover:underline"
+                >
+                  How these ranges are estimated
+                </button>
+              </>
+            ) : null}
           </p>
 
           <div className="h-52 w-full">
@@ -286,7 +388,11 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                   tickFormatter={(value: number) => `${symbol}${compact(value)}`}
                 />
                 <Tooltip
-                  formatter={(value: number) => [format(value), 'Cohort value']}
+                  formatter={(value: number | number[]) =>
+                    Array.isArray(value)
+                      ? [`${format(value[0])} – ${format(value[1])}`, 'Likely range']
+                      : [format(value), 'Cohort value']
+                  }
                   contentStyle={{
                     backgroundColor: isDark ? '#1c1c1c' : '#ffffff',
                     border: `1px solid ${isDark ? '#333333' : '#bdbdbd'}`,
@@ -298,9 +404,22 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
                   y={totals.totalSpend}
                   stroke="#f87171"
                   strokeDasharray="5 4"
-                  label={{ value: 'Spend', position: 'insideTopRight', fontSize: 11, fill: '#f87171' }}
+                  // With the band, the value line ends near the spend line: the label moves clear of it.
+                  label={{
+                    value: 'Spend',
+                    position: band ? 'insideTopLeft' : 'insideTopRight',
+                    fontSize: 11,
+                    fill: '#f87171',
+                  }}
                 />
-                <Area type="monotone" dataKey="value" stroke="#34d399" strokeWidth={2} fill="url(#plan-canvas-value)" />
+                {band ? <Area type="monotone" dataKey="band" stroke="none" fill="#34d399" fillOpacity={0.14} /> : null}
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke="#34d399"
+                  strokeWidth={2}
+                  fill={band ? 'none' : 'url(#plan-canvas-value)'}
+                />
               </AreaChart>
             </ResponsiveContainer>
           </div>
@@ -347,6 +466,15 @@ export function PlanCanvas({ onOpenChannels }: { onOpenChannels: () => void }) {
           </div>
         </section>
       </div>
+
+      {engine.optimise ? <OptimiseMixDialog open={optimiseOpen} onOpenChange={setOptimiseOpen} /> : null}
+      {ranges ? (
+        <RangeAssumptionsDialog
+          open={assumptionsOpen}
+          onOpenChange={setAssumptionsOpen}
+          assumptions={ranges.assumptions}
+        />
+      ) : null}
     </div>
   );
 }
