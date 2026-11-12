@@ -1,6 +1,7 @@
 import { Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { NarrativeError } from '@/hooks/use-report-narrative';
+import { AI_CONNECTION_HREF } from '@/lib/user-ai-key';
 
 interface Props {
   loading: boolean;
@@ -19,8 +20,13 @@ export function NarrativePrompt({ loading, error, onGenerate }: Props) {
       {error && (
         <p role="alert" className="text-xs text-red-400">
           {error.message}
+          {(error.connectKey || error.fixKey) && (
+            <a href={AI_CONNECTION_HREF} className="ml-2 font-semibold text-indigo-300 underline">
+              {error.connectKey ? 'Connect your key' : 'Check your key'}
+            </a>
+          )}
           {error.limit && (
-            <a href="/pricing" className="ml-2 font-semibold text-indigo-300 underline">
+            <a href="/pricing" className="ml-2 text-slate-400 underline">
               See plans
             </a>
           )}

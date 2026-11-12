@@ -78,3 +78,14 @@ describe('Settings plan section', () => {
     expect(buttons(el)).toEqual(['Current plan (disabled)', 'Upgrade to Pro', 'Upgrade to Enterprise']);
   });
 });
+
+describe('Settings AI connection', () => {
+  it('shows the AI connection card, on the shared trial until a key is connected', async () => {
+    localStorage.removeItem('mediaplan-user-ai-key');
+    const el = await renderSettings();
+    const card = el.querySelector('#ai-connection')!;
+    expect(card.querySelector('h2')?.textContent).toBe('AI connection');
+    expect(card.textContent).toContain('Using the shared trial: limited to a few messages a day for all users');
+    expect(card.querySelector('input[type="password"]')).not.toBeNull();
+  });
+});

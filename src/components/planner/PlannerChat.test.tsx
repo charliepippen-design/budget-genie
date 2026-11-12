@@ -9,6 +9,7 @@ vi.mock('@clerk/clerk-react', () => ({
 import { PlannerChat, ToolCard } from '@/components/planner/PlannerChat';
 import { useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { CurrencyProvider } from '@/contexts/CurrencyContext';
+import { setUserAIKey } from '@/lib/user-ai-key';
 
 const Chat = () => (
   <CurrencyProvider>
@@ -180,6 +181,93 @@ describe('PlannerChat', () => {
     });
     await act(async () => {
       await vi.waitFor(() => expect(container.querySelector('a[href="/auth"]')).not.toBeNull());
+    });
+  });
+
+  describe('own Gemini key (BYOK)', () => {
+    const KEY = `AIza${'Ab1_-'.repeat(6)}wxyz9`; // right shape, not a real key
+    const fail = (status: number, body: unknown) => () => Promise.resolve(new Response(JSON.stringify(body), { status }));
+    const prompt = () => container.querySelector('[data-testid="byok-prompt"]');
+    const footer = () => container.querySelector('[data-testid="ai-connection-link"]')!;
+
+    it.each([
+      ['FREE_TIER_LIMIT', { error: 'You have used all 10 free AI messages for this month.', code: 'FREE_TIER_LIMIT', used: 10, limit: 10 }],
+      ['AI_RATE_LIMITED', { error: 'The AI usage limit has been reached for now.', code: 'AI_RATE_LIMITED' }],
+    ])('turns the shared-trial limit (%s) into a prompt to connect a key', async (_code, body) => {
+      vi.stubGlobal('fetch', vi.fn(fail(429, body)));
+      act(() => root.render(<Chat />));
+      await typeAndSend('hello');
+      await act(async () => {
+        await vi.waitFor(() => expect(prompt()).not.toBeNull());
+      });
+      expect(prompt()!.textContent).toContain('The shared AI trial has reached its limit. Connect your own free Gemini key to keep going.');
+      expect(prompt()!.textContent).not.toContain(body.error);
+      const connect = prompt()!.querySelector('a')!;
+      expect(connect.textContent).toBe('Connect your key');
+      expect(connect.getAttribute('href')).toBe('/settings#ai-connection');
+      // A paid plan is never the only way on, and never the first one offered.
+      expect(prompt()!.textContent).not.toMatch(/upgrade/i);
+      expect(prompt()!.querySelector('a')!.getAttribute('href')).not.toBe('/pricing');
+    });
+
+    it('once a key is connected, the limit prompt offers a retry that sends the key', async () => {
+      const fetchMock = vi
+        .fn()
+        .mockImplementationOnce(fail(429, { error: 'x', code: 'FREE_TIER_LIMIT' }))
+        .mockImplementationOnce(() => reply({ text: 'Working on your key.', toolCalls: [], raw: [] }));
+      vi.stubGlobal('fetch', fetchMock);
+      act(() => root.render(<Chat />));
+      await typeAndSend('hello');
+      await act(async () => {
+        await vi.waitFor(() => expect(prompt()).not.toBeNull());
+      });
+      expect(fetchMock.mock.calls[0][1].headers).not.toHaveProperty('x-user-ai-key');
+      const retryWithKey = () => [...container.querySelectorAll('button')].find((b) => b.textContent === 'Retry with your key');
+      expect(retryWithKey()).toBeUndefined();
+
+      await act(async () => void setUserAIKey(KEY)); // what "Test and save" does in Settings
+      await act(async () => {
+        retryWithKey()!.click();
+      });
+      await act(async () => {
+        await vi.waitFor(() => expect(container.textContent).toContain('Working on your key.'));
+      });
+      expect(fetchMock.mock.calls[1][1].headers['x-user-ai-key']).toBe(KEY);
+      expect(prompt()).toBeNull();
+    });
+
+    it.each([
+      ['user_key_invalid', 403, 'Google rejected your Gemini key. It may be mistyped, revoked or restricted. Check it in Google AI Studio.'],
+      ['user_key_quota', 429, 'Your Gemini key has reached its Google quota. Wait for it to reset, or enable billing on your Google account for more.'],
+      ['user_key_model', 400, 'Your Gemini key cannot use the AI model this app needs. Create a new key in Google AI Studio and try again.'],
+    ])("shows the user key's own error (%s) with a link to the key, not the shared-trial prompt", async (code, status, error) => {
+      setUserAIKey(KEY);
+      vi.stubGlobal('fetch', vi.fn(fail(status, { error, code })));
+      act(() => root.render(<Chat />));
+      await typeAndSend('hello');
+      await act(async () => {
+        await vi.waitFor(() => expect(container.textContent).toContain(error));
+      });
+      expect(prompt()).toBeNull();
+      expect(container.textContent).not.toContain('shared AI trial has reached');
+      const link = [...container.querySelectorAll('a')].find((a) => a.textContent === 'Check your key')!;
+      expect(link.getAttribute('href')).toBe('/settings#ai-connection');
+      expect(container.querySelector('a[href="/pricing"]')).toBeNull();
+      expect(container.textContent).not.toContain(KEY);
+    });
+
+    it('has a compact link to the AI connection card and a disclosure that follows the mode', async () => {
+      act(() => root.render(<Chat />));
+      expect(footer().textContent).toBe('Using the shared AI trial. Connect your own key');
+      expect(footer().querySelector('a')!.getAttribute('href')).toBe('/settings#ai-connection');
+      expect(container.textContent).toContain("through the free tier of Google's API");
+      expect(container.textContent).not.toContain('AI replies use your own Google Gemini key');
+
+      await act(async () => void setUserAIKey(KEY));
+      expect(footer().textContent).toBe('Using your Gemini key ····xyz9. Manage');
+      expect(container.textContent).toContain("AI replies use your own Google Gemini key; Google's terms for your account apply.");
+      expect(container.textContent).not.toContain("through the free tier of Google's API");
+      expect(container.textContent).not.toContain(KEY);
     });
   });
 

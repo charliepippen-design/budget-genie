@@ -35,6 +35,7 @@ import {
   type QuickStartField,
   type QuickStartForm,
 } from '@/lib/quick-start';
+import { AI_CONNECTION_HREF } from '@/lib/user-ai-key';
 import { WIZARD_MAX_BUDGET, WIZARD_MIN_BUDGET, isValidBudget, parseBudgetInput } from '@/lib/wizard-budget';
 import { useOnboardingDraftStore } from '@/store/useOnboardingDraftStore';
 
@@ -54,7 +55,7 @@ type AiStatus =
   | { kind: 'idle' }
   | { kind: 'loading' }
   | { kind: 'filled'; fields: QuickStartField[]; skippedMarkets: string[] }
-  | { kind: 'failed'; message: string };
+  | { kind: 'failed'; message: string; keyAction?: 'connect' | 'check' };
 
 const optionClass = (selected: boolean) =>
   `border transition-colors ${
@@ -141,7 +142,7 @@ export const QuickStart = () => {
     setAi({ kind: 'loading' });
     const result = await fillBriefWithAI(text, code, form.industry);
     if (!result.ok) {
-      setAi({ kind: 'failed', message: result.message });
+      setAi({ kind: 'failed', message: result.message, keyAction: result.keyAction });
       return;
     }
     setForm((prev) => ({ ...prev, ...result.patch }));
@@ -279,7 +280,16 @@ export const QuickStart = () => {
                 </span>
               </p>
             ) : null}
-            {ai.kind === 'failed' ? <p className="mt-3 text-sm text-amber-300">{ai.message}</p> : null}
+            {ai.kind === 'failed' ? (
+              <p className="mt-3 text-sm text-amber-300">
+                {ai.message}
+                {ai.keyAction ? (
+                  <a href={AI_CONNECTION_HREF} className="ml-2 font-semibold text-white underline underline-offset-2">
+                    {ai.keyAction === 'connect' ? 'Connect your key' : 'Check your key'}
+                  </a>
+                ) : null}
+              </p>
+            ) : null}
           </div>
         </section>
 

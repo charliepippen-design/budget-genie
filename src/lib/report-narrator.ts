@@ -143,7 +143,7 @@ export async function generateReportNarrative(
 Return ONLY a JSON object with the fields described above.`));
     return parsed.success ? parsed.data : null;
   } catch (err) {
-    // The free-tier cap is not a failure to hide: the caller shows the upgrade message.
+    // The free-tier cap is not a failure to hide: the caller shows how to keep going.
     if (isFreeTierLimit(err)) throw err;
     // Busy / rate-limited / unavailable are typed so the caller can say what happened and when to retry.
     if (aiErrorKind(err) !== 'generic') throw err;

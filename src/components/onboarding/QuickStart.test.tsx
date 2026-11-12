@@ -180,7 +180,8 @@ describe('QuickStart', () => {
     mockGenerateJSON.mockRejectedValueOnce(new AIError('Free AI limit reached for today.', 'FREE_TIER_LIMIT', 402));
     const el = await render();
     await describeAndFill(el, 'Online casino in Germany');
-    expect(aiStatus(el)).toContain('Free AI limit reached for today.');
+    expect(aiStatus(el)).toContain('The shared AI trial has reached its limit. Connect your own free Gemini key to keep going.');
+    expect(el.querySelector('[data-testid="ai-status"] a[href="/settings#ai-connection"]')?.textContent).toBe('Connect your key');
 
     mockGenerateJSON.mockResolvedValueOnce(null);
     await click(byText(el, 'button', 'Fill with AI'));
