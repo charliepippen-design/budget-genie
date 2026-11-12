@@ -1,6 +1,8 @@
 // AI gateway: the only place that holds the LLM key (runs as a Vercel Function).
 // Tasks are allow-listed; prompts live here, the browser only sends data.
 //
+// A signed-in user may send their own Gemini key per request instead (x-user-ai-key, see _user-key.ts).
+//
 // Env: GEMINI_API_KEY (required), GEMINI_MODEL and GEMINI_FALLBACK_MODEL (optional, see _models.ts),
 //      VITE_CLERK_PUBLISHABLE_KEY (used to verify signed-in users), ALLOW_ANON=true (local dev only)
 
@@ -9,6 +11,7 @@ import { geminiModels } from "./_models.js";
 import { admitRequest } from "./_usage.js";
 
 import { isModelExhausted, markModelExhausted } from "./_quota.js";
+import { readUserKey, redactKey, upstreamRetryAfter } from "./_user-key.js";
 
 const env = (k: string) => process.env[k];
 
@@ -37,17 +40,24 @@ const json = (body: unknown, status = 200) =>
 // ---------- Gemini ----------
 // Matches the "try again in a minute" wording of the busy message.
 const BUSY_RETRY_SECONDS = 60;
+// Google's wording for a key it does not accept (HTTP 400, reason API_KEY_INVALID).
+const INVALID_KEY_RE = /API_KEY_INVALID|API key not valid|API key expired/i;
 
-async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[] }> {
-  const key = env("GEMINI_API_KEY");
+async function callGemini(body: Record<string, unknown>, userKey: string | null = null): Promise<{ parts: Part[] }> {
+  // A user's own key (BYOK, see _user-key.ts) replaces the shared key for every call of the request.
+  const own = userKey !== null;
+  const key = userKey ?? env("GEMINI_API_KEY");
   if (!key) throw new Error("GEMINI_API_KEY is not configured");
 
   const errors: string[] = [];
   let quotaExhausted = false;
+  let modelMissing = false;
+  let retryAfter: number | undefined;
   // Retry transient overloads (429/503) once per model, then fall back to the next model.
   let attempted = 0;
   for (const model of geminiModels()) {
-    if (isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
+    // The exhaustion memo describes the shared key only: a user key neither reads nor writes it.
+    if (!own && isModelExhausted(model)) continue; // daily quota already spent, resets at midnight PT
     attempted++;
     for (let attempt = 0; attempt < 2; attempt++) {
       const startedAt = Date.now();
@@ -56,23 +66,45 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
         headers: { "Content-Type": "application/json", "x-goog-api-key": key },
         body: JSON.stringify(body),
       });
-      console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt });
+      console.info("ai_gemini_timing", { model, ms: Date.now() - startedAt, status: res.status, attempt, key: own ? "user" : "shared" });
       if (res.ok) {
         const data = await res.json();
         return { parts: data?.candidates?.[0]?.content?.parts ?? [] };
       }
-      const detail = await res.text();
+      const detail = redactKey(await res.text(), userKey);
       errors.push(`${model}: ${res.status} ${detail.slice(0, 300)}`);
-      if (res.status === 401 || res.status === 403) {
-        console.error("Gemini auth failed:", errors);
-        throw new GatewayError("The AI service key is invalid. The site owner needs to update it.", 503);
-      }
-      // A spent daily/monthly quota won't recover by retrying.
-      if (res.status === 429 && /quota/i.test(detail)) {
-        quotaExhausted = true;
-        // Only a per-day limit is worth remembering; a per-minute 429 recovers on its own.
-        if (/PerDay|per day/i.test(detail) || !/PerMinute|per minute/i.test(detail)) markModelExhausted(model);
-        break;
+      if (own) {
+        // Google answers a bad key with 400 API_KEY_INVALID, a blocked or restricted one with 401/403.
+        if (res.status === 401 || res.status === 403 || (res.status === 400 && INVALID_KEY_RE.test(detail))) {
+          console.error("Gemini refused a user key:", errors);
+          throw new GatewayError(
+            "Google rejected your Gemini key. It may be mistyped, revoked or restricted. Check it in Google AI Studio.",
+            403,
+            "user_key_invalid"
+          );
+        }
+        if (res.status === 404) {
+          modelMissing = true;
+          break;
+        }
+        // Their quota: no retry on the same model, the fallback model has its own bucket.
+        if (res.status === 429) {
+          quotaExhausted = true;
+          retryAfter = upstreamRetryAfter(res.headers.get("retry-after"), detail) ?? retryAfter;
+          break;
+        }
+      } else {
+        if (res.status === 401 || res.status === 403) {
+          console.error("Gemini auth failed:", errors);
+          throw new GatewayError("The AI service key is invalid. The site owner needs to update it.", 503);
+        }
+        // A spent daily/monthly quota won't recover by retrying.
+        if (res.status === 429 && /quota/i.test(detail)) {
+          quotaExhausted = true;
+          // Only a per-day limit is worth remembering; a per-minute 429 recovers on its own.
+          if (/PerDay|per day/i.test(detail) || !/PerMinute|per minute/i.test(detail)) markModelExhausted(model);
+          break;
+        }
       }
       if (res.status !== 429 && res.status !== 503) break;
       await new Promise((r) => setTimeout(r, 1500));
@@ -80,6 +112,21 @@ async function callGemini(body: Record<string, unknown>): Promise<{ parts: Part[
   }
   if (attempted === 0) quotaExhausted = true; // every model is exhausted: no fetch was made
   else console.error("Gemini failed:", errors);
+  if (own && quotaExhausted) {
+    throw new GatewayError(
+      "Your Gemini key has reached its Google quota. Wait for it to reset, or enable billing on your Google account for more.",
+      429,
+      "user_key_quota",
+      retryAfter
+    );
+  }
+  if (own && modelMissing) {
+    throw new GatewayError(
+      "Your Gemini key cannot use the AI model this app needs. Create a new key in Google AI Studio and try again.",
+      400,
+      "user_key_model"
+    );
+  }
   if (quotaExhausted) {
     throw new GatewayError(
       "The AI usage limit has been reached for now. Your plan and sliders still work; try the chat again later.",
@@ -222,7 +269,10 @@ FUNNEL LABELS: ${JSON.stringify(ctx.funnel ?? {})}
 PLAN STATE: ${JSON.stringify(ctx.plan ?? null)}`;
 }
 
-async function runPlanner(payload: { messages: AgentMessage[]; context: Record<string, unknown>; uiLang?: unknown }) {
+async function runPlanner(
+  payload: { messages: AgentMessage[]; context: Record<string, unknown>; uiLang?: unknown },
+  userKey: string | null = null
+) {
   const uiLang = payload.uiLang === "it" || payload.uiLang === "en" ? payload.uiLang : undefined;
   const ctx = payload.context ?? {};
   const decisions = getDecisionModel();
@@ -249,12 +299,15 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
   }
 
   const planThinking = thinkingConfig("AI_PLANNER_THINKING");
-  const { parts } = await callGemini({
-    systemInstruction: { parts: [{ text: plannerSystemPrompt(ctx) }] },
-    contents: toContents(payload.messages),
-    ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
-    ...(planThinking.thinkingConfig ? { generationConfig: planThinking } : {}),
-  });
+  const { parts } = await callGemini(
+    {
+      systemInstruction: { parts: [{ text: plannerSystemPrompt(ctx) }] },
+      contents: toContents(payload.messages),
+      ...(tools.length ? { tools: [{ functionDeclarations: tools }] } : {}),
+      ...(planThinking.thinkingConfig ? { generationConfig: planThinking } : {}),
+    },
+    userKey
+  );
   const result = splitParts(parts);
   result.text = stripFieldNames(result.text);
 
@@ -284,11 +337,14 @@ async function runPlanner(payload: { messages: AgentMessage[]; context: Record<s
 // ---------- Task: json (onboarding refinement, report narrative) ----------
 // The prompt is built by the app; output is forced to JSON and validated client-side.
 
-async function runJson(payload: { prompt: string }) {
-  const { parts } = await callGemini({
-    contents: [{ role: "user", parts: [{ text: String(payload.prompt ?? "").slice(0, MAX_PROMPT) }] }],
-    generationConfig: { responseMimeType: "application/json", ...thinkingConfig("AI_JSON_THINKING") },
-  });
+async function runJson(payload: { prompt: string }, userKey: string | null = null) {
+  const { parts } = await callGemini(
+    {
+      contents: [{ role: "user", parts: [{ text: String(payload.prompt ?? "").slice(0, MAX_PROMPT) }] }],
+      generationConfig: { responseMimeType: "application/json", ...thinkingConfig("AI_JSON_THINKING") },
+    },
+    userKey
+  );
   return splitParts(parts);
 }
 
@@ -299,6 +355,11 @@ export async function handleAIRequest(req: Request): Promise<Response> {
   const session = await verifyClerkSession(req);
   if (!session) return json({ error: "Sign in to use the AI planner." }, 401);
 
+  // Optional own key (BYOK). A malformed header is refused, never silently replaced by the shared key.
+  const userKey = readUserKey(req);
+  if (!userKey.ok) return json({ error: userKey.message, code: "user_key_malformed" }, 400);
+  const ownKey = userKey.key;
+
   try {
     const body = await req.json();
     const messages = trimHistory(Array.isArray(body.messages) ? body.messages : []);
@@ -306,19 +367,21 @@ export async function handleAIRequest(req: Request): Promise<Response> {
     if (body.task !== "planner" && body.task !== "json") return json({ error: "Unknown task" }, 400);
 
     // Free-tier cap (see _usage.ts). Paid and superuser accounts pass straight through.
-    const admit = await admitRequest(session.userId, session.claims, body.turnId);
-    if (!admit.ok) {
+    // With an own key the request spends the user's Google quota, so the cap is neither checked nor counted.
+    const admit = ownKey ? null : await admitRequest(session.userId, session.claims, body.turnId);
+    if (admit && !admit.ok) {
       return json({ error: admit.message, code: admit.code, used: admit.used, limit: admit.limit }, admit.status);
     }
 
     const result =
       body.task === "planner"
-        ? await runPlanner({ messages, context: body.context, uiLang: body.uiLang })
-        : await runJson({ prompt: body.prompt });
-    await admit.commit();
+        ? await runPlanner({ messages, context: body.context, uiLang: body.uiLang }, ownKey)
+        : await runJson({ prompt: body.prompt }, ownKey);
+    if (admit?.ok) await admit.commit();
     return json(result);
   } catch (err) {
-    console.error("ai-gateway error:", err);
+    // With an own key only a redacted string is logged, never the error object.
+    console.error("ai-gateway error:", ownKey ? redactKey(err instanceof Error ? (err.stack ?? err.message) : String(err), ownKey) : err);
     if (err instanceof GatewayError) {
       const res = json({ error: err.message, code: err.code, retryAfterSeconds: err.retryAfterSeconds }, err.status);
       if (err.retryAfterSeconds) res.headers.set("Retry-After", String(err.retryAfterSeconds));

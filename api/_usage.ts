@@ -257,7 +257,7 @@ export async function admitRequest(
       ok: false,
       status: 429,
       code: "FREE_TIER_LIMIT",
-      message: `You have used all ${check.limit} free AI messages for this month. Upgrade for unlimited AI planning.`,
+      message: `You have used all ${check.limit} free AI messages for this month. Connect your own Gemini key in Settings to keep going.`,
       used: check.used,
       limit: check.limit,
     };

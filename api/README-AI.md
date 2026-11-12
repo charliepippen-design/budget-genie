@@ -28,3 +28,37 @@ Gemini calls send `generationConfig.thinkingConfig.thinkingLevel` so each round 
 |---|---|---|---|
 | `AI_PLANNER_THINKING` | `minimal` / `low` / `medium` / `high` / `default` | `low` | Thinking level for planner chat calls. `default` sends nothing, so the model uses its own default (medium). |
 | `AI_JSON_THINKING` | same | `low` | Same for the `json` task (onboarding refinement, report narrative). |
+
+## Bring your own key (BYOK)
+
+The shared `GEMINI_API_KEY` is a small trial: one free-tier quota for all users. A signed-in user can instead send their own Google Gemini API key with each request (created at https://aistudio.google.com/apikey; it has its own quota, and billing on it is between the user and Google).
+
+**Request header:** `x-user-ai-key: <key>` (optional). Shape: `AIza` + 35 URL-safe characters. Anything else is refused with `400 user_key_malformed`; the gateway never falls back to the shared key for a request that carried a header.
+
+| | Shared key (no header) | User key (header) |
+|---|---|---|
+| Key sent to Google | `GEMINI_API_KEY` | the header value, for every Gemini call of the request (both models, retries) |
+| Clerk session | required | required |
+| Per-user rate guard (`_quota.ts`: daily count, in-flight) | on | on |
+| Request-size limits (`MAX_MESSAGES`, `MAX_TEXT`, `MAX_PROMPT`) | on | on |
+| Free-tier monthly cap (`_usage.ts`) | on | skipped: not checked, not counted |
+| "Model exhausted" memo (`_quota.ts`) | read and written | neither read nor written |
+| Decision layer (`AI_DECISIONS`) | unchanged | unchanged (it uses the site's Vercel AI Gateway credentials, not Gemini) |
+
+**Errors with a user key** (`{ error, code }`; the shared-key codes `FREE_TIER_LIMIT` and `AI_RATE_LIMITED` are never returned for these requests):
+
+| Google answers | Gateway answers | Meaning |
+|---|---|---|
+| 400 with `API_KEY_INVALID` / "API key not valid" / "API key expired", or any 401 / 403 | `403 user_key_invalid` | Key mistyped, revoked, expired or restricted. No retry, no second model. |
+| 429 on every model | `429 user_key_quota`, with `Retry-After` and `retryAfterSeconds` when Google gives a wait (`Retry-After` header or `RetryInfo.retryDelay`) | The user's quota is spent. |
+| 404 on every model | `400 user_key_model` | The key's project cannot use the configured models. |
+| anything else | `503 AI_BUSY` as today | |
+
+**Security properties** (tests in `src/lib/ai-byok-gateway.test.ts`):
+
+- The key lives in the request only. Nothing writes it to a store, a usage record or a cache; there is no server-side copy.
+- It is never logged: `ai_gemini_timing` records `key: "user" | "shared"`, never the value. Google's error text is passed through `redactKey` before it is logged, and with a user key the catch-all logs a redacted string instead of the error object. A test captures every console call across all error paths, with an upstream that echoes the key, and searches the output for it.
+- It is never returned: error bodies are fixed texts, and the same test searches response bodies and headers.
+- It is sent to Google in the `x-goog-api-key` header, never in a URL.
+- Same-origin only, as before: the gateway sets no CORS headers, so a browser on another origin cannot send the custom header (the preflight fails).
+- In the browser the key is kept in `localStorage` (`mediaplan-user-ai-key`, see `src/lib/user-ai-key.ts`), for that browser only. It is not part of debug exports (`DEBUG_EXPORT_KEYS`) or cloud sync, and is sent only to `/api/ai-gateway`.
