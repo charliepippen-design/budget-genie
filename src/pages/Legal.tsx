@@ -1,6 +1,11 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
-import { AI_PRIVACY_PARAGRAPH, AI_PRIVACY_PARAGRAPH_IT } from '@/lib/ai-disclosure';
+import {
+  AI_PRIVACY_OWN_KEY_PARAGRAPH,
+  AI_PRIVACY_OWN_KEY_PARAGRAPH_IT,
+  AI_PRIVACY_PARAGRAPH,
+  AI_PRIVACY_PARAGRAPH_IT,
+} from '@/lib/ai-disclosure';
 
 // Public legal pages (/terms, /refund-policy, /privacy), linked from the landing and pricing pages.
 // Payment providers review these during merchant onboarding: keep the operator details accurate.
@@ -170,8 +175,10 @@ function Privacy() {
       </Section>
       <Section title="AI assistant and data use">
         <p>{AI_PRIVACY_PARAGRAPH}</p>
+        <p>{AI_PRIVACY_OWN_KEY_PARAGRAPH}</p>
         <p lang="it">
-          <strong>Assistente AI e uso dei dati (italiano).</strong> {AI_PRIVACY_PARAGRAPH_IT}
+          <strong>Assistente AI e uso dei dati (italiano).</strong> {AI_PRIVACY_PARAGRAPH_IT}{' '}
+          {AI_PRIVACY_OWN_KEY_PARAGRAPH_IT}
         </p>
       </Section>
       <Section title="Why we use it">

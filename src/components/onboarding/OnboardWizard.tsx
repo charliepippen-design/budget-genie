@@ -19,8 +19,7 @@ import {
   type OnboardingAIResult,
 } from '@/lib/onboarding-ai';
 import { IgamingSubvertical, Vertical, VERTICAL_PRESETS } from '@/lib/vertical-presets';
-import { AI_DISCLOSURE_SHORT, AI_DISCLOSURE_SHORT_IT } from '@/lib/ai-disclosure';
-import { getUiLang } from '@/lib/ai-client';
+import { AIDisclosureNote } from '@/components/common/AIDisclosureNote';
 import { ConfirmDialog, type ConfirmRequest } from '@/components/common/ConfirmDialog';
 import {
   BUDGET_TIERS,
@@ -800,8 +799,7 @@ export const OnboardWizard = () => {
               </div>
             </div>
             <div className="mt-4 space-y-1 text-xs text-slate-500">
-              <p>{AI_DISCLOSURE_SHORT}</p>
-              {getUiLang() === 'it' && <p lang="it">{AI_DISCLOSURE_SHORT_IT}</p>}
+              <AIDisclosureNote />
             </div>
           </section>
         )}

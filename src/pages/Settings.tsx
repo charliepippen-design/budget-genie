@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { Separator } from '@/components/ui/separator';
 import { SubscriptionTier, useMediaPlanStore } from '@/hooks/use-media-plan-store';
 import { UpgradeGatewayModal } from '@/components/settings/UpgradeGatewayModal';
+import { AIConnectionCard } from '@/components/settings/AIConnectionCard';
 import { cn } from '@/lib/utils';
 import { BrandLogo } from '@/components/common/BrandLogo';
 import { EngineSwitch } from '@/components/settings/EngineSwitch';
@@ -537,6 +538,7 @@ export default function Settings() {
 
           {/* Dev / QA engine switch: renders nothing in a production build. */}
           <EngineSwitch />
+          <AIConnectionCard className="md:col-span-2" />
 
           {/* Internal billing debug card: never shown to customers. */}
           {import.meta.env.DEV ? (

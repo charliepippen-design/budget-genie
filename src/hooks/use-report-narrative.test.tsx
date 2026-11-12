@@ -165,7 +165,11 @@ describe('useReportNarrative', () => {
       await api.generate();
     });
     expect(api.loading).toBe(false);
-    expect(api.error).toEqual({ message: 'Limit reached', limit: true });
+    expect(api.error).toEqual({
+      message: 'The shared AI trial has reached its limit. Connect your own free Gemini key to keep going.',
+      limit: true,
+      connectKey: true,
+    });
   });
 
   it('says the AI is busy, with the wait, instead of a generic failure', async () => {
