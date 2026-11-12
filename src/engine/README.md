@@ -10,7 +10,10 @@ store ──selectEngineInput──▶ EngineInput ──engine.compute──▶
 |---|---|
 | `contract.ts` | `EngineInput`, `EngineResult`, `PlanEngine`. The contract the real engine must meet. |
 | `placeholder-engine.ts` | Today's heuristics (`computePlanSnapshot`, `plan-economics`, `ltv-model`, `planning-insights`) wrapped to the contract. Numbers are illustrative. |
-| `registry.ts` | `getEngine` / `setEngine`: the single switch. |
+| `registry.ts` | `getEngine` / `setEngine` / `setEngineById`: the single switch, and the `engines` map (`placeholder`, `response-curve`). |
+| `optimise.ts` | `OptimiseOptions` / `OptimiseResult` for the optional `PlanEngine.optimise`. |
+| `v1/` | The response-curve engine: prior-based response curves, ranges, value over time, optimiser. Not the default. See `v1/README.md`. |
+| `port-conformance.tsx` | `describeEnginePort(engine)`: the shape, purity and swap tests any engine must pass. |
 | `use-plan-result.ts` | `usePlanResult()` for components, `computePlanResult(state)` outside React, `selectEngineInput` (store → input). |
 
 ## Timeline and what-if
@@ -34,11 +37,25 @@ lab controls + sandbox store ──selectWhatIfInput──▶ WhatIfInput ──
 
 The multi-month store's actions ask the engine too: `generateMonths` / `applyPattern` / `setGlobalSettings` take month budgets from `TimelineResult.patternBudgets`, new months start from `baseChannels`, and `runOptimization` ranks `optimisation`.
 
-## Plugging in the real engine
+## Engines and how one is selected
+
+`placeholderEngine` is the default and what customers see. `responseCurveEngine` (`v1/`) is registered next to it and selected only on request:
+
+- In code: `setEngineById('response-curve')`.
+- For dev / QA, without a build: `localStorage['mediaplan-engine'] = 'response-curve'`, then reload. `App.tsx` calls `selectEngineFromStorage()` once at startup. Remove the key to go back. There is no UI for this.
+
+## Optional parts of the contract
+
+- `EngineResult.ranges` (and `TimelineResult.ranges`, `WhatIfResult.ranges`): P10 / P50 / P90 around the headline figures, with the assumptions behind them. Engines that give point estimates leave it undefined (the placeholder does).
+- `PlanEngine.optimise(input, { goal, constraints })`: a better split of the budget across channels. Optional; the placeholder does not implement it.
+
+No screen reads either yet.
+
+## Plugging in another engine
 
 1. Implement `PlanEngine` (`compute`, `computeTimeline` and `computeWhatIf` must be pure: no store, storage or network reads).
-2. Call `setEngine(realEngine)` once at startup.
-3. Run `src/engine/engine-port.test.tsx`, `timeline-port.test.tsx` and `what-if-port.test.tsx` against it (shape and purity tests apply to any engine; the parity tests pin the placeholder).
+2. Add it to `engines` in `registry.ts`.
+3. Run the conformance suite against it: a test file with `describeEnginePort(yourEngine)` (see `placeholder-conformance.test.tsx`, `v1/conformance.test.tsx`). `engine-port.test.tsx`, `timeline-port.test.tsx` and `what-if-port.test.tsx` additionally pin the placeholder's formulas.
 
 ## Rules for screens
 
