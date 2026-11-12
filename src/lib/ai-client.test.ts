@@ -101,7 +101,7 @@ describe('own Gemini key (BYOK)', () => {
   it('never sends a stored value of the wrong shape', async () => {
     const fetchMock = okFetch();
     vi.stubGlobal('fetch', fetchMock);
-    localStorage.setItem(USER_AI_KEY_STORAGE, 'garbage');
+    localStorage.setItem(USER_AI_KEY_STORAGE, 'gar bage');
     await callAI('json', { prompt: 'x' }, 't');
     expect(sent(fetchMock).headers).not.toHaveProperty(USER_AI_KEY_HEADER);
   });

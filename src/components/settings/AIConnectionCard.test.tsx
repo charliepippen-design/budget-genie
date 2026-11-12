@@ -89,6 +89,7 @@ describe('AI connection card', () => {
   it.each([
     ['an invalid key', 403, { error: 'Google rejected your Gemini key. It may be mistyped, revoked or restricted. Check it in Google AI Studio.', code: 'user_key_invalid' }, /Google rejected your Gemini key/],
     ['a key out of quota', 429, { error: 'Your Gemini key has reached its Google quota.', code: 'user_key_quota', retryAfterSeconds: 34 }, /reached its Google quota\. Try again in 34 seconds/],
+    ['Google overloaded', 503, { error: 'The AI model is busy or unavailable right now. Please try again in a minute.', code: 'AI_BUSY', retryAfterSeconds: 60 }, /Google is busy right now.*It was not rejected/],
     ['a key without the model', 400, { error: 'Your Gemini key cannot use the AI model this app needs.', code: 'user_key_model' }, /cannot use the AI model/],
   ])('Test and save with %s shows the precise error and saves nothing', async (_name, statusCode, body, expected) => {
     vi.stubGlobal('fetch', gateway(statusCode as number, body));
@@ -115,10 +116,20 @@ describe('AI connection card', () => {
     const fetchMock = success();
     vi.stubGlobal('fetch', fetchMock);
     const el = await mount(<AIConnectionCard />);
-    await testAndSave(el, 'my-password-123');
+    await testAndSave(el, 'pasted with spaces');
     expect(feedback(el)).toMatch(/does not look like a Gemini API key/);
     expect(fetchMock).not.toHaveBeenCalled();
     expect(localStorage.getItem(USER_AI_KEY_STORAGE)).toBeNull();
+  });
+
+  it('accepts the newer Google key format ("AQ." prefix, longer) and lets the test call decide', async () => {
+    const newer = `AQ.${'Ab1_-'.repeat(11)}`;
+    const fetchMock = success();
+    vi.stubGlobal('fetch', fetchMock);
+    const el = await mount(<AIConnectionCard />);
+    await testAndSave(el, newer);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(localStorage.getItem(USER_AI_KEY_STORAGE)).toBe(newer);
   });
 
   it('Remove key goes back to the shared trial', async () => {

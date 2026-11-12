@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { ExternalLink, KeyRound, Loader2 } from 'lucide-react';
-import { aiErrorMessage, callAI } from '@/lib/ai-client';
+import { aiErrorKind, aiErrorMessage, callAI } from '@/lib/ai-client';
 import { cn } from '@/lib/utils';
 import {
   AI_STUDIO_KEY_URL,
@@ -53,7 +53,7 @@ export function AIConnectionCard({ className }: { className?: string }) {
     const key = candidate.trim();
     if (!key || testing) return;
     if (!isUserAIKeyShape(key)) {
-      setFeedback({ tone: 'error', text: 'That does not look like a Gemini API key. It starts with "AIza" and is 39 characters long.' });
+      setFeedback({ tone: 'error', text: 'That does not look like a Gemini API key. Paste the whole key, with no spaces.' });
       return;
     }
     setTesting(true);
@@ -67,7 +67,12 @@ export function AIConnectionCard({ className }: { className?: string }) {
         setFeedback({ tone: 'error', text: 'The key works, but this browser would not save it. Check that site storage is not blocked.' });
       }
     } catch (err) {
-      setFeedback({ tone: 'error', text: `${aiErrorMessage(err, 'The test did not work.')} The key was not saved.` });
+      // Google overloaded or slow: it did not judge the key, so say that instead of a generic failure.
+      const text =
+        aiErrorKind(err) === 'busy'
+          ? 'Google is busy right now, so the key could not be tested. It was not rejected. Try again in a minute.'
+          : aiErrorMessage(err, 'The test did not work.');
+      setFeedback({ tone: 'error', text: `${text} The key was not saved.` });
     } finally {
       setTesting(false);
     }
@@ -124,7 +129,7 @@ export function AIConnectionCard({ className }: { className?: string }) {
               setCandidate(e.target.value);
               setFeedback(null);
             }}
-            placeholder="AIza…"
+            placeholder="Paste your key"
             className="h-10 w-full min-w-0 rounded-full border border-slate-700 bg-[#1c1c1c] px-4 font-mono text-sm text-white placeholder:text-slate-500 focus:border-slate-400 focus:outline-none"
           />
           <div className="flex flex-wrap gap-2">
