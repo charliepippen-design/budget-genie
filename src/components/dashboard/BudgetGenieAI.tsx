@@ -7,6 +7,8 @@ import {
   GitCompare,
   Globe2,
   LayoutDashboard,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings2,
   Table2,
 } from 'lucide-react';
@@ -69,6 +71,15 @@ const WORKSPACE_TABS = [
 ] as const;
 type WorkspaceTab = (typeof WORKSPACE_TABS)[number]['id'];
 const WORKSPACE_TAB_KEY = 'mediaplan-workspace-tab';
+const RAIL_EXPANDED_KEY = 'mediaplan-rail-expanded';
+
+function readRailExpanded(): boolean {
+  try {
+    return localStorage.getItem(RAIL_EXPANDED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
 
 function readSavedTab(): WorkspaceTab {
   try {
@@ -105,8 +116,22 @@ export const BudgetGenieAI = () => {
       // storage unavailable: the tab just isn't remembered
     }
   }, []);
+  // The rail remembers whether the user wants names next to the icons.
+  const [railExpanded, setRailExpanded] = useState(readRailExpanded);
+  const toggleRail = useCallback(() => {
+    setRailExpanded((expanded) => {
+      try {
+        localStorage.setItem(RAIL_EXPANDED_KEY, expanded ? '0' : '1');
+      } catch {
+        // storage unavailable: the choice just isn't remembered
+      }
+      return !expanded;
+    });
+  }, []);
+  const railIconClass = 'h-[18px] w-[18px] shrink-0';
   const railButtonClass = cn(
-    'flex h-10 min-h-0 w-10 items-center justify-center rounded-xl transition-colors',
+    'flex h-10 min-h-0 items-center rounded-xl text-sm font-medium transition-colors',
+    railExpanded ? 'w-full gap-3 px-3' : 'w-10 justify-center',
     isDark ? 'text-slate-500 hover:bg-slate-900 hover:text-white' : 'text-slate-500 hover:bg-white hover:text-slate-900'
   );
   const railActiveClass = isDark ? 'bg-slate-800 text-white' : 'bg-white text-slate-900 shadow-sm';
@@ -203,12 +228,26 @@ export const BudgetGenieAI = () => {
           />
         )}
 
-        {/* ICON RAIL: the workspace areas, then assumptions and account settings */}
+        {/* RAIL: the workspace areas, then assumptions. Collapsed it shows icons; expanded, icons and names. */}
         <nav
           aria-label="Workspace"
-          className="hidden w-[60px] shrink-0 flex-col items-center gap-1 py-3 md:flex"
+          className={cn(
+            'hidden shrink-0 flex-col gap-1 py-3 transition-[width] duration-200 md:flex',
+            railExpanded ? 'w-[184px] px-2' : 'w-[60px] items-center'
+          )}
         >
-          <div role="tablist" aria-orientation="vertical" className="flex flex-col items-center gap-1">
+          <button
+            type="button"
+            onClick={toggleRail}
+            aria-expanded={railExpanded}
+            aria-label={railExpanded ? 'Collapse menu' : 'Expand menu'}
+            title={railExpanded ? 'Collapse menu' : 'Expand menu: show the names'}
+            className={cn(railButtonClass, 'mb-2')}
+          >
+            {railExpanded ? <PanelLeftClose className={railIconClass} /> : <PanelLeftOpen className={railIconClass} />}
+            {railExpanded ? <span className="truncate">Collapse</span> : null}
+          </button>
+          <div role="tablist" aria-orientation="vertical" className="flex flex-col gap-1">
             {WORKSPACE_TABS.map(({ id, label, icon: Icon }) => (
               <button
                 key={id}
@@ -216,24 +255,26 @@ export const BudgetGenieAI = () => {
                 role="tab"
                 aria-selected={tab === id}
                 aria-label={label}
-                title={label}
+                title={railExpanded ? undefined : label}
                 onClick={() => selectTab(id)}
                 className={cn(railButtonClass, tab === id && railActiveClass)}
               >
-                <Icon className="h-[18px] w-[18px]" />
+                <Icon className={railIconClass} />
+                {railExpanded ? <span className="truncate">{label}</span> : null}
               </button>
             ))}
           </div>
-          <div className="mt-auto flex flex-col items-center gap-1">
+          <div className="mt-auto flex flex-col gap-1">
             <button
               type="button"
               onClick={() => setIsSidebarOpen((open) => !open)}
               aria-pressed={isSidebarOpen}
               aria-label="Assumptions"
-              title="Assumptions: targets, multipliers and the channel list"
+              title={railExpanded ? 'Targets, multipliers and the channel list' : 'Assumptions: targets, multipliers and the channel list'}
               className={cn(railButtonClass, isSidebarOpen && railActiveClass)}
             >
-              <Settings2 className="h-[18px] w-[18px]" />
+              <Settings2 className={railIconClass} />
+              {railExpanded ? <span className="truncate">Assumptions</span> : null}
             </button>
           </div>
         </nav>
